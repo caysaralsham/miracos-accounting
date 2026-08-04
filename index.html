@@ -213,6 +213,7 @@
   .receipt-view th{background:var(--ink); color:#EDEAE1;}
 
   @media print{
+    #loginScreen, .app, .toast{ display:none !important; }
     body *{ visibility:hidden; }
     #receiptPrintArea, #receiptPrintArea *,
     #invoicePrintArea, #invoicePrintArea *,
@@ -1953,7 +1954,7 @@ function viewInvoice(id){
     document.getElementById('invoicePrintArea').innerHTML = `
       <div class="receipt-top">
         <div class="receipt-brand">
-          <img src="${settings.logo}" style="width:5cm; height:6cm; object-fit:contain;">
+          <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
           <div>
             <div class="name" style="font-size:16px;">${settings.companyName} — ${settings.companyDesc}</div>
             <div class="meta" style="font-size:11px; line-height:1.5;">${settings.address} · ${settings.phone}</div>
@@ -2009,7 +2010,7 @@ function viewInvoice(id){
   document.getElementById('invoicePrintArea').innerHTML = `
     <div class="receipt-top" style="direction:ltr; text-align:left;">
       <div class="receipt-brand">
-        <img src="${settings.logo}" style="width:5cm; height:6cm; object-fit:contain;">
+        <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
         <div>
           <div class="name" style="font-size:16px;">${settings.companyName} — ${settings.companyDesc}</div>
           <div class="meta" style="font-size:10.5px; line-height:1.5;">${settings.address} · ${settings.phone} · RC: ${settings.rc||''} · NIF: ${settings.nif||''}</div>
