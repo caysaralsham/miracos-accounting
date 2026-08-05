@@ -7,6 +7,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="ميراكوس">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#21262B">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -2350,6 +2354,12 @@ document.getElementById('btnPrintExpenseLedger').addEventListener('click', ()=>{
 document.getElementById('btnPrintLedger').addEventListener('click', ()=>window.print());
 
 document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ar-DZ', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('sw.js').catch(err=> console.error('SW registration failed', err));
+  });
+}
 
 (async function init(){
   await loadAll();
