@@ -141,10 +141,10 @@
   .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;}
 
   table{width:100%; border-collapse:collapse; font-size:13.5px;}
-  #receiptsTableWrap, #invoicesTableWrap, #expensesTableWrap, #deliveryTrackWrap{
+  #receiptsTableWrap, #invoicesTableWrap, #expensesTableWrap, #deliveryTrackWrap, #measurementsTableWrap{
     overflow-x:auto; -webkit-overflow-scrolling:touch;
   }
-  #receiptsTableWrap table, #invoicesTableWrap table, #expensesTableWrap table, #deliveryTrackWrap table{
+  #receiptsTableWrap table, #invoicesTableWrap table, #expensesTableWrap table, #deliveryTrackWrap table, #measurementsTableWrap table{
     min-width:640px;
   }
   th,td{padding:10px 10px; text-align:right; border-bottom:1px solid var(--line);}
@@ -205,13 +205,24 @@
   .receipt-view table{font-size:15.5px;}
   .receipt-view th{background:var(--ink); color:#EDEAE1;}
 
+  .meas-table-box{border:1px solid var(--line); border-radius:9px; padding:12px 14px; margin-top:14px; background:var(--marble-2);}
+  .meas-table-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .meas-table-head .meas-title{font-size:14px; font-weight:700; color:var(--brass-deep);}
+  .meas-row-grid{display:grid; grid-template-columns:26px minmax(0,1fr) 1fr 1fr 1fr 110px 30px; gap:6px; align-items:center; margin-bottom:5px;}
+  .meas-row-grid input[disabled]{background:var(--stone); color:var(--text-dim);}
+  .meas-result{font-size:13px; font-weight:700; color:var(--brass-deep); text-align:center;}
+  .meas-print-table{width:100%; border-collapse:collapse; font-size:13px; margin-top:6px;}
+  .meas-print-table th, .meas-print-table td{border:1px solid var(--line); padding:6px 8px; text-align:center;}
+  .meas-print-table th{background:var(--ink); color:#EDEAE1;}
+
   @media print{
     #loginScreen, .app, .toast{ display:none !important; }
     body *{ visibility:hidden; }
     #receiptPrintArea, #receiptPrintArea *,
     #invoicePrintArea, #invoicePrintArea *,
-    #ledgerPrintArea, #ledgerPrintArea *{ visibility:visible; }
-    #receiptPrintArea, #invoicePrintArea, #ledgerPrintArea{
+    #ledgerPrintArea, #ledgerPrintArea *,
+    #measurementsPrintArea, #measurementsPrintArea *{ visibility:visible; }
+    #receiptPrintArea, #invoicePrintArea, #ledgerPrintArea, #measurementsPrintArea{
       position:absolute; top:0; left:0; width:100%;
       border:none; padding:0; box-shadow:none;
     }
@@ -302,6 +313,10 @@
       <a class="nav-item" data-view="expenses">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/></svg>
         المصاريف
+      </a>
+      <a class="nav-item" data-view="measurements">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"/><path d="M8 4v4M12 4v6M16 4v4M4 8h4M4 16h4M4 12h6"/></svg>
+        حاسبة القياسات
       </a>
       <a class="nav-item" data-view="reports">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9"/><path d="M11 19V5"/><path d="M18 19v-7"/><path d="M2 19h20"/></svg>
@@ -439,6 +454,44 @@
           </div>
         </div>
         <div id="expensesTableWrap"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-measurements">
+      <div class="topbar">
+        <h1>حاسبة القياسات</h1>
+      </div>
+
+      <div class="panel">
+        <div class="grid2">
+          <div class="field">
+            <label>اسم الزبون</label>
+            <input type="text" id="measCustomerName" placeholder="مثلا: احمد بلحاج">
+          </div>
+          <div class="field">
+            <label>الهاتف</label>
+            <input type="text" id="measCustomerPhone" placeholder="0555 00 00 00">
+          </div>
+        </div>
+
+        <div id="measTablesWrap"></div>
+
+        <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+          <button class="btn" id="btnMeasAddSq">+ جدول متر مربع</button>
+          <button class="btn" id="btnMeasAddLen">+ جدول متر طول</button>
+          <button class="btn" id="btnMeasAddCube">+ جدول متر مكعب</button>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:16px; border-top:1px solid var(--line); padding-top:14px; flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btnMeasSaveOnly">حفظ فقط</button>
+          <button class="btn btn-primary" id="btnMeasSavePrint">حفظ وطباعة</button>
+          <button class="btn btn-primary" id="btnMeasConvertReceipt">تحويل لوصل دفع</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>القياسات المحفوظة</h2></div>
+        <div id="measurementsTableWrap"></div>
       </div>
     </section>
 
@@ -608,7 +661,7 @@
 
       <label style="margin-bottom:8px;">تفاصيل الطلب</label>
       <table class="items-editor">
-        <thead><tr><th style="width:60px">العدد</th><th>النوع والتفاصيل *</th><th style="width:100px">السعر</th><th style="width:100px">المبلغ</th><th style="width:36px"></th></tr></thead>
+        <thead><tr><th style="width:90px">العدد</th><th>النوع والتفاصيل *</th><th style="width:100px">السعر</th><th style="width:100px">المبلغ</th><th style="width:30px"></th><th style="width:36px"></th></tr></thead>
         <tbody id="itemsBody"></tbody>
       </table>
       <button class="btn btn-sm" id="btnAddItemRow" style="margin-top:8px;">+ إضافة سطر</button>
@@ -714,11 +767,12 @@
       <label style="margin-bottom:8px;" id="invItemsSectionLabel">Désignation</label>
       <table class="items-editor">
         <thead><tr>
-          <th style="width:70px" id="invColQty">Qté</th>
+          <th style="width:90px" id="invColQty">Qté</th>
           <th id="invColDesig">Désignation</th>
           <th style="width:70px" id="invColUnit">Unité</th>
           <th style="width:100px" id="invColPrice">Prix Unit.</th>
           <th style="width:100px" id="invColTotal">Total</th>
+          <th style="width:30px"></th>
           <th style="width:36px"></th>
         </tr></thead>
         <tbody id="invItemsBody"></tbody>
@@ -798,6 +852,24 @@
   </div>
 </div>
 
+<div class="overlay" id="measurementsViewOverlay">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-head">
+      <h3>عرض القياسات</h3>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-sm" id="btnPrintMeasurementsView">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M6 9V3h12v6M6 18h12v4H6v-4z"/><rect x="6" y="11" width="12" height="7"/></svg>
+          طباعة
+        </button>
+        <button class="close-x" data-close="measurementsViewOverlay">×</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="receipt-view" id="measurementsPrintArea"></div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="expenseOverlay">
   <div class="modal" style="max-width:460px;">
     <div class="modal-head">
@@ -853,6 +925,7 @@ let settings = {...DEFAULT_SETTINGS};
 let receipts = [];
 let expenses = [];
 let invoices = [];
+let measurementsList = [];
 
 function makeSafeStorage(realStorage){
   const mem = {};
@@ -926,11 +999,12 @@ function startRealtimeSync(){
       if(data.receipts) receipts = data.receipts;
       if(data.expenses) expenses = data.expenses;
       if(data.invoices) invoices = data.invoices;
+      if(data.measurementsList) measurementsList = data.measurementsList;
     } else {
-      await ref.set({settings, receipts, expenses, invoices});
+      await ref.set({settings, receipts, expenses, invoices, measurementsList});
     }
     applySettingsToUI();
-    renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports();
+    renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable();
   }, (err)=>{
     console.error(err);
     toast('انقطع الاتصال بقاعدة البيانات السحابية');
@@ -957,6 +1031,7 @@ async function saveSettings(){ await cloudSet({settings}); }
 async function saveReceipts(){ await cloudSet({receipts}); }
 async function saveExpenses(){ await cloudSet({expenses}); }
 async function saveInvoices(){ await cloudSet({invoices}); }
+async function saveMeasurementsList(){ await cloudSet({measurementsList}); }
 
 function fillFirebaseForm(cfg){
   document.getElementById('fbApiKey').value = cfg.apiKey || '';
@@ -1008,6 +1083,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.view === 'dashboard') renderDashboard();
     if(item.dataset.view === 'customers') renderReceiptsTable();
     if(item.dataset.view === 'expenses') renderExpensesTable();
+    if(item.dataset.view === 'measurements') renderMeasurementsTable();
     if(item.dataset.view === 'reports') renderReports();
     if(item.dataset.view === 'customer-reports') renderCustomerReports();
     if(item.dataset.view === 'settings') fillSettingsForm();
@@ -1201,7 +1277,7 @@ function exportExcelReport(silent){
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
-  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices };
+  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList };
   const blob = new Blob([JSON.stringify(restoreData)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1249,13 +1325,15 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       receipts = data.receipts;
       expenses = data.expenses;
       if(Array.isArray(data.invoices)) invoices = data.invoices;
+      if(Array.isArray(data.measurementsList)) measurementsList = data.measurementsList;
       if(data.settings) settings = {...DEFAULT_SETTINGS, ...data.settings};
       await saveReceipts();
       await saveExpenses();
       await saveInvoices();
+      await saveMeasurementsList();
       await saveSettings();
       applySettingsToUI();
-      renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports();
+      renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable();
       toast('تم استرجاع البيانات بنجاح');
     }catch(err){
       console.error(err);
@@ -1280,14 +1358,22 @@ document.getElementById('btnResetAll').addEventListener('click', async ()=>{
 
 let currentItems = [];
 
+function measResultFor(type, l, w, h){
+  l = parseFloat(l)||0; w = parseFloat(w)||0; h = parseFloat(h)||0;
+  if(type==='طول') return {value: l/100, label: (l/100).toFixed(2)+' م.ط'};
+  if(type==='مكعب') return {value: (l*w*h)/1000000, label: ((l*w*h)/1000000).toFixed(3)+' م³'};
+  return {value: (l*w)/10000, label: ((l*w)/10000).toFixed(2)+' م²'};
+}
+
 function newItemRow(item){
-  item = item || {qty:1, desc:'', price:''};
+  item = item || {qty:'', desc:'', price:''};
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td><input type="number" class="it-qty" value="${item.qty}" min="0"></td>
-    <td><input type="text" class="it-desc" value="${item.desc.replace(/"/g,'&quot;')}"></td>
+    <td><input type="number" class="it-qty" value="${item.qty}" min="0" step="0.01"></td>
+    <td><input type="text" class="it-desc" value="${(item.desc||'').replace(/"/g,'&quot;')}"></td>
     <td><input type="number" class="it-price" value="${item.price||''}" min="0"></td>
     <td class="amount-cell it-amount">0 دج</td>
+    <td><button type="button" class="btn btn-ghost btn-sm it-measure" title="قياس">📐</button></td>
     <td><button class="btn btn-ghost btn-sm it-remove">✕</button></td>
   `;
   document.getElementById('itemsBody').appendChild(row);
@@ -1302,13 +1388,72 @@ function newItemRow(item){
   qty.addEventListener('input', recalc);
   price.addEventListener('input', recalc);
   row.querySelector('.it-remove').addEventListener('click', ()=>{ row.remove(); recalcTotals(); });
+  row.querySelector('.it-measure').addEventListener('click', ()=>openItemMeasureTool(row, qty));
   recalc();
+}
+
+function openItemMeasureTool(row, qtyInput){
+  const existing = row.nextElementSibling;
+  if(existing && existing.classList && existing.classList.contains('it-measure-row')){
+    existing.remove();
+    return;
+  }
+  const mRow = document.createElement('tr');
+  mRow.className = 'it-measure-row';
+  mRow.innerHTML = `
+    <td colspan="6" style="background:var(--marble-2); border-radius:8px;">
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 2px;">
+        <select class="im-type" style="width:110px;">
+          <option value="مربع">متر مربع</option>
+          <option value="طول">متر طول</option>
+          <option value="مكعب">متر مكعب</option>
+        </select>
+        <input type="number" class="im-l" placeholder="طول (سم)" style="width:100px;">
+        <input type="number" class="im-w" placeholder="عرض (سم)" style="width:100px;">
+        <input type="number" class="im-h" placeholder="سماكة (سم)" style="width:100px; display:none;">
+        <input type="number" class="im-count" placeholder="عدد القطع" value="1" min="1" style="width:100px;">
+        <span class="im-result" style="font-size:13px; font-weight:700; color:var(--brass-deep); min-width:90px;">0.00 م²</span>
+        <button type="button" class="btn btn-sm im-apply">تطبيق على العدد</button>
+      </div>
+    </td>
+  `;
+  row.after(mRow);
+  const typeSel = mRow.querySelector('.im-type');
+  const lIn = mRow.querySelector('.im-l');
+  const wIn = mRow.querySelector('.im-w');
+  const hIn = mRow.querySelector('.im-h');
+  const countIn = mRow.querySelector('.im-count');
+  const resultEl = mRow.querySelector('.im-result');
+  function updateVisibility(){
+    const t = typeSel.value;
+    wIn.style.display = (t==='طول') ? 'none' : '';
+    hIn.style.display = (t==='مكعب') ? '' : 'none';
+  }
+  function recalcMeasure(){
+    const t = typeSel.value;
+    const r = measResultFor(t, lIn.value, wIn.value, hIn.value);
+    const count = Number(countIn.value)||1;
+    resultEl.textContent = (r.value*count).toFixed(3).replace(/\.?0+$/,'') + (t==='طول'?' م.ط':(t==='مكعب'?' م³':' م²'));
+  }
+  [typeSel,lIn,wIn,hIn,countIn].forEach(el=>el.addEventListener('input', ()=>{ updateVisibility(); recalcMeasure(); }));
+  updateVisibility(); recalcMeasure();
+  mRow.querySelector('.im-apply').addEventListener('click', ()=>{
+    const t = typeSel.value;
+    const r = measResultFor(t, lIn.value, wIn.value, hIn.value);
+    const count = Number(countIn.value)||1;
+    const total = r.value*count;
+    qtyInput.value = Number(total.toFixed(3));
+    qtyInput.dispatchEvent(new Event('input'));
+    mRow.remove();
+  });
 }
 
 function recalcTotals(){
   let total = 0;
   document.querySelectorAll('#itemsBody tr').forEach(row=>{
-    const qty = Number(row.querySelector('.it-qty').value)||0;
+    const qtyEl = row.querySelector('.it-qty');
+    if(!qtyEl) return;
+    const qty = Number(qtyEl.value)||0;
     const price = Number(row.querySelector('.it-price').value)||0;
     total += qty*price;
   });
@@ -1385,7 +1530,9 @@ async function buildAndSaveReceiptFromForm(){
   if(!name){ toast('يرجى إدخال اسم الزبون'); return null; }
   const items = [];
   document.querySelectorAll('#itemsBody tr').forEach(row=>{
-    const qty = Number(row.querySelector('.it-qty').value)||0;
+    const qtyEl = row.querySelector('.it-qty');
+    if(!qtyEl) return;
+    const qty = Number(qtyEl.value)||0;
     const desc = row.querySelector('.it-desc').value.trim();
     const price = Number(row.querySelector('.it-price').value)||0;
     if(desc || qty || price) items.push({qty, desc, price, amount: qty*price});
@@ -1613,14 +1760,15 @@ document.getElementById('btnShareReceipt').addEventListener('click', async ()=>{
 });
 
 function newInvoiceItemRow(item){
-  item = item || {qty:1, desc:'', unit:'', price:''};
+  item = item || {qty:'', desc:'', unit:'', price:''};
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td><input type="number" class="inv-it-qty" value="${item.qty}" min="0"></td>
+    <td><input type="number" class="inv-it-qty" value="${item.qty}" min="0" step="0.01"></td>
     <td><input type="text" class="inv-it-desc" value="${(item.desc||'').replace(/"/g,'&quot;')}"></td>
     <td><input type="text" class="inv-it-unit" list="unitOptions" value="${(item.unit||'').replace(/"/g,'&quot;')}" placeholder="الوحدة"></td>
     <td><input type="number" class="inv-it-price" value="${item.price||''}" min="0"></td>
     <td class="amount-cell inv-it-amount">0 دج</td>
+    <td><button type="button" class="btn btn-ghost btn-sm inv-it-measure" title="قياس">📐</button></td>
     <td><button class="btn btn-ghost btn-sm inv-it-remove">✕</button></td>
   `;
   document.getElementById('invItemsBody').appendChild(row);
@@ -1635,13 +1783,72 @@ function newInvoiceItemRow(item){
   qty.addEventListener('input', recalc);
   price.addEventListener('input', recalc);
   row.querySelector('.inv-it-remove').addEventListener('click', ()=>{ row.remove(); recalcInvoiceTotals(); });
+  row.querySelector('.inv-it-measure').addEventListener('click', ()=>openInvoiceItemMeasureTool(row, qty));
   recalc();
+}
+
+function openInvoiceItemMeasureTool(row, qtyInput){
+  const existing = row.nextElementSibling;
+  if(existing && existing.classList && existing.classList.contains('inv-it-measure-row')){
+    existing.remove();
+    return;
+  }
+  const mRow = document.createElement('tr');
+  mRow.className = 'inv-it-measure-row';
+  mRow.innerHTML = `
+    <td colspan="7" style="background:var(--marble-2); border-radius:8px;">
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 2px;">
+        <select class="iim-type" style="width:110px;">
+          <option value="مربع">متر مربع</option>
+          <option value="طول">متر طول</option>
+          <option value="مكعب">متر مكعب</option>
+        </select>
+        <input type="number" class="iim-l" placeholder="طول (سم)" style="width:100px;">
+        <input type="number" class="iim-w" placeholder="عرض (سم)" style="width:100px;">
+        <input type="number" class="iim-h" placeholder="سماكة (سم)" style="width:100px; display:none;">
+        <input type="number" class="iim-count" placeholder="عدد القطع" value="1" min="1" style="width:100px;">
+        <span class="iim-result" style="font-size:13px; font-weight:700; color:var(--brass-deep); min-width:90px;">0.00 م²</span>
+        <button type="button" class="btn btn-sm iim-apply">تطبيق على العدد</button>
+      </div>
+    </td>
+  `;
+  row.after(mRow);
+  const typeSel = mRow.querySelector('.iim-type');
+  const lIn = mRow.querySelector('.iim-l');
+  const wIn = mRow.querySelector('.iim-w');
+  const hIn = mRow.querySelector('.iim-h');
+  const countIn = mRow.querySelector('.iim-count');
+  const resultEl = mRow.querySelector('.iim-result');
+  function updateVisibility(){
+    const t = typeSel.value;
+    wIn.style.display = (t==='طول') ? 'none' : '';
+    hIn.style.display = (t==='مكعب') ? '' : 'none';
+  }
+  function recalcMeasure(){
+    const t = typeSel.value;
+    const r = measResultFor(t, lIn.value, wIn.value, hIn.value);
+    const count = Number(countIn.value)||1;
+    resultEl.textContent = (r.value*count).toFixed(3).replace(/\.?0+$/,'') + (t==='طول'?' م.ط':(t==='مكعب'?' م³':' م²'));
+  }
+  [typeSel,lIn,wIn,hIn,countIn].forEach(el=>el.addEventListener('input', ()=>{ updateVisibility(); recalcMeasure(); }));
+  updateVisibility(); recalcMeasure();
+  mRow.querySelector('.iim-apply').addEventListener('click', ()=>{
+    const t = typeSel.value;
+    const r = measResultFor(t, lIn.value, wIn.value, hIn.value);
+    const count = Number(countIn.value)||1;
+    const total = r.value*count;
+    qtyInput.value = Number(total.toFixed(3));
+    qtyInput.dispatchEvent(new Event('input'));
+    mRow.remove();
+  });
 }
 
 function recalcInvoiceTotals(){
   let ht = 0;
   document.querySelectorAll('#invItemsBody tr').forEach(row=>{
-    const qty = Number(row.querySelector('.inv-it-qty').value)||0;
+    const qtyEl = row.querySelector('.inv-it-qty');
+    if(!qtyEl) return;
+    const qty = Number(qtyEl.value)||0;
     const price = Number(row.querySelector('.inv-it-price').value)||0;
     ht += qty*price;
   });
@@ -1770,7 +1977,9 @@ async function buildAndSaveInvoiceFromForm(){
   if(!clientName){ toast('يرجى إدخال اسم الزبون / الشركة'); return null; }
   const items = [];
   document.querySelectorAll('#invItemsBody tr').forEach(row=>{
-    const qty = Number(row.querySelector('.inv-it-qty').value)||0;
+    const qtyEl = row.querySelector('.inv-it-qty');
+    if(!qtyEl) return;
+    const qty = Number(qtyEl.value)||0;
     const desc = row.querySelector('.inv-it-desc').value.trim();
     const unit = row.querySelector('.inv-it-unit').value.trim();
     const price = Number(row.querySelector('.inv-it-price').value)||0;
@@ -1954,16 +2163,6 @@ function viewInvoice(id){
       </div>
       ${inv.delay ? `<div class="field" style="margin-top:14px;"><label>مدة التسليم</label><div>${inv.delay}</div></div>` : ''}
       ${inv.note ? `<div class="field" style="margin-top:14px;"><label>ملاحظة</label><div>${inv.note}</div></div>` : ''}
-      <div style="display:flex; justify-content:space-between; margin-top:60px;">
-        <div style="text-align:center; width:45%;">
-          <div style="font-size:13px; font-weight:700; margin-bottom:50px;">اسم وتوقيع الزبون${inv.clientName ? ' — '+inv.clientName : ''}</div>
-          <div style="border-top:1px solid var(--ink); width:100%;"></div>
-        </div>
-        <div style="text-align:center; width:45%;">
-          <div style="font-size:13px; font-weight:700; margin-bottom:50px;">ختم وتوقيع — ${settings.companyName}</div>
-          <div style="border-top:1px solid var(--ink); width:100%;"></div>
-        </div>
-      </div>
     `;
     document.getElementById('viewInvoiceTitle').textContent = 'عرض سعر مبسط';
     document.getElementById('viewInvoiceOverlay').classList.add('show');
@@ -2186,6 +2385,254 @@ async function deleteExpense(id){
   toast('تم حذف المصروف');
 }
 
+const MEAS_SPECS = {
+  'مربع': {label:'متر مربع', cols:['طول (سم)','عرض (سم)']},
+  'طول': {label:'متر طول', cols:['طول (سم)']},
+  'مكعب': {label:'متر مكعب', cols:['طول (سم)','عرض (سم)','سماكة (سم)']}
+};
+
+function emptyMeasRow(){ return {l:'', w:'', h:''}; }
+
+let measTables = [
+  {type:'مربع', rows: Array.from({length:10}, emptyMeasRow)}
+];
+
+function renderMeasTables(){
+  const wrap = document.getElementById('measTablesWrap');
+  wrap.innerHTML = '';
+  measTables.forEach((tbl, ti)=>{
+    const spec = MEAS_SPECS[tbl.type];
+    const box = document.createElement('div');
+    box.className = 'meas-table-box';
+    let headCols = spec.cols.map(c=>`<span>${c}</span>`).join('');
+    let rowsHtml = tbl.rows.map((r,ri)=>{
+      let inputs = spec.cols.map((c,ci)=>{
+        const field = ci===0?'l':ci===1?'w':'h';
+        return `<input type="number" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
+      }).join('');
+      const pad = spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '';
+      const res = measResultFor(tbl.type, r.l, r.w, r.h);
+      return `<div class="meas-row-grid">
+        <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
+        ${inputs}${pad}
+        <span class="meas-result">${res.label}</span>
+        <button type="button" class="btn btn-ghost btn-sm" data-delrow="${ti}-${ri}" title="حذف">✕</button>
+      </div>`;
+    }).join('');
+    box.innerHTML = `
+      <div class="meas-table-head">
+        <span class="meas-title">${spec.label}</span>
+        <button type="button" class="btn btn-sm btn-danger" data-deltable="${ti}">حذف الجدول</button>
+      </div>
+      <div class="meas-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
+        <span></span>${headCols}${spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):''}<span>النتيجة</span><span></span>
+      </div>
+      ${rowsHtml}
+      <button type="button" class="btn btn-sm" data-addrow="${ti}" style="margin-top:6px;">+ إضافة قياس</button>
+    `;
+    wrap.appendChild(box);
+  });
+
+  wrap.querySelectorAll('input').forEach(el=>{
+    el.addEventListener('input', e=>{
+      const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
+      measTables[t].rows[r][f] = e.target.value;
+      renderMeasTables();
+    });
+  });
+  wrap.querySelectorAll('[data-addrow]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      measTables[e.currentTarget.dataset.addrow].rows.push(emptyMeasRow());
+      renderMeasTables();
+    });
+  });
+  wrap.querySelectorAll('[data-delrow]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const [t,r] = e.currentTarget.dataset.delrow.split('-');
+      measTables[t].rows.splice(r,1);
+      renderMeasTables();
+    });
+  });
+  wrap.querySelectorAll('[data-deltable]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      measTables.splice(e.currentTarget.dataset.deltable,1);
+      renderMeasTables();
+    });
+  });
+}
+
+function addMeasTable(type){
+  measTables.push({type, rows: Array.from({length:10}, emptyMeasRow)});
+  renderMeasTables();
+}
+document.getElementById('btnMeasAddSq').addEventListener('click', ()=>addMeasTable('مربع'));
+document.getElementById('btnMeasAddLen').addEventListener('click', ()=>addMeasTable('طول'));
+document.getElementById('btnMeasAddCube').addEventListener('click', ()=>addMeasTable('مكعب'));
+
+function buildMeasurementRecord(){
+  const name = document.getElementById('measCustomerName').value.trim();
+  if(!name){ toast('يرجى إدخال اسم الزبون'); return null; }
+  const tables = measTables.map(tbl=>({
+    type: tbl.type,
+    rows: tbl.rows.filter(r=> (r.l!=='' && r.l!==null) || (r.w!=='' && r.w!==null) || (r.h!=='' && r.h!==null))
+  })).filter(tbl=>tbl.rows.length>0);
+  if(tables.length===0){ toast('يرجى إدخال قياس واحد على الأقل'); return null; }
+  return {
+    id: uid(),
+    date: new Date().toISOString().slice(0,10),
+    customerName: name,
+    customerPhone: document.getElementById('measCustomerPhone').value.trim(),
+    tables
+  };
+}
+
+async function saveMeasurementRecord(rec){
+  measurementsList.push(rec);
+  await saveMeasurementsList();
+  renderMeasurementsTable();
+}
+
+function resetMeasForm(){
+  document.getElementById('measCustomerName').value = '';
+  document.getElementById('measCustomerPhone').value = '';
+  measTables = [{type:'مربع', rows: Array.from({length:10}, emptyMeasRow)}];
+  renderMeasTables();
+}
+
+document.getElementById('btnMeasSaveOnly').addEventListener('click', async ()=>{
+  const rec = buildMeasurementRecord();
+  if(!rec) return;
+  await saveMeasurementRecord(rec);
+  toast('تم حفظ القياسات');
+  resetMeasForm();
+});
+
+document.getElementById('btnMeasSavePrint').addEventListener('click', async ()=>{
+  const rec = buildMeasurementRecord();
+  if(!rec) return;
+  await saveMeasurementRecord(rec);
+  toast('تم حفظ القياسات');
+  viewMeasurementRecord(rec.id);
+  setTimeout(()=>window.print(), 300);
+  resetMeasForm();
+});
+
+document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
+  const rec = buildMeasurementRecord();
+  if(!rec) return;
+  const items = [];
+  rec.tables.forEach(tbl=>{
+    tbl.rows.forEach(r=>{
+      const res = measResultFor(tbl.type, r.l, r.w, r.h);
+      const dims = tbl.type==='طول' ? `${r.l||0} سم` : (tbl.type==='مكعب' ? `${r.l||0}×${r.w||0}×${r.h||0} سم` : `${r.l||0}×${r.w||0} سم`);
+      items.push({qty: Number(res.value.toFixed(3)), desc: `${MEAS_SPECS[tbl.type].label} — ${dims}`, price:''});
+    });
+  });
+  const pseudoReceipt = {
+    id: '',
+    no: String(receipts.length + 1).padStart(3,'0'),
+    date: new Date().toISOString().slice(0,10),
+    duration: '',
+    name: rec.customerName,
+    phone: rec.customerPhone || '',
+    address: '',
+    note: 'محوّل من حاسبة القياسات',
+    items,
+    payments: []
+  };
+  openReceiptModal(pseudoReceipt);
+  document.getElementById('rcpId').value = '';
+  document.getElementById('receiptModalTitle').textContent = 'وصل جديد (محوّل من قياسات)';
+  toast('عبّي السعر لكل بند ثم احفظ الوصل');
+  resetMeasForm();
+});
+
+function renderMeasurementsTable(){
+  const wrap = document.getElementById('measurementsTableWrap');
+  if(!wrap) return;
+  if(measurementsList.length===0){
+    wrap.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v16H4z"/></svg>
+      <div>لا توجد قياسات محفوظة بعد.</div>
+    </div>`;
+    return;
+  }
+  let html = `<table><thead><tr><th>التاريخ</th><th>الزبون</th><th>عدد الجداول</th><th></th></tr></thead><tbody>`;
+  [...measurementsList].reverse().forEach(rec=>{
+    html += `<tr>
+      <td>${rec.date||''}</td>
+      <td>${rec.customerName}</td>
+      <td>${rec.tables.length}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-sm btn-ghost" onclick="viewMeasurementRecord('${rec.id}')" title="عرض/طباعة">👁</button>
+          <button class="btn btn-sm btn-ghost" onclick="deleteMeasurementRecord('${rec.id}')" title="حذف">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+async function deleteMeasurementRecord(id){
+  if(!confirm('هل تريد حذف هذا السجل؟')) return;
+  measurementsList = measurementsList.filter(r=>r.id!==id);
+  await saveMeasurementsList();
+  renderMeasurementsTable();
+  toast('تم الحذف');
+}
+
+function viewMeasurementRecord(id){
+  const rec = measurementsList.find(r=>r.id===id);
+  if(!rec) return;
+  let tablesHtml = rec.tables.map(tbl=>{
+    const spec = MEAS_SPECS[tbl.type];
+    const headCols = spec.cols.map(c=>`<th>${c}</th>`).join('');
+    const rowsHtml = tbl.rows.map((r,i)=>{
+      const cells = spec.cols.map((c,ci)=>{
+        const field = ci===0?'l':ci===1?'w':'h';
+        return `<td>${r[field]||'—'}</td>`;
+      }).join('');
+      const res = measResultFor(tbl.type, r.l, r.w, r.h);
+      return `<tr><td>${i+1}</td>${cells}<td>${res.label}</td></tr>`;
+    }).join('');
+    return `
+      <div style="margin-top:14px;">
+        <div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${spec.label}</div>
+        <table class="meas-print-table">
+          <thead><tr><th>#</th>${headCols}<th>النتيجة</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  document.getElementById('measurementsPrintArea').innerHTML = `
+    <div class="receipt-top">
+      <div class="receipt-brand">
+        <img src="${settings.logo}">
+        <div>
+          <div class="name">${settings.companyName}</div>
+          <div class="meta">${settings.companyDesc}</div>
+        </div>
+      </div>
+      <div class="receipt-stamp">
+        <div class="no">قياسات</div>
+        <div class="lbl">${rec.date||''}</div>
+      </div>
+    </div>
+    <div class="receipt-info-grid">
+      <div><span>الزبون: </span>${rec.customerName}</div>
+      <div><span>الهاتف: </span>${rec.customerPhone||'—'}</div>
+    </div>
+    ${tablesHtml}
+  `;
+  document.getElementById('measurementsViewOverlay').classList.add('show');
+}
+document.getElementById('btnPrintMeasurementsView').addEventListener('click', ()=>window.print());
+
+renderMeasTables();
+
 function renderDashboard(){
   const income = receipts.reduce((s,r)=>s + getReceiptPayments(r).reduce((a,p)=>a+p.amount,0), 0);
   const expTotal = expenses.reduce((s,e)=>s+e.amount,0);
@@ -2379,6 +2826,7 @@ if('serviceWorker' in navigator){
     renderReports();
     renderInvoicesTable();
     renderCustomerReports();
+    renderMeasurementsTable();
   });
 })();
 </script>
