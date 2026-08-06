@@ -2415,7 +2415,7 @@ function renderMeasTables(){
       return `<div class="meas-row-grid">
         <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
         ${inputs}${pad}
-        <span class="meas-result">${res.label}</span>
+        <span class="meas-result" data-result-t="${ti}" data-result-r="${ri}">${res.label}</span>
         <button type="button" class="btn btn-ghost btn-sm" data-delrow="${ti}-${ri}" title="حذف">✕</button>
       </div>`;
     }).join('');
@@ -2437,7 +2437,10 @@ function renderMeasTables(){
     el.addEventListener('input', e=>{
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
       measTables[t].rows[r][f] = e.target.value;
-      renderMeasTables();
+      const row = measTables[t].rows[r];
+      const res = measResultFor(measTables[t].type, row.l, row.w, row.h);
+      const resultEl = wrap.querySelector(`.meas-result[data-result-t="${t}"][data-result-r="${r}"]`);
+      if(resultEl) resultEl.textContent = res.label;
     });
   });
   wrap.querySelectorAll('[data-addrow]').forEach(btn=>{
