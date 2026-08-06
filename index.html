@@ -1360,9 +1360,9 @@ let currentItems = [];
 
 function measResultFor(type, l, w, h){
   l = parseFloat(l)||0; w = parseFloat(w)||0; h = parseFloat(h)||0;
-  if(type==='طول') return {value: l/100, label: (l/100).toFixed(2)+' م.ط'};
-  if(type==='مكعب') return {value: (l*w*h)/1000000, label: ((l*w*h)/1000000).toFixed(3)+' م³'};
-  return {value: (l*w)/10000, label: ((l*w)/10000).toFixed(2)+' م²'};
+  if(type==='طول') return {value: l, label: l.toFixed(2)+' م.ط'};
+  if(type==='مكعب') return {value: l*w*h, label: (l*w*h).toFixed(3)+' م³'};
+  return {value: l*w, label: (l*w).toFixed(2)+' م²'};
 }
 
 function newItemRow(item){
@@ -1392,6 +1392,17 @@ function newItemRow(item){
   recalc();
 }
 
+function measurementNoteText(t, l, w, h, count, total){
+  l = parseFloat(l)||0; w = parseFloat(w)||0; h = parseFloat(h)||0;
+  let dims;
+  if(t==='طول') dims = `${l.toFixed(2)} م.ط`;
+  else if(t==='مكعب') dims = `${l.toFixed(2)}×${w.toFixed(2)}×${h.toFixed(2)}`;
+  else dims = `${l.toFixed(2)}×${w.toFixed(2)}`;
+  const countPart = count > 1 ? ` × ${count} قطعة` : '';
+  const unit = t==='طول' ? 'م.ط' : (t==='مكعب' ? 'م³' : 'م²');
+  return `(${dims}${countPart} = ${total.toFixed(3).replace(/\.?0+$/,'')} ${unit})`;
+}
+
 function openItemMeasureTool(row, qtyInput){
   const existing = row.nextElementSibling;
   if(existing && existing.classList && existing.classList.contains('it-measure-row')){
@@ -1408,9 +1419,9 @@ function openItemMeasureTool(row, qtyInput){
           <option value="طول">متر طول</option>
           <option value="مكعب">متر مكعب</option>
         </select>
-        <input type="number" class="im-l" placeholder="طول (سم)" style="width:100px;">
-        <input type="number" class="im-w" placeholder="عرض (سم)" style="width:100px;">
-        <input type="number" class="im-h" placeholder="سماكة (سم)" style="width:100px; display:none;">
+        <input type="number" class="im-l" placeholder="طول (م)" step="0.01" style="width:100px;">
+        <input type="number" class="im-w" placeholder="عرض (م)" step="0.01" style="width:100px;">
+        <input type="number" class="im-h" placeholder="سماكة (م)" step="0.01" style="width:100px; display:none;">
         <input type="number" class="im-count" placeholder="عدد القطع" value="1" min="1" style="width:100px;">
         <span class="im-result" style="font-size:13px; font-weight:700; color:var(--brass-deep); min-width:90px;">0.00 م²</span>
         <button type="button" class="btn btn-sm im-apply">تطبيق على العدد</button>
@@ -1444,6 +1455,11 @@ function openItemMeasureTool(row, qtyInput){
     const total = r.value*count;
     qtyInput.value = Number(total.toFixed(3));
     qtyInput.dispatchEvent(new Event('input'));
+    const descIn = row.querySelector('.it-desc');
+    if(descIn){
+      const note = measurementNoteText(t, lIn.value, wIn.value, hIn.value, count, total);
+      descIn.value = descIn.value.trim() ? `${descIn.value.trim()} ${note}` : note;
+    }
     mRow.remove();
   });
 }
@@ -1803,9 +1819,9 @@ function openInvoiceItemMeasureTool(row, qtyInput){
           <option value="طول">متر طول</option>
           <option value="مكعب">متر مكعب</option>
         </select>
-        <input type="number" class="iim-l" placeholder="طول (سم)" style="width:100px;">
-        <input type="number" class="iim-w" placeholder="عرض (سم)" style="width:100px;">
-        <input type="number" class="iim-h" placeholder="سماكة (سم)" style="width:100px; display:none;">
+        <input type="number" class="iim-l" placeholder="طول (م)" step="0.01" style="width:100px;">
+        <input type="number" class="iim-w" placeholder="عرض (م)" step="0.01" style="width:100px;">
+        <input type="number" class="iim-h" placeholder="سماكة (م)" step="0.01" style="width:100px; display:none;">
         <input type="number" class="iim-count" placeholder="عدد القطع" value="1" min="1" style="width:100px;">
         <span class="iim-result" style="font-size:13px; font-weight:700; color:var(--brass-deep); min-width:90px;">0.00 م²</span>
         <button type="button" class="btn btn-sm iim-apply">تطبيق على العدد</button>
@@ -1839,6 +1855,11 @@ function openInvoiceItemMeasureTool(row, qtyInput){
     const total = r.value*count;
     qtyInput.value = Number(total.toFixed(3));
     qtyInput.dispatchEvent(new Event('input'));
+    const descIn = row.querySelector('.inv-it-desc');
+    if(descIn){
+      const note = measurementNoteText(t, lIn.value, wIn.value, hIn.value, count, total);
+      descIn.value = descIn.value.trim() ? `${descIn.value.trim()} ${note}` : note;
+    }
     mRow.remove();
   });
 }
@@ -2386,9 +2407,9 @@ async function deleteExpense(id){
 }
 
 const MEAS_SPECS = {
-  'مربع': {label:'متر مربع', cols:['طول (سم)','عرض (سم)']},
-  'طول': {label:'متر طول', cols:['طول (سم)']},
-  'مكعب': {label:'متر مكعب', cols:['طول (سم)','عرض (سم)','سماكة (سم)']}
+  'مربع': {label:'متر مربع', cols:['طول (م)','عرض (م)']},
+  'طول': {label:'متر طول', cols:['طول (م)']},
+  'مكعب': {label:'متر مكعب', cols:['طول (م)','عرض (م)','سماكة (م)']}
 };
 
 function emptyMeasRow(){ return {l:'', w:'', h:''}; }
