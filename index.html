@@ -208,7 +208,7 @@
   .meas-table-box{border:1px solid var(--line); border-radius:9px; padding:12px 14px; margin-top:14px; background:var(--marble-2);}
   .meas-table-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
   .meas-table-head .meas-title{font-size:14px; font-weight:700; color:var(--brass-deep);}
-  .meas-row-grid{display:grid; grid-template-columns:26px minmax(0,1fr) 1fr 1fr 1fr 110px 30px; gap:6px; align-items:center; margin-bottom:5px;}
+  .meas-row-grid{display:grid; grid-template-columns:26px minmax(0,1fr) 1fr 1fr 70px 110px 30px; gap:6px; align-items:center; margin-bottom:5px;}
   .meas-row-grid input[disabled]{background:var(--stone); color:var(--text-dim);}
   .meas-result{font-size:13px; font-weight:700; color:var(--brass-deep); text-align:center;}
   .meas-print-table{width:100%; border-collapse:collapse; font-size:13px; margin-top:6px;}
@@ -475,6 +475,7 @@
         </div>
 
         <div id="measTablesWrap"></div>
+        <div id="measTotalsSummary" style="display:flex; gap:14px; flex-wrap:wrap; margin-top:14px;"></div>
 
         <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
           <button class="btn" id="btnMeasAddSq">+ جدول متر مربع</button>
@@ -2412,7 +2413,32 @@ const MEAS_SPECS = {
   'مكعب': {label:'متر مكعب', cols:['طول (م)','عرض (م)','سماكة (م)']}
 };
 
-function emptyMeasRow(){ return {l:'', w:'', h:''}; }
+function computeMeasTotalsFrom(tables){
+  const totals = {'مربع':0, 'طول':0, 'مكعب':0};
+  tables.forEach(tbl=>{
+    tbl.rows.forEach(r=>{
+      const count = r.count===undefined || r.count===null || r.count==='' ? 1 : (Number(r.count)||1);
+      const base = measResultFor(tbl.type, r.l, r.w, r.h);
+      totals[tbl.type] += base.value * count;
+    });
+  });
+  return totals;
+}
+
+function renderMeasTotals(tables, targetEl){
+  const el = targetEl || document.getElementById('measTotalsSummary');
+  if(!el) return;
+  const totals = computeMeasTotalsFrom(tables);
+  const card = (label, val, unit) => `<div style="background:var(--marble-2); border-radius:8px; padding:10px 16px; text-align:center; min-width:130px;">
+    <div style="font-size:11.5px; color:var(--text-dim); margin-bottom:4px;">${label}</div>
+    <div style="font-size:16px; font-weight:800; color:var(--brass-deep);">${val.toFixed(unit==='م³'?3:2)} ${unit}</div>
+  </div>`;
+  el.innerHTML = card('إجمالي متر مربع', totals['مربع'], 'م²')
+    + card('إجمالي متر طول', totals['طول'], 'م.ط')
+    + card('إجمالي متر مكعب', totals['مكعب'], 'م³');
+}
+
+function emptyMeasRow(){ return {l:'', w:'', h:'', count:1}; }
 
 let measTables = [
   {type:'مربع', rows: Array.from({length:10}, emptyMeasRow)}
@@ -2432,11 +2458,16 @@ function renderMeasTables(){
         return `<input type="number" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
       }).join('');
       const pad = spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '';
-      const res = measResultFor(tbl.type, r.l, r.w, r.h);
+      const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
+      const base = measResultFor(tbl.type, r.l, r.w, r.h);
+      const total = base.value * (Number(count)||1);
+      const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
+      const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
       return `<div class="meas-row-grid">
         <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
         ${inputs}${pad}
-        <span class="meas-result" data-result-t="${ti}" data-result-r="${ri}">${res.label}</span>
+        <input type="number" min="1" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
+        <span class="meas-result" data-result-t="${ti}" data-result-r="${ri}">${resLabel}</span>
         <button type="button" class="btn btn-ghost btn-sm" data-delrow="${ti}-${ri}" title="حذف">✕</button>
       </div>`;
     }).join('');
@@ -2446,22 +2477,27 @@ function renderMeasTables(){
         <button type="button" class="btn btn-sm btn-danger" data-deltable="${ti}">حذف الجدول</button>
       </div>
       <div class="meas-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
-        <span></span>${headCols}${spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):''}<span>النتيجة</span><span></span>
+        <span></span>${headCols}${spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):''}<span>العدد</span><span>النتيجة</span><span></span>
       </div>
       ${rowsHtml}
       <button type="button" class="btn btn-sm" data-addrow="${ti}" style="margin-top:6px;">+ إضافة قياس</button>
     `;
     wrap.appendChild(box);
   });
+  renderMeasTotals(measTables);
 
   wrap.querySelectorAll('input').forEach(el=>{
     el.addEventListener('input', e=>{
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
       measTables[t].rows[r][f] = e.target.value;
       const row = measTables[t].rows[r];
-      const res = measResultFor(measTables[t].type, row.l, row.w, row.h);
+      const count = row.count===undefined || row.count===null || row.count==='' ? 1 : row.count;
+      const base = measResultFor(measTables[t].type, row.l, row.w, row.h);
+      const total = base.value * (Number(count)||1);
+      const unit = measTables[t].type==='طول' ? ' م.ط' : (measTables[t].type==='مكعب' ? ' م³' : ' م²');
       const resultEl = wrap.querySelector(`.meas-result[data-result-t="${t}"][data-result-r="${r}"]`);
-      if(resultEl) resultEl.textContent = res.label;
+      if(resultEl) resultEl.textContent = total.toFixed(measTables[t].type==='مكعب'?3:2) + unit;
+      renderMeasTotals(measTables);
     });
   });
   wrap.querySelectorAll('[data-addrow]').forEach(btn=>{
@@ -2544,14 +2580,11 @@ document.getElementById('btnMeasSavePrint').addEventListener('click', async ()=>
 document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
   const rec = buildMeasurementRecord();
   if(!rec) return;
+  const totals = computeMeasTotalsFrom(rec.tables);
   const items = [];
-  rec.tables.forEach(tbl=>{
-    tbl.rows.forEach(r=>{
-      const res = measResultFor(tbl.type, r.l, r.w, r.h);
-      const dims = tbl.type==='طول' ? `${r.l||0} سم` : (tbl.type==='مكعب' ? `${r.l||0}×${r.w||0}×${r.h||0} سم` : `${r.l||0}×${r.w||0} سم`);
-      items.push({qty: Number(res.value.toFixed(3)), desc: `${MEAS_SPECS[tbl.type].label} — ${dims}`, price:''});
-    });
-  });
+  if(totals['مربع'] > 0) items.push({qty: Number(totals['مربع'].toFixed(2)), desc: '', price:''});
+  if(totals['طول'] > 0) items.push({qty: Number(totals['طول'].toFixed(2)), desc: '', price:''});
+  if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: '', price:''});
   const pseudoReceipt = {
     id: '',
     no: String(receipts.length + 1).padStart(3,'0'),
@@ -2618,18 +2651,30 @@ function viewMeasurementRecord(id){
         const field = ci===0?'l':ci===1?'w':'h';
         return `<td>${r[field]||'—'}</td>`;
       }).join('');
-      const res = measResultFor(tbl.type, r.l, r.w, r.h);
-      return `<tr><td>${i+1}</td>${cells}<td>${res.label}</td></tr>`;
+      const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
+      const base = measResultFor(tbl.type, r.l, r.w, r.h);
+      const total = base.value * (Number(count)||1);
+      const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
+      const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
+      return `<tr><td>${i+1}</td>${cells}<td>${count}</td><td>${resLabel}</td></tr>`;
     }).join('');
     return `
       <div style="margin-top:14px;">
         <div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${spec.label}</div>
         <table class="meas-print-table">
-          <thead><tr><th>#</th>${headCols}<th>النتيجة</th></tr></thead>
+          <thead><tr><th>#</th>${headCols}<th>العدد</th><th>النتيجة</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>`;
   }).join('');
+
+  const t = computeMeasTotalsFrom(rec.tables);
+  const totalsHtml = `
+    <div class="totals-box" style="margin-top:16px; display:flex; gap:20px; flex-wrap:wrap;">
+      ${t['مربع']>0 ? `<div><b>إجمالي متر مربع:</b> ${t['مربع'].toFixed(2)} م²</div>` : ''}
+      ${t['طول']>0 ? `<div><b>إجمالي متر طول:</b> ${t['طول'].toFixed(2)} م.ط</div>` : ''}
+      ${t['مكعب']>0 ? `<div><b>إجمالي متر مكعب:</b> ${t['مكعب'].toFixed(3)} م³</div>` : ''}
+    </div>`;
 
   document.getElementById('measurementsPrintArea').innerHTML = `
     <div class="receipt-top">
@@ -2650,6 +2695,7 @@ function viewMeasurementRecord(id){
       <div><span>الهاتف: </span>${rec.customerPhone||'—'}</div>
     </div>
     ${tablesHtml}
+    ${totalsHtml}
   `;
   document.getElementById('measurementsViewOverlay').classList.add('show');
 }
