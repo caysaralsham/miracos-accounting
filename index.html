@@ -249,6 +249,14 @@
     .stats-grid{grid-template-columns:1fr;}
     .stats-grid.cols-5, .stats-grid.cols-3{grid-template-columns:repeat(2,1fr);}
     .stat-num{font-size:19px;}
+    .meas-row-grid{
+      grid-template-columns:22px 1fr 1fr;
+      grid-auto-flow:row;
+      row-gap:4px;
+      background:var(--marble-2); border-radius:8px; padding:8px; margin-bottom:8px;
+    }
+    .meas-row-grid > *:nth-child(n+5){ grid-column:span 1; }
+    .meas-row-grid input, .meas-row-grid .meas-result{ width:100%; min-width:0; }
   }
   @media (max-width: 420px){
     .stats-grid.cols-5, .stats-grid.cols-3{grid-template-columns:1fr;}
@@ -686,6 +694,15 @@
       <div class="field" style="margin-top:10px;">
         <label>ملاحظة</label>
         <textarea id="rcpNote" rows="2"></textarea>
+      </div>
+
+      <hr style="margin:16px 0; border:none; border-top:1px solid var(--line);">
+      <label style="margin-bottom:8px;">جداول القياسات المرفقة (اختياري)</label>
+      <div id="rcpMeasTablesWrap"></div>
+      <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+        <button type="button" class="btn btn-sm" id="btnRcpMeasAddSq">+ جدول متر مربع</button>
+        <button type="button" class="btn btn-sm" id="btnRcpMeasAddLen">+ جدول متر طول</button>
+        <button type="button" class="btn btn-sm" id="btnRcpMeasAddCube">+ جدول متر مكعب</button>
       </div>
     </div>
     <div class="modal-foot">
@@ -1524,6 +1541,7 @@ function openReceiptModal(receipt){
     (receipt.items||[]).forEach(it=>newItemRow(it));
     const pays = getReceiptPayments(receipt);
     if(pays.length) pays.forEach(p=>newPaymentRow(p));
+    receiptMeasTables = receipt.measurementTables ? JSON.parse(JSON.stringify(receipt.measurementTables)) : [];
   } else {
     document.getElementById('receiptModalTitle').textContent = 'وصل دفع جديد';
     document.getElementById('rcpId').value = '';
@@ -1535,7 +1553,9 @@ function openReceiptModal(receipt){
     document.getElementById('rcpAddress').value = '';
     document.getElementById('rcpNote').value = '';
     newItemRow();
+    receiptMeasTables = [];
   }
+  renderReceiptMeasTables();
   recalcTotals();
   document.getElementById('receiptOverlay').classList.add('show');
 }
@@ -1565,6 +1585,10 @@ async function buildAndSaveReceiptFromForm(){
   });
   const paid = payments.reduce((s,p)=>s+p.amount,0);
 
+  const measTablesToSave = receiptMeasTables
+    .map(tbl => ({...tbl, rows: tbl.rows.filter(r => r.l || r.w || r.h)}))
+    .filter(tbl => tbl.rows.length > 0);
+
   const id = document.getElementById('rcpId').value;
   const data = {
     id: id || uid(),
@@ -1576,7 +1600,8 @@ async function buildAndSaveReceiptFromForm(){
     address: document.getElementById('rcpAddress').value.trim(),
     items, total, payments,
     remaining: total - paid,
-    note: document.getElementById('rcpNote').value.trim()
+    note: document.getElementById('rcpNote').value.trim(),
+    measurementTables: measTablesToSave
   };
 
   if(id){
@@ -1700,6 +1725,47 @@ function viewReceipt(id){
   const paymentsRows = payList.map(p=>`
     <div class="totals-row"><span>دفعة بتاريخ ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
   `).join('') || '<div class="totals-row"><span>لا توجد دفعات مسجلة</span><span>—</span></div>';
+
+  let measTablesHtml = '';
+  if(r.measurementTables && r.measurementTables.length){
+    const tablesPart = r.measurementTables.map(tbl=>{
+      const spec = MEAS_SPECS[tbl.type];
+      const headCols = spec.cols.map(c=>`<th>${c}</th>`).join('');
+      const rowsHtml = tbl.rows.map((row,i)=>{
+        const cells = spec.cols.map((c,ci)=>{
+          const field = ci===0?'l':ci===1?'w':'h';
+          return `<td>${row[field]||'—'}</td>`;
+        }).join('');
+        const count = row.count===undefined || row.count===null || row.count==='' ? 1 : row.count;
+        const base = measResultFor(tbl.type, row.l, row.w, row.h);
+        const total = base.value * (Number(count)||1);
+        const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
+        const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
+        return `<tr><td>${i+1}</td>${cells}<td>${count}</td><td>${resLabel}</td></tr>`;
+      }).join('');
+      return `<div style="margin-top:14px;">
+        <div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${spec.label}</div>
+        <table class="meas-print-table">
+          <thead><tr><th>#</th>${headCols}<th>العدد</th><th>النتيجة</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>`;
+    }).join('');
+    const t = computeMeasTotalsFrom(r.measurementTables);
+    const totalsPart = `
+      <div class="totals-box" style="margin-top:10px; display:flex; gap:20px; flex-wrap:wrap;">
+        ${t['مربع']>0 ? `<div><b>إجمالي متر مربع:</b> ${t['مربع'].toFixed(2)} م²</div>` : ''}
+        ${t['طول']>0 ? `<div><b>إجمالي متر طول:</b> ${t['طول'].toFixed(2)} م.ط</div>` : ''}
+        ${t['مكعب']>0 ? `<div><b>إجمالي متر مكعب:</b> ${t['مكعب'].toFixed(3)} م³</div>` : ''}
+      </div>`;
+    measTablesHtml = `
+      <hr style="margin:18px 0; border:none; border-top:1px dashed var(--line);">
+      <div style="font-weight:800; margin-bottom:8px;">جداول القياسات المرفقة</div>
+      ${tablesPart}
+      ${totalsPart}
+    `;
+  }
+
   document.getElementById('receiptPrintArea').innerHTML = `
     <div class="receipt-top">
       <div class="receipt-brand">
@@ -1732,6 +1798,7 @@ function viewReceipt(id){
       <div class="totals-row" style="color:var(--danger); font-weight:700;"><span>الباقي</span><span>${fmt(r.remaining)}</span></div>
     </div>
     ${r.note ? `<div class="field" style="margin-top:14px;"><label>ملاحظة</label><div>${r.note}</div></div>` : ''}
+    ${measTablesHtml}
   `;
   document.getElementById('viewReceiptOverlay').classList.add('show');
 }
@@ -2409,7 +2476,7 @@ async function deleteExpense(id){
 
 const MEAS_SPECS = {
   'مربع': {label:'متر مربع', cols:['طول (م)','عرض (م)']},
-  'طول': {label:'متر طول', cols:['طول (م)']},
+  'طول': {label:'متر طول', cols:['طول (م)','العرض (مرجعي، م)']},
   'مكعب': {label:'متر مكعب', cols:['طول (م)','عرض (م)','سماكة (م)']}
 };
 
@@ -2529,6 +2596,93 @@ document.getElementById('btnMeasAddSq').addEventListener('click', ()=>addMeasTab
 document.getElementById('btnMeasAddLen').addEventListener('click', ()=>addMeasTable('طول'));
 document.getElementById('btnMeasAddCube').addEventListener('click', ()=>addMeasTable('مكعب'));
 
+// ---------- جداول القياسات المرفقة بنافذة الوصل (قابلة للتعديل والإضافة حتى بعد الحفظ) ----------
+let receiptMeasTables = [];
+
+function renderReceiptMeasTables(){
+  const wrap = document.getElementById('rcpMeasTablesWrap');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  receiptMeasTables.forEach((tbl, ti)=>{
+    const spec = MEAS_SPECS[tbl.type];
+    const box = document.createElement('div');
+    box.className = 'meas-table-box';
+    let headCols = spec.cols.map(c=>`<span>${c}</span>`).join('');
+    let rowsHtml = tbl.rows.map((r,ri)=>{
+      let inputs = spec.cols.map((c,ci)=>{
+        const field = ci===0?'l':ci===1?'w':'h';
+        return `<input type="number" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
+      }).join('');
+      const pad = spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '';
+      const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
+      const base = measResultFor(tbl.type, r.l, r.w, r.h);
+      const total = base.value * (Number(count)||1);
+      const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
+      const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
+      return `<div class="meas-row-grid">
+        <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
+        ${inputs}${pad}
+        <input type="number" min="1" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
+        <span class="meas-result" data-rcp-result-t="${ti}" data-rcp-result-r="${ri}">${resLabel}</span>
+        <button type="button" class="btn btn-ghost btn-sm" data-rcp-delrow="${ti}-${ri}" title="حذف">✕</button>
+      </div>`;
+    }).join('');
+    box.innerHTML = `
+      <div class="meas-table-head">
+        <span class="meas-title">${spec.label}</span>
+        <button type="button" class="btn btn-sm btn-danger" data-rcp-deltable="${ti}">حذف الجدول</button>
+      </div>
+      <div class="meas-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
+        <span></span>${headCols}${spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):''}<span>العدد</span><span>النتيجة</span><span></span>
+      </div>
+      ${rowsHtml}
+      <button type="button" class="btn btn-sm" data-rcp-addrow="${ti}" style="margin-top:6px;">+ إضافة قياس</button>
+    `;
+    wrap.appendChild(box);
+  });
+
+  wrap.querySelectorAll('input').forEach(el=>{
+    el.addEventListener('input', e=>{
+      const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
+      receiptMeasTables[t].rows[r][f] = e.target.value;
+      const row = receiptMeasTables[t].rows[r];
+      const count = row.count===undefined || row.count===null || row.count==='' ? 1 : row.count;
+      const base = measResultFor(receiptMeasTables[t].type, row.l, row.w, row.h);
+      const total = base.value * (Number(count)||1);
+      const unit = receiptMeasTables[t].type==='طول' ? ' م.ط' : (receiptMeasTables[t].type==='مكعب' ? ' م³' : ' م²');
+      const resultEl = wrap.querySelector(`.meas-result[data-rcp-result-t="${t}"][data-rcp-result-r="${r}"]`);
+      if(resultEl) resultEl.textContent = total.toFixed(receiptMeasTables[t].type==='مكعب'?3:2) + unit;
+    });
+  });
+  wrap.querySelectorAll('[data-rcp-addrow]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      receiptMeasTables[e.currentTarget.dataset.rcpAddrow].rows.push(emptyMeasRow());
+      renderReceiptMeasTables();
+    });
+  });
+  wrap.querySelectorAll('[data-rcp-delrow]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const [t,r] = e.currentTarget.dataset.rcpDelrow.split('-');
+      receiptMeasTables[t].rows.splice(r,1);
+      renderReceiptMeasTables();
+    });
+  });
+  wrap.querySelectorAll('[data-rcp-deltable]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      receiptMeasTables.splice(e.currentTarget.dataset.rcpDeltable,1);
+      renderReceiptMeasTables();
+    });
+  });
+}
+
+function addReceiptMeasTable(type){
+  receiptMeasTables.push({type, rows: Array.from({length:5}, emptyMeasRow)});
+  renderReceiptMeasTables();
+}
+document.getElementById('btnRcpMeasAddSq').addEventListener('click', ()=>addReceiptMeasTable('مربع'));
+document.getElementById('btnRcpMeasAddLen').addEventListener('click', ()=>addReceiptMeasTable('طول'));
+document.getElementById('btnRcpMeasAddCube').addEventListener('click', ()=>addReceiptMeasTable('مكعب'));
+
 function buildMeasurementRecord(){
   const name = document.getElementById('measCustomerName').value.trim();
   if(!name){ toast('يرجى إدخال اسم الزبون'); return null; }
@@ -2582,9 +2736,9 @@ document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
   if(!rec) return;
   const totals = computeMeasTotalsFrom(rec.tables);
   const items = [];
-  if(totals['مربع'] > 0) items.push({qty: Number(totals['مربع'].toFixed(2)), desc: '', price:''});
-  if(totals['طول'] > 0) items.push({qty: Number(totals['طول'].toFixed(2)), desc: '', price:''});
-  if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: '', price:''});
+  if(totals['مربع'] > 0) items.push({qty: Number(totals['مربع'].toFixed(2)), desc: 'متر مربع', price:''});
+  if(totals['طول'] > 0) items.push({qty: Number(totals['طول'].toFixed(2)), desc: 'متر طول', price:''});
+  if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: 'متر مكعب', price:''});
   const pseudoReceipt = {
     id: '',
     no: String(receipts.length + 1).padStart(3,'0'),
@@ -2595,7 +2749,8 @@ document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
     address: '',
     note: 'محوّل من حاسبة القياسات',
     items,
-    payments: []
+    payments: [],
+    measurementTables: rec.tables
   };
   openReceiptModal(pseudoReceipt);
   document.getElementById('rcpId').value = '';
