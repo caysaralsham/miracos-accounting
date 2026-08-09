@@ -238,20 +238,31 @@
     .modal-body{ max-height:none !important; height:auto !important; min-height:0 !important; overflow:visible !important; padding:0 !important; margin:0 !important; }
     .receipt-view{ border:none !important; padding:0 !important; margin:0 !important; min-height:0 !important; }
 
-    /* طباعة متعددة الصفحات مدمجة: خط ومسافات أصغر لاستيعاب أكبر قدر من البيانات بكل صفحة */
-    table{ page-break-inside:auto; border-collapse:collapse; width:100%; font-size:11.5px; }
-    th, td{ padding:4px 6px !important; }
+    /* طباعة متعددة الصفحات: الحجم الافتراضي مريح للقراءة عند قلة البيانات،
+       وينضغط تلقائيًا (عبر كلاس print-compact يضيفه الجافاسكربت) فقط لما البيانات كتيرة */
+    table{ page-break-inside:auto; border-collapse:collapse; width:100%; font-size:14.5px; }
+    th, td{ padding:8px 8px !important; }
     thead{ display:table-header-group; }
     tfoot{ display:table-footer-group; }
     tr{ page-break-inside:avoid; page-break-after:auto; }
     .print-head-row td{ padding:0 !important; border:none !important; }
 
-    .receipt-view .receipt-top{ padding-bottom:8px !important; margin-bottom:8px !important; }
-    .receipt-brand img{ width:56px !important; height:56px !important; }
-    .receipt-brand .name{ font-size:16px !important; }
-    .receipt-info-grid{ font-size:12px !important; margin-bottom:8px !important; gap:4px 16px !important; }
-    .totals-box{ padding:8px 10px !important; margin-top:8px !important; }
-    .totals-row{ padding:2px 0 !important; font-size:11.5px !important; }
+    .receipt-view .receipt-top{ padding-bottom:12px !important; margin-bottom:12px !important; }
+    .receipt-brand img{ width:80px !important; height:80px !important; }
+    .receipt-brand .name{ font-size:21px !important; }
+    .receipt-info-grid{ font-size:14.5px !important; margin-bottom:12px !important; gap:6px 20px !important; }
+    .totals-box{ padding:12px 14px !important; margin-top:12px !important; }
+    .totals-row{ padding:4px 0 !important; font-size:14px !important; }
+
+    /* الوضع المضغوط: يتفعّل تلقائيًا فقط لما عدد الصفوف كبير (راجع beforeprint بالجافاسكربت) */
+    body.print-compact table{ font-size:10.5px; }
+    body.print-compact th, body.print-compact td{ padding:3px 5px !important; }
+    body.print-compact .receipt-view .receipt-top{ padding-bottom:6px !important; margin-bottom:6px !important; }
+    body.print-compact .receipt-brand img{ width:44px !important; height:44px !important; }
+    body.print-compact .receipt-brand .name{ font-size:14px !important; }
+    body.print-compact .receipt-info-grid{ font-size:11px !important; margin-bottom:6px !important; gap:3px 14px !important; }
+    body.print-compact .totals-box{ padding:6px 8px !important; margin-top:6px !important; }
+    body.print-compact .totals-row{ padding:1px 0 !important; font-size:10.5px !important; }
 
     * { animation:none !important; transition:none !important; }
     *{
@@ -702,6 +713,9 @@
         <button class="btn" id="btnExportRestore">تحميل نسخة استرجاع</button>
         <input type="file" id="restoreFileInput" accept="application/json" style="display:none;">
         <button class="btn btn-danger" id="btnImportRestore" style="margin-inline-start:8px;">استرجاع من ملف</button>
+        <hr style="margin:16px 0; border:none; border-top:1px solid var(--line);">
+        <p style="font-size:13px; color:var(--text-dim); margin-top:0;"><b>النسخة اليومية التلقائية:</b> بتنزّل تلقائيًا (ملفين: Excel + استرجاع) لمجلد التنزيلات (Downloads) بجهازك، أول مرة تفتحي فيها البرنامج كل يوم. هاي مرتبطة بالجهاز والمتصفح يلي تفتحي فيه — مش بتصير من جهاز تاني ما فتحتي منه البرنامج.</p>
+        <p style="font-size:13px; margin-top:0;">آخر نسخة تلقائية بهالجهاز: <b id="lastDailyBackupLabel" style="color:var(--brass-deep);">—</b></p>
       </div>
 
       <div class="panel" style="max-width:520px;">
@@ -1243,6 +1257,7 @@ function showLoginScreen(){
 }
 function hideLoginScreen(){
   document.getElementById('loginScreen').style.display = 'none';
+  updateLastDailyBackupLabel();
   runDailyBackupIfNeeded();
 }
 function doLogin(){
@@ -1382,15 +1397,26 @@ const DAILY_BACKUP_KEY = 'miracos_last_daily_backup';
 function isMobileDevice(){
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 }
+function updateLastDailyBackupLabel(){
+  const el = document.getElementById('lastDailyBackupLabel');
+  if(!el) return;
+  const last = safeLocal.getItem(DAILY_BACKUP_KEY);
+  el.textContent = last || 'لسا ما صارت';
+}
+
 function runDailyBackupIfNeeded(){
   const today = new Date().toISOString().slice(0,10);
   const last = safeLocal.getItem(DAILY_BACKUP_KEY);
   if(last === today) return;
   if(receipts.length === 0 && expenses.length === 0 && invoices.length === 0) return;
+  // فاصل زمني بسيط بين التحميلين، حتى ما يحجب المتصفح ثاني تحميل تلقائي متتالي بدون تفاعل من المستخدم
   exportExcelReport(true);
-  exportRestoreJSON(true);
-  safeLocal.setItem(DAILY_BACKUP_KEY, today);
-  toast('تم إنشاء نسخة احتياطية يومية تلقائيًا');
+  setTimeout(()=>{
+    exportRestoreJSON(true);
+    safeLocal.setItem(DAILY_BACKUP_KEY, today);
+    updateLastDailyBackupLabel();
+    toast('تم إنشاء نسخة احتياطية يومية تلقائيًا — تفقّدي مجلد التنزيلات');
+  }, 700);
 }
 
 document.getElementById('btnImportRestore').addEventListener('click', ()=>{
@@ -2985,6 +3011,17 @@ function viewMeasurementRecord(id){
 document.getElementById('btnPrintMeasurementsView').addEventListener('click', ()=>window.print());
 
 renderMeasTables();
+
+// يقرر تلقائيًا قبل الطباعة إذا المحتوى كبير (يحتاج خط مضغوط) أو صغير (يبقى بالحجم المريح)،
+// بالاعتماد على عدد صفوف الجدول الفعلي بالنافذة الظاهرة وقت الطباعة فقط.
+window.addEventListener('beforeprint', ()=>{
+  const activeOverlay = document.querySelector('.overlay.show');
+  const rowCount = activeOverlay ? activeOverlay.querySelectorAll('tbody tr').length : 0;
+  document.body.classList.toggle('print-compact', rowCount > 14);
+});
+window.addEventListener('afterprint', ()=>{
+  document.body.classList.remove('print-compact');
+});
 
 function renderDashboard(){
   const income = receipts.reduce((s,r)=>s + getReceiptPayments(r).reduce((a,p)=>a+p.amount,0), 0);
