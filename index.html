@@ -2233,7 +2233,8 @@ async function buildAndSaveInvoiceFromForm(){
     if(desc || qty || price) items.push({qty, desc, unit, price, amount: qty*price});
   });
   const ht = items.reduce((s,it)=>s+it.amount,0);
-  const tva = ht*0.19;
+  const isSimpleDoc = document.getElementById('invDocType').value === 'simple';
+  const tva = isSimpleDoc ? 0 : ht * 0.19;
   const ttc = ht+tva;
   const payments = [];
   document.querySelectorAll('#invPaymentsBody tr').forEach(row=>{
