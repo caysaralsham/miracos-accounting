@@ -216,32 +216,50 @@
   .meas-print-table th{background:var(--ink); color:#EDEAE1;}
 
   @media print{
+    /* السبب الحقيقي للصفحات الفارغة: (1) كل صناديق النوافذ المنبثقة (.overlay) السبعة بالتطبيق
+       كانت تدخل ضمن تدفق الصفحة المطبوعة مع بعض (حتى المخفية منها)، فكل نموذج غير ظاهر
+       كان يضيف مساحة فارغة كاملة. (2) html/body كان مجبر على ارتفاع صفحة كاملة (100%) بغض النظر
+       عن طول المحتوى الفعلي. الحل: نلغي أي ارتفاع مفروض، ونخفي كل النوافذ المنبثقة تمامًا
+       (display:none) ما عدا النافذة الوحيدة الظاهرة فعليًا وقت الطباعة. */
+    html, body{ height:auto !important; min-height:0 !important; margin:0 !important; padding:0 !important; }
     #loginScreen, .app, .toast{ display:none !important; }
     body *{ visibility:hidden; }
-    #receiptPrintArea, #receiptPrintArea *,
-    #invoicePrintArea, #invoicePrintArea *,
-    #ledgerPrintArea, #ledgerPrintArea *,
-    #measurementsPrintArea, #measurementsPrintArea *{ visibility:visible; }
-    #receiptPrintArea, #invoicePrintArea, #ledgerPrintArea, #measurementsPrintArea{
-      position:absolute; top:0; left:0; width:100%;
-      border:none; padding:0; box-shadow:none;
+
+    .overlay{ display:none !important; }
+    .overlay.show{
+      display:block !important; position:static !important;
+      overflow:visible !important; height:auto !important; min-height:0 !important; max-height:none !important;
+      margin:0 !important; padding:0 !important; background:none !important; backdrop-filter:none !important;
     }
-    .overlay{ position:static !important; overflow:visible !important; height:auto !important; max-height:none !important; padding:0 !important; background:none !important; backdrop-filter:none !important; display:block !important; }
-    .modal{ max-width:none !important; box-shadow:none !important; }
+    .overlay.show *{ visibility:visible; }
+
+    .modal{ max-width:none !important; width:auto !important; height:auto !important; min-height:0 !important; box-shadow:none !important; margin:0 !important; }
     .modal-head, .modal-foot{ display:none !important; }
-    .modal-body{ max-height:none !important; overflow:visible !important; padding:0 !important; }
-    .receipt-view{ border:none !important; padding:0 !important; }
-    table{ page-break-inside:auto; border-collapse:collapse; width:100%; }
+    .modal-body{ max-height:none !important; height:auto !important; min-height:0 !important; overflow:visible !important; padding:0 !important; margin:0 !important; }
+    .receipt-view{ border:none !important; padding:0 !important; margin:0 !important; min-height:0 !important; }
+
+    /* طباعة متعددة الصفحات مدمجة: خط ومسافات أصغر لاستيعاب أكبر قدر من البيانات بكل صفحة */
+    table{ page-break-inside:auto; border-collapse:collapse; width:100%; font-size:11.5px; }
+    th, td{ padding:4px 6px !important; }
     thead{ display:table-header-group; }
     tfoot{ display:table-footer-group; }
     tr{ page-break-inside:avoid; page-break-after:auto; }
     .print-head-row td{ padding:0 !important; border:none !important; }
+
+    .receipt-view .receipt-top{ padding-bottom:8px !important; margin-bottom:8px !important; }
+    .receipt-brand img{ width:56px !important; height:56px !important; }
+    .receipt-brand .name{ font-size:16px !important; }
+    .receipt-info-grid{ font-size:12px !important; margin-bottom:8px !important; gap:4px 16px !important; }
+    .totals-box{ padding:8px 10px !important; margin-top:8px !important; }
+    .totals-row{ padding:2px 0 !important; font-size:11.5px !important; }
+
+    * { animation:none !important; transition:none !important; }
     *{
       -webkit-print-color-adjust:exact !important;
       print-color-adjust:exact !important;
       color-adjust:exact !important;
     }
-    @page{ margin:12mm; }
+    @page{ margin:10mm; size:auto; }
   }
 
   @media (max-width: 900px){
