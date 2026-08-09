@@ -1018,7 +1018,6 @@ const DEFAULT_SETTINGS = {
   logo: LOGO_B64
 };
 
-let settings = {...DEFAULT_SETTINGS};
 let receipts = [];
 let expenses = [];
 let invoices = [];
@@ -1036,6 +1035,20 @@ function makeSafeStorage(realStorage){
 let safeLocal, safeSession;
 try{ safeLocal = makeSafeStorage(window.localStorage); }catch(e){ safeLocal = makeSafeStorage({getItem(){throw 0;},setItem(){throw 0;},removeItem(){throw 0;}}); }
 try{ safeSession = makeSafeStorage(window.sessionStorage); }catch(e){ safeSession = makeSafeStorage({getItem(){throw 0;},setItem(){throw 0;},removeItem(){throw 0;}}); }
+
+// نخزّن آخر إعدادات (بما فيها الشعار) محليًا بهالجهاز، حتى تظهر فورًا من أول ثانية
+// بفتح البرنامج بدون انتظار الاتصال بالسحابة — هيك ما في وميض شعار خاطئ ثم تبديله.
+const SETTINGS_CACHE_KEY = 'miracos_cached_settings';
+let settings = (function(){
+  try{
+    const cached = JSON.parse(safeLocal.getItem(SETTINGS_CACHE_KEY) || 'null');
+    if(cached) return {...DEFAULT_SETTINGS, ...cached};
+  }catch(e){}
+  return {...DEFAULT_SETTINGS};
+})();
+function cacheSettingsLocally(){
+  try{ safeLocal.setItem(SETTINGS_CACHE_KEY, JSON.stringify(settings)); }catch(e){}
+}
 
 const FB_CONFIG_KEY = 'miracos_firebase_config';
 
@@ -1093,7 +1106,7 @@ function startRealtimeSync(){
   unsubscribeSnapshot = ref.onSnapshot(async (doc)=>{
     if(doc.exists){
       const data = doc.data();
-      if(data.settings) settings = {...DEFAULT_SETTINGS, ...data.settings};
+      if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
       if(data.receipts) receipts = data.receipts;
       if(data.expenses) expenses = data.expenses;
       if(data.invoices) invoices = data.invoices;
@@ -1266,6 +1279,7 @@ document.getElementById('btnSaveSettings').addEventListener('click', async ()=>{
   const preview = document.getElementById('setLogoPreview');
   if(preview.dataset.newlogo) settings.logo = preview.dataset.newlogo;
   await saveSettings();
+  cacheSettingsLocally();
   applySettingsToUI();
   toast('تم حفظ الإعدادات');
 });
@@ -1458,7 +1472,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       if(Array.isArray(data.invoices)) invoices = data.invoices;
       if(Array.isArray(data.measurementsList)) measurementsList = data.measurementsList;
       if(Array.isArray(data.paymentHistory)) paymentHistory = data.paymentHistory;
-      if(data.settings) settings = {...DEFAULT_SETTINGS, ...data.settings};
+      if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
       await saveReceipts();
       await saveExpenses();
       await saveInvoices();
