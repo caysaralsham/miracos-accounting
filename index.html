@@ -1946,8 +1946,8 @@ function viewReceipt(id){
       <tbody>${itemsRows}</tbody>
     </table>
     <div class="totals-box">
-      ${paymentsRows}
       <div class="totals-row grand"><span>المجموع</span><span>${fmt(r.total)}</span></div>
+      ${paymentsRows}
       <div class="totals-row" style="color:var(--danger); font-weight:700;"><span>الباقي</span><span>${fmt(r.remaining)}</span></div>
     </div>
     ${r.note ? `<div class="field" style="margin-top:14px;"><label>ملاحظة</label><div>${r.note}</div></div>` : ''}
