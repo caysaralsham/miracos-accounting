@@ -1226,8 +1226,27 @@ document.getElementById('setLogoFile').addEventListener('change', (e)=>{
   if(!file) return;
   const reader = new FileReader();
   reader.onload = ()=>{
-    document.getElementById('setLogoPreview').src = reader.result;
-    document.getElementById('setLogoPreview').dataset.newlogo = reader.result;
+    const img = new Image();
+    img.onload = ()=>{
+      // نصغّر ونضغط اللوغو قبل الحفظ (بحد أقصى 300×300px) — الصور الأصلية من الكاميرا
+      // كبيرة جدًا (عدة ميغابايت) وممكن تتجاوز حد حجم المستند بقاعدة البيانات السحابية
+      // فيفشل الحفظ بصمت ويرجع اللوغو القديم تلقائيًا بالمزامنة التالية.
+      const maxSize = 300;
+      let w = img.width, h = img.height;
+      if(w > h){ if(w > maxSize){ h = Math.round(h * maxSize / w); w = maxSize; } }
+      else{ if(h > maxSize){ w = Math.round(w * maxSize / h); h = maxSize; } }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0,0,w,h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const compressed = canvas.toDataURL('image/jpeg', 0.85);
+      document.getElementById('setLogoPreview').src = compressed;
+      document.getElementById('setLogoPreview').dataset.newlogo = compressed;
+    };
+    img.onerror = ()=>{ toast('تعذر قراءة هالصورة'); };
+    img.src = reader.result;
   };
   reader.readAsDataURL(file);
 });
