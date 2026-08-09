@@ -226,6 +226,16 @@
       position:absolute; top:0; left:0; width:100%;
       border:none; padding:0; box-shadow:none;
     }
+    .overlay{ position:static !important; overflow:visible !important; height:auto !important; max-height:none !important; padding:0 !important; background:none !important; backdrop-filter:none !important; display:block !important; }
+    .modal{ max-width:none !important; box-shadow:none !important; }
+    .modal-head, .modal-foot{ display:none !important; }
+    .modal-body{ max-height:none !important; overflow:visible !important; padding:0 !important; }
+    .receipt-view{ border:none !important; padding:0 !important; }
+    table{ page-break-inside:auto; border-collapse:collapse; width:100%; }
+    thead{ display:table-header-group; }
+    tfoot{ display:table-footer-group; }
+    tr{ page-break-inside:avoid; page-break-after:auto; }
+    .print-head-row td{ padding:0 !important; border:none !important; }
     *{
       -webkit-print-color-adjust:exact !important;
       print-color-adjust:exact !important;
@@ -548,6 +558,24 @@
           <button class="btn btn-primary" id="btnPrintExpenseLedger">طباعة سجل المصروف</button>
         </div>
       </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>سجل الدفعات (تاريخي)</h2>
+          <button class="btn btn-primary btn-sm" id="btnPrintPaymentHistory">طباعة السجل</button>
+        </div>
+        <p style="font-size:12.5px; color:var(--text-dim); margin-top:0;">كل دفعة جديدة بتتسجل هون تلقائيًا بشكل دائم بالتاريخ والوقت — حتى لو الوصل أو الفاتورة الأصلية اتعدّلت أو انحذفت لاحقًا، السجل هون بيضل موجود.</p>
+        <div class="grid2" style="margin-bottom:10px;">
+          <div class="search-box" style="max-width:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+            <input type="text" id="paymentHistorySearch" placeholder="بحث باسم الزبون أو رقم الوصل/الفاتورة...">
+          </div>
+          <div style="display:flex; gap:8px;">
+            <input type="date" id="paymentHistoryFrom" title="من تاريخ">
+            <input type="date" id="paymentHistoryTo" title="إلى تاريخ">
+          </div>
+        </div>
+        <div id="paymentHistoryTableWrap"></div>
+      </div>
     </section>
 
     <section class="view" id="view-customer-reports">
@@ -700,7 +728,7 @@
         <div style="margin-top:12px;">
           <label>الدفعات</label>
           <table class="items-editor">
-            <thead><tr><th style="width:130px">التاريخ</th><th>المبلغ</th><th style="width:36px"></th></tr></thead>
+            <thead><tr><th style="width:130px">التاريخ</th><th>المبلغ</th><th style="width:110px">طريقة الدفع</th><th style="width:36px"></th></tr></thead>
             <tbody id="paymentsBody"></tbody>
           </table>
           <button class="btn btn-sm" id="btnAddPaymentRow" style="margin-top:6px;">+ إضافة دفعة</button>
@@ -824,7 +852,7 @@
         <div style="margin-top:12px;">
           <label id="invPaymentsSectionLabel">Paiements</label>
           <table class="items-editor">
-            <thead><tr><th style="width:130px" id="invColPayDate">Date</th><th id="invColPayAmount">Montant</th><th style="width:36px"></th></tr></thead>
+            <thead><tr><th style="width:130px" id="invColPayDate">Date</th><th id="invColPayAmount">Montant</th><th style="width:110px" id="invColPayMethod">طريقة الدفع</th><th style="width:36px"></th></tr></thead>
             <tbody id="invPaymentsBody"></tbody>
           </table>
           <button class="btn btn-sm" id="btnAddInvoicePaymentRow" style="margin-top:6px;">+ <span id="invAddPaymentLabel">Ajouter un paiement</span></button>
@@ -941,7 +969,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const LOGO_B64 = "data:image/png;base64,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";
+const LOGO_B64 = "data:image/jpeg;base64,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";
 
 const DEFAULT_SETTINGS = {
   companyName: "شركة ميراكوس كنستريكسون",
@@ -963,6 +991,7 @@ let receipts = [];
 let expenses = [];
 let invoices = [];
 let measurementsList = [];
+let paymentHistory = [];
 
 function makeSafeStorage(realStorage){
   const mem = {};
@@ -1037,11 +1066,12 @@ function startRealtimeSync(){
       if(data.expenses) expenses = data.expenses;
       if(data.invoices) invoices = data.invoices;
       if(data.measurementsList) measurementsList = data.measurementsList;
+      if(data.paymentHistory) paymentHistory = data.paymentHistory;
     } else {
-      await ref.set({settings, receipts, expenses, invoices, measurementsList});
+      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory});
     }
     applySettingsToUI();
-    renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable();
+    renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable();
   }, (err)=>{
     console.error(err);
     toast('انقطع الاتصال بقاعدة البيانات السحابية');
@@ -1069,6 +1099,7 @@ async function saveReceipts(){ await cloudSet({receipts}); }
 async function saveExpenses(){ await cloudSet({expenses}); }
 async function saveInvoices(){ await cloudSet({invoices}); }
 async function saveMeasurementsList(){ await cloudSet({measurementsList}); }
+async function savePaymentHistory(){ await cloudSet({paymentHistory}); }
 
 function fillFirebaseForm(cfg){
   document.getElementById('fbApiKey').value = cfg.apiKey || '';
@@ -1121,7 +1152,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.view === 'customers') renderReceiptsTable();
     if(item.dataset.view === 'expenses') renderExpensesTable();
     if(item.dataset.view === 'measurements') renderMeasurementsTable();
-    if(item.dataset.view === 'reports') renderReports();
+    if(item.dataset.view === 'reports'){ renderReports(); renderPaymentHistoryTable(); }
     if(item.dataset.view === 'customer-reports') renderCustomerReports();
     if(item.dataset.view === 'settings') fillSettingsForm();
   });
@@ -1314,7 +1345,7 @@ function exportExcelReport(silent){
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
-  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList };
+  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory };
   const blob = new Blob([JSON.stringify(restoreData)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1363,14 +1394,16 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       expenses = data.expenses;
       if(Array.isArray(data.invoices)) invoices = data.invoices;
       if(Array.isArray(data.measurementsList)) measurementsList = data.measurementsList;
+      if(Array.isArray(data.paymentHistory)) paymentHistory = data.paymentHistory;
       if(data.settings) settings = {...DEFAULT_SETTINGS, ...data.settings};
       await saveReceipts();
       await saveExpenses();
       await saveInvoices();
       await saveMeasurementsList();
+      await savePaymentHistory();
       await saveSettings();
       applySettingsToUI();
-      renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable();
+      renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable();
       toast('تم استرجاع البيانات بنجاح');
     }catch(err){
       console.error(err);
@@ -1520,12 +1553,19 @@ function recalcTotals(){
   return total;
 }
 
+const PAYMENT_METHODS = ['نقدي','تحويل بنكي','شيك','أخرى'];
+function paymentMethodOptions(selected){
+  return PAYMENT_METHODS.map(m=>`<option value="${m}" ${m===selected?'selected':''}>${m}</option>`).join('');
+}
 function newPaymentRow(payment){
-  payment = payment || {date: new Date().toISOString().slice(0,10), amount:''};
+  payment = payment || {date: new Date().toISOString().slice(0,10), amount:'', method:'نقدي'};
+  if(!payment.id) payment.id = uid();
   const row = document.createElement('tr');
+  row.dataset.pmId = payment.id;
   row.innerHTML = `
     <td><input type="date" class="pm-date" value="${payment.date||''}"></td>
     <td><input type="number" class="pm-amount" value="${payment.amount||''}" min="0"></td>
+    <td><select class="pm-method">${paymentMethodOptions(payment.method||'نقدي')}</select></td>
     <td><button class="btn btn-ghost btn-sm pm-remove">✕</button></td>
   `;
   document.getElementById('paymentsBody').appendChild(row);
@@ -1581,6 +1621,29 @@ function openReceiptModal(receipt){
 
 document.getElementById('btnNewReceipt').addEventListener('click', ()=>openReceiptModal(null));
 
+// يسجّل كل دفعة جديدة (مش موجودة قبل بالسجل) بشكل مستقل بسجل تاريخي دائم،
+// بدون ما يمسح أو يعدّل أي سجل قديم — حتى لو الوصل/الفاتورة الأصلية اتعدّلت أو انحذفت لاحقًا.
+async function logPaymentHistoryEntries(payments, meta){
+  const existingIds = new Set(paymentHistory.map(h=>h.paymentId));
+  let changed = false;
+  payments.forEach(p=>{
+    if(!p.id || existingIds.has(p.id)) return;
+    paymentHistory.push({
+      id: uid(),
+      paymentId: p.id,
+      loggedAt: new Date().toISOString(),
+      date: p.date || '',
+      customerName: meta.customerName,
+      amount: p.amount,
+      method: p.method || 'نقدي',
+      docType: meta.docType,
+      docNo: meta.docNo
+    });
+    changed = true;
+  });
+  if(changed) await savePaymentHistory();
+}
+
 async function buildAndSaveReceiptFromForm(){
   const name = document.getElementById('rcpName').value.trim();
   if(!name){ toast('يرجى إدخال اسم الزبون'); return null; }
@@ -1600,7 +1663,9 @@ async function buildAndSaveReceiptFromForm(){
   document.querySelectorAll('#paymentsBody tr').forEach(row=>{
     const date = row.querySelector('.pm-date').value;
     const amount = Number(row.querySelector('.pm-amount').value)||0;
-    if(amount) payments.push({date, amount});
+    const method = row.querySelector('.pm-method') ? row.querySelector('.pm-method').value : 'نقدي';
+    const pid = row.dataset.pmId || uid();
+    if(amount) payments.push({id: pid, date, amount, method});
   });
   const paid = payments.reduce((s,p)=>s+p.amount,0);
 
@@ -1630,8 +1695,10 @@ async function buildAndSaveReceiptFromForm(){
     receipts.push(data);
   }
   await saveReceipts();
+  await logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no});
   renderReceiptsTable();
   renderDashboard();
+  renderPaymentHistoryTable();
   return data.id;
 }
 
@@ -1786,29 +1853,33 @@ function viewReceipt(id){
   }
 
   document.getElementById('receiptPrintArea').innerHTML = `
-    <div class="receipt-top">
-      <div class="receipt-brand">
-        <img src="${settings.logo}">
-        <div>
-          <div class="name">${settings.companyName}</div>
-          <div class="meta">${settings.companyDesc}</div>
-          <div class="meta">${settings.address} · ${settings.phone}</div>
-        </div>
-      </div>
-      <div class="receipt-stamp">
-        <div class="no">#${r.no}</div>
-        <div class="lbl">وصل دفع</div>
-      </div>
-    </div>
-    <div class="receipt-info-grid">
-      <div><span>الاسم: </span>${r.name}</div>
-      <div><span>التاريخ: </span>${r.date||''}</div>
-      <div><span>الهاتف: </span>${r.phone||'—'}</div>
-      <div><span>المدة: </span>${r.duration||'—'}</div>
-      <div><span>العنوان: </span>${r.address||'—'}</div>
-    </div>
     <table>
-      <thead><tr><th>العدد</th><th>النوع والتفاصيل</th><th>السعر</th><th>المبلغ</th></tr></thead>
+      <thead>
+        <tr class="print-head-row"><td colspan="4">
+          <div class="receipt-top">
+            <div class="receipt-brand">
+              <img src="${settings.logo}">
+              <div>
+                <div class="name">${settings.companyName}</div>
+                <div class="meta">${settings.companyDesc}</div>
+                <div class="meta">${settings.address} · ${settings.phone}</div>
+              </div>
+            </div>
+            <div class="receipt-stamp">
+              <div class="no">#${r.no}</div>
+              <div class="lbl">وصل دفع</div>
+            </div>
+          </div>
+          <div class="receipt-info-grid">
+            <div><span>الاسم: </span>${r.name}</div>
+            <div><span>التاريخ: </span>${r.date||''}</div>
+            <div><span>الهاتف: </span>${r.phone||'—'}</div>
+            <div><span>المدة: </span>${r.duration||'—'}</div>
+            <div><span>العنوان: </span>${r.address||'—'}</div>
+          </div>
+        </td></tr>
+        <tr><th>العدد</th><th>النوع والتفاصيل</th><th>السعر</th><th>المبلغ</th></tr>
+      </thead>
       <tbody>${itemsRows}</tbody>
     </table>
     <div class="totals-box">
@@ -1976,11 +2047,14 @@ function recalcInvoiceTotals(){
 }
 
 function newInvoicePaymentRow(payment){
-  payment = payment || {date: new Date().toISOString().slice(0,10), amount:''};
+  payment = payment || {date: new Date().toISOString().slice(0,10), amount:'', method:'نقدي'};
+  if(!payment.id) payment.id = uid();
   const row = document.createElement('tr');
+  row.dataset.pmId = payment.id;
   row.innerHTML = `
     <td><input type="date" class="inv-pm-date" value="${payment.date||''}"></td>
     <td><input type="number" class="inv-pm-amount" value="${payment.amount||''}" min="0"></td>
+    <td><select class="inv-pm-method">${paymentMethodOptions(payment.method||'نقدي')}</select></td>
     <td><button class="btn btn-ghost btn-sm inv-pm-remove">✕</button></td>
   `;
   document.getElementById('invPaymentsBody').appendChild(row);
@@ -2022,6 +2096,7 @@ function updateInvNoLabel(){
   document.getElementById('invPaymentsSectionLabel').textContent = isSimple ? 'الدفعات' : 'Paiements';
   document.getElementById('invColPayDate').textContent = isSimple ? 'التاريخ' : 'Date';
   document.getElementById('invColPayAmount').textContent = isSimple ? 'المبلغ' : 'Montant';
+  document.getElementById('invColPayMethod').textContent = isSimple ? 'طريقة الدفع' : 'Mode de paiement';
   document.getElementById('invAddPaymentLabel').textContent = isSimple ? 'إضافة دفعة' : 'Ajouter un paiement';
   document.getElementById('invPaidLabel').textContent = isSimple ? 'مجموع المدفوع' : 'Total payé';
   document.getElementById('invRemainingLabel').textContent = isSimple ? 'الباقي' : 'Reste à payer';
@@ -2100,7 +2175,9 @@ async function buildAndSaveInvoiceFromForm(){
   document.querySelectorAll('#invPaymentsBody tr').forEach(row=>{
     const date = row.querySelector('.inv-pm-date').value;
     const amount = Number(row.querySelector('.inv-pm-amount').value)||0;
-    if(amount) payments.push({date, amount});
+    const method = row.querySelector('.inv-pm-method') ? row.querySelector('.inv-pm-method').value : 'نقدي';
+    const pid = row.dataset.pmId || uid();
+    if(amount) payments.push({id: pid, date, amount, method});
   });
   const paid = payments.reduce((s,p)=>s+p.amount,0);
 
@@ -2129,8 +2206,10 @@ async function buildAndSaveInvoiceFromForm(){
     invoices.push(data);
   }
   await saveInvoices();
+  await logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no});
   renderInvoicesTable();
   renderDashboard();
+  renderPaymentHistoryTable();
   return data.id;
 }
 
@@ -2241,27 +2320,31 @@ function viewInvoice(id){
     `).join('') || '<div class="totals-row"><span>لا توجد دفعات مسجّلة</span><span>—</span></div>';
 
     document.getElementById('invoicePrintArea').innerHTML = `
-      <div class="receipt-top">
-        <div class="receipt-brand">
-          <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
-          <div>
-            <div class="name" style="font-size:16px;">${settings.companyName} — ${settings.companyDesc}</div>
-            <div class="meta" style="font-size:11px; line-height:1.5;">${settings.address} · ${settings.phone}</div>
-          </div>
-        </div>
-        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
-          <div class="receipt-stamp">
-            <div class="no">عرض سعر</div>
-            <div class="lbl">رقم ${inv.no}</div>
-          </div>
-          <div style="font-size:13px; font-weight:700; color:var(--text-dim);">التاريخ: ${inv.date||''}</div>
-        </div>
-      </div>
-      <div style="margin-bottom:14px; font-size:13.5px; line-height:1.6;">
-        <div><b>الزبون:</b> ${inv.clientName} ${inv.clientAddress ? '— '+inv.clientAddress : ''}${inv.clientPhone ? ' — '+inv.clientPhone : ''}</div>
-      </div>
       <table>
-        <thead><tr><th>العدد</th><th>البيان</th><th>الوحدة</th><th>السعر</th><th>المجموع</th></tr></thead>
+        <thead>
+          <tr class="print-head-row"><td colspan="5">
+            <div class="receipt-top">
+              <div class="receipt-brand">
+                <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
+                <div>
+                  <div class="name" style="font-size:16px;">${settings.companyName} — ${settings.companyDesc}</div>
+                  <div class="meta" style="font-size:11px; line-height:1.5;">${settings.address} · ${settings.phone}</div>
+                </div>
+              </div>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+                <div class="receipt-stamp">
+                  <div class="no">عرض سعر</div>
+                  <div class="lbl">رقم ${inv.no}</div>
+                </div>
+                <div style="font-size:13px; font-weight:700; color:var(--text-dim);">التاريخ: ${inv.date||''}</div>
+              </div>
+            </div>
+            <div style="margin-bottom:14px; font-size:13.5px; line-height:1.6;">
+              <div><b>الزبون:</b> ${inv.clientName} ${inv.clientAddress ? '— '+inv.clientAddress : ''}${inv.clientPhone ? ' — '+inv.clientPhone : ''}</div>
+            </div>
+          </td></tr>
+          <tr><th>العدد</th><th>البيان</th><th>الوحدة</th><th>السعر</th><th>المجموع</th></tr>
+        </thead>
         <tbody>${itemsRowsAr}</tbody>
       </table>
       <div class="totals-box">
@@ -2285,33 +2368,36 @@ function viewInvoice(id){
     <div class="totals-row"><span>Paiement du ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
   `).join('') || '<div class="totals-row"><span>Aucun paiement enregistré</span><span>—</span></div>';
 
-  document.getElementById('invoicePrintArea').innerHTML = `
-    <div class="receipt-top" style="direction:ltr; text-align:left;">
-      <div class="receipt-brand">
-        <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
-        <div>
-          <div class="name" style="font-size:16px;">${settings.companyName} — ${settings.companyDesc}</div>
-          <div class="meta" style="font-size:10.5px; line-height:1.5;">${settings.address} · ${settings.phone} · RC: ${settings.rc||''} · NIF: ${settings.nif||''}</div>
-          <div class="meta" style="font-size:10.5px; line-height:1.5;">NIS: ${settings.nis||''} · Art: ${settings.article||''} · ${settings.bank||''} · ${settings.email||''}</div>
-        </div>
-      </div>
-      <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
-        <div class="receipt-stamp">
-          <div class="no">${docLabel}</div>
-          <div class="lbl">N° ${inv.no}</div>
-        </div>
-        <div style="font-size:13px; font-weight:700; color:var(--text-dim);">Date: ${inv.date||''}</div>
-      </div>
-    </div>
-    <div style="direction:ltr; text-align:left; margin-bottom:14px; font-size:13.5px; line-height:1.6;">`;
   document.getElementById('viewInvoiceTitle').textContent = docLabel === 'FACTURE' ? 'Facture' : 'Devis';
   const clientLegalLine = `<div style="color:var(--text-dim); font-size:12px;">${inv.clientRC ? 'RC: '+inv.clientRC+' · ' : ''}${inv.clientNIF ? 'NIF: '+inv.clientNIF+' · ' : ''}${inv.clientNIS ? 'NIS: '+inv.clientNIS : ''}</div>`;
-  document.getElementById('invoicePrintArea').innerHTML += `
-      <div><b>Client:</b> ${inv.clientName} ${inv.clientAddress ? '— '+inv.clientAddress : ''}</div>
-      ${clientLegalLine}
-    </div>
+  document.getElementById('invoicePrintArea').innerHTML = `
     <table style="direction:ltr;">
-      <thead><tr><th>Qté</th><th>Désignation</th><th>Unité</th><th>Prix Unit.</th><th>Total</th></tr></thead>
+      <thead>
+        <tr class="print-head-row"><td colspan="5">
+          <div class="receipt-top" style="direction:ltr; text-align:left;">
+            <div class="receipt-brand">
+              <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
+              <div>
+                <div class="name" style="font-size:16px;">${settings.companyName} — ${settings.companyDesc}</div>
+                <div class="meta" style="font-size:10.5px; line-height:1.5;">${settings.address} · ${settings.phone} · RC: ${settings.rc||''} · NIF: ${settings.nif||''}</div>
+                <div class="meta" style="font-size:10.5px; line-height:1.5;">NIS: ${settings.nis||''} · Art: ${settings.article||''} · ${settings.bank||''} · ${settings.email||''}</div>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+              <div class="receipt-stamp">
+                <div class="no">${docLabel}</div>
+                <div class="lbl">N° ${inv.no}</div>
+              </div>
+              <div style="font-size:13px; font-weight:700; color:var(--text-dim);">Date: ${inv.date||''}</div>
+            </div>
+          </div>
+          <div style="direction:ltr; text-align:left; margin-bottom:14px; font-size:13.5px; line-height:1.6;">
+            <div><b>Client:</b> ${inv.clientName} ${inv.clientAddress ? '— '+inv.clientAddress : ''}</div>
+            ${clientLegalLine}
+          </div>
+        </td></tr>
+        <tr><th>Qté</th><th>Désignation</th><th>Unité</th><th>Prix Unit.</th><th>Total</th></tr>
+      </thead>
       <tbody>${itemsRows}</tbody>
     </table>
     <div class="totals-box" style="direction:ltr; text-align:left;">
@@ -2817,40 +2903,7 @@ async function deleteMeasurementRecord(id){
 function viewMeasurementRecord(id){
   const rec = measurementsList.find(r=>r.id===id);
   if(!rec) return;
-  let tablesHtml = rec.tables.map(tbl=>{
-    const spec = MEAS_SPECS[tbl.type];
-    const headCols = spec.cols.map(c=>`<th>${c}</th>`).join('');
-    const rowsHtml = tbl.rows.map((r,i)=>{
-      const cells = spec.cols.map((c,ci)=>{
-        const field = ci===0?'l':ci===1?'w':'h';
-        return `<td>${r[field]||'—'}</td>`;
-      }).join('');
-      const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
-      const base = measResultFor(tbl.type, r.l, r.w, r.h);
-      const total = base.value * (Number(count)||1);
-      const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
-      const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
-      return `<tr><td>${i+1}</td>${cells}<td>${count}</td><td>${resLabel}</td></tr>`;
-    }).join('');
-    return `
-      <div style="margin-top:14px;">
-        <div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${spec.label}</div>
-        <table class="meas-print-table">
-          <thead><tr><th>#</th>${headCols}<th>العدد</th><th>النتيجة</th></tr></thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      </div>`;
-  }).join('');
-
-  const t = computeMeasTotalsFrom(rec.tables);
-  const totalsHtml = `
-    <div class="totals-box" style="margin-top:16px; display:flex; gap:20px; flex-wrap:wrap;">
-      ${t['مربع']>0 ? `<div><b>إجمالي متر مربع:</b> ${t['مربع'].toFixed(2)} م²</div>` : ''}
-      ${t['طول']>0 ? `<div><b>إجمالي متر طول:</b> ${t['طول'].toFixed(2)} م.ط</div>` : ''}
-      ${t['مكعب']>0 ? `<div><b>إجمالي متر مكعب:</b> ${t['مكعب'].toFixed(3)} م³</div>` : ''}
-    </div>`;
-
-  document.getElementById('measurementsPrintArea').innerHTML = `
+  const measDocHead = `
     <div class="receipt-top">
       <div class="receipt-brand">
         <img src="${settings.logo}">
@@ -2867,7 +2920,45 @@ function viewMeasurementRecord(id){
     <div class="receipt-info-grid">
       <div><span>الزبون: </span>${rec.customerName}</div>
       <div><span>الهاتف: </span>${rec.customerPhone||'—'}</div>
-    </div>
+    </div>`;
+
+  let tablesHtml = rec.tables.map((tbl, tblIndex)=>{
+    const spec = MEAS_SPECS[tbl.type];
+    const headCols = spec.cols.map(c=>`<th>${c}</th>`).join('');
+    const rowsHtml = tbl.rows.map((r,i)=>{
+      const cells = spec.cols.map((c,ci)=>{
+        const field = ci===0?'l':ci===1?'w':'h';
+        return `<td>${r[field]||'—'}</td>`;
+      }).join('');
+      const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
+      const base = measResultFor(tbl.type, r.l, r.w, r.h);
+      const total = base.value * (Number(count)||1);
+      const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
+      const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
+      return `<tr><td>${i+1}</td>${cells}<td>${count}</td><td>${resLabel}</td></tr>`;
+    }).join('');
+    const headRow = tblIndex===0
+      ? `<tr class="print-head-row"><td colspan="${spec.cols.length+3}">${measDocHead}<div style="font-weight:700; color:var(--brass-deep); margin:10px 0 6px;">${spec.label}</div></td></tr>`
+      : '';
+    return `
+      <div style="margin-top:14px;">
+        ${tblIndex>0 ? `<div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${spec.label}</div>` : ''}
+        <table class="meas-print-table">
+          <thead>${headRow}<tr><th>#</th>${headCols}<th>العدد</th><th>النتيجة</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>`;
+  }).join('');
+
+  const t = computeMeasTotalsFrom(rec.tables);
+  const totalsHtml = `
+    <div class="totals-box" style="margin-top:16px; display:flex; gap:20px; flex-wrap:wrap;">
+      ${t['مربع']>0 ? `<div><b>إجمالي متر مربع:</b> ${t['مربع'].toFixed(2)} م²</div>` : ''}
+      ${t['طول']>0 ? `<div><b>إجمالي متر طول:</b> ${t['طول'].toFixed(2)} م.ط</div>` : ''}
+      ${t['مكعب']>0 ? `<div><b>إجمالي متر مكعب:</b> ${t['مكعب'].toFixed(3)} م³</div>` : ''}
+    </div>`;
+
+  document.getElementById('measurementsPrintArea').innerHTML = `
     ${tablesHtml}
     ${totalsHtml}
   `;
@@ -2979,6 +3070,68 @@ function renderCustomerReports(){
   }
 }
 
+function getFilteredPaymentHistory(){
+  const q = (document.getElementById('paymentHistorySearch').value || '').trim();
+  const from = document.getElementById('paymentHistoryFrom').value;
+  const to = document.getElementById('paymentHistoryTo').value;
+  let list = [...paymentHistory];
+  if(q) list = list.filter(h => (h.customerName||'').includes(q) || (h.docNo||'').includes(q));
+  if(from) list = list.filter(h => (h.date||'') >= from);
+  if(to) list = list.filter(h => (h.date||'') <= to);
+  return list.sort((a,b)=> (b.loggedAt||'').localeCompare(a.loggedAt||''));
+}
+
+function renderPaymentHistoryTable(){
+  const wrap = document.getElementById('paymentHistoryTableWrap');
+  if(!wrap) return;
+  const list = getFilteredPaymentHistory();
+  if(list.length === 0){
+    wrap.innerHTML = `<div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="18" height="13" rx="2"/></svg>
+      <div>لا توجد دفعات مسجّلة بعد.</div>
+    </div>`;
+    return;
+  }
+  const totalAmount = list.reduce((s,h)=>s+(Number(h.amount)||0), 0);
+  let html = `<table><thead><tr>
+    <th>التاريخ</th><th>الوقت</th><th>الزبون</th><th>المبلغ</th><th>المستند</th><th>طريقة الدفع</th>
+  </tr></thead><tbody>`;
+  list.forEach(h=>{
+    const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ', {hour:'2-digit', minute:'2-digit'}) : '—';
+    html += `<tr>
+      <td>${h.date||'—'}</td>
+      <td>${loggedTime}</td>
+      <td>${h.customerName||'—'}</td>
+      <td>${fmt(h.amount)}</td>
+      <td>${h.docType||''} ${h.docNo?'#'+h.docNo:''}</td>
+      <td>${h.method||'—'}</td>
+    </tr>`;
+  });
+  html += `</tbody></table>
+    <div class="totals-box" style="margin-top:10px;">
+      <div class="totals-row grand"><span>عدد الدفعات: ${list.length}</span><span>الإجمالي: ${fmt(totalAmount)}</span></div>
+    </div>`;
+  wrap.innerHTML = html;
+}
+document.getElementById('paymentHistorySearch').addEventListener('input', renderPaymentHistoryTable);
+document.getElementById('paymentHistoryFrom').addEventListener('input', renderPaymentHistoryTable);
+document.getElementById('paymentHistoryTo').addEventListener('input', renderPaymentHistoryTable);
+
+document.getElementById('btnPrintPaymentHistory').addEventListener('click', ()=>{
+  const list = getFilteredPaymentHistory();
+  if(list.length === 0){ toast('لا توجد دفعات لطباعتها'); return; }
+  const rows = list.map(h=>{
+    const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ', {hour:'2-digit', minute:'2-digit'}) : '';
+    const docPart = h.docType ? `${h.docType}${h.docNo?' #'+h.docNo:''}` : '';
+    return {
+      date: h.date || '',
+      details: `${h.customerName||''}${docPart?' — '+docPart:''}${h.method?' — '+h.method:''}${loggedTime?' — سُجّلت '+loggedTime:''}`,
+      amount: Number(h.amount)||0
+    };
+  });
+  showLedger('سجل الدفعات', rows);
+});
+
 function sortLedgerRows(rows){
   return rows.sort((a,b)=>{
     const da = a.date ? new Date(a.date).getTime() : 0;
@@ -2990,17 +3143,21 @@ function showLedger(title, rows){
   document.getElementById('ledgerViewTitle').textContent = title;
   const totalAmount = rows.reduce((s,r)=>s+r.amount,0);
   let html = `
-    <div class="receipt-top" style="margin-bottom:16px;">
-      <div class="receipt-brand">
-        <img src="${settings.logo}" style="width:60px; height:60px;">
-        <div>
-          <div class="name" style="font-size:16px;">${settings.companyName}</div>
-          <div class="meta" style="font-size:12px;">${title} — ${new Date().toLocaleDateString('ar-DZ')}</div>
-        </div>
-      </div>
-    </div>
     <table>
-      <thead><tr><th style="width:60px;">#</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr></thead>
+      <thead>
+        <tr class="print-head-row"><td colspan="4">
+          <div class="receipt-top" style="margin-bottom:16px;">
+            <div class="receipt-brand">
+              <img src="${settings.logo}" style="width:60px; height:60px;">
+              <div>
+                <div class="name" style="font-size:16px;">${settings.companyName}</div>
+                <div class="meta" style="font-size:12px;">${title} — ${new Date().toLocaleDateString('ar-DZ')}</div>
+              </div>
+            </div>
+          </div>
+        </td></tr>
+        <tr><th style="width:60px;">#</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr>
+      </thead>
       <tbody>
         ${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.date||'—'}</td><td style="text-align:right;">${r.details}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
       </tbody>
