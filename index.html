@@ -2692,7 +2692,7 @@ function renderMeasTables(){
     let rowsHtml = tbl.rows.map((r,ri)=>{
       let inputs = spec.cols.map((c,ci)=>{
         const field = ci===0?'l':ci===1?'w':'h';
-        return `<input type="number" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
+        return `<input type="text" inputmode="decimal" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
       }).join('');
       const pad = spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '';
       const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
@@ -2703,7 +2703,7 @@ function renderMeasTables(){
       return `<div class="meas-row-grid">
         <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
         ${inputs}${pad}
-        <input type="number" min="1" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
+        <input type="text" inputmode="numeric" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
         <span class="meas-result" data-result-t="${ti}" data-result-r="${ri}">${resLabel}</span>
         <button type="button" class="btn btn-ghost btn-sm" data-delrow="${ti}-${ri}" title="حذف">✕</button>
       </div>`;
@@ -2726,7 +2726,26 @@ function renderMeasTables(){
   wrap.querySelectorAll('input').forEach(el=>{
     el.addEventListener('input', e=>{
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
-      measTables[t].rows[r][f] = e.target.value;
+      let clean;
+      if(f === 'count'){
+        clean = e.target.value.replace(/[^0-9]/g, '');
+      } else {
+        const raw = e.target.value;
+        if(raw.includes('.')){
+          const parts = raw.replace(/[^0-9.]/g, '').split('.');
+          clean = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+        } else {
+          const digits = raw.replace(/[^0-9]/g, '');
+          if(digits.length === 0){ clean = ''; }
+          else if(digits[0] === '0' && digits.length > 1){
+            clean = '0.' + digits.slice(1);
+          } else {
+            clean = digits;
+          }
+        }
+      }
+      if(clean !== e.target.value) e.target.value = clean;
+      measTables[t].rows[r][f] = clean;
       const row = measTables[t].rows[r];
       const count = row.count===undefined || row.count===null || row.count==='' ? 1 : row.count;
       const base = measResultFor(measTables[t].type, row.l, row.w, row.h);
@@ -2781,7 +2800,7 @@ function renderReceiptMeasTables(){
     let rowsHtml = tbl.rows.map((r,ri)=>{
       let inputs = spec.cols.map((c,ci)=>{
         const field = ci===0?'l':ci===1?'w':'h';
-        return `<input type="number" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
+        return `<input type="text" inputmode="decimal" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
       }).join('');
       const pad = spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '';
       const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
@@ -2792,7 +2811,7 @@ function renderReceiptMeasTables(){
       return `<div class="meas-row-grid">
         <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
         ${inputs}${pad}
-        <input type="number" min="1" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
+        <input type="text" inputmode="numeric" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
         <span class="meas-result" data-rcp-result-t="${ti}" data-rcp-result-r="${ri}">${resLabel}</span>
         <button type="button" class="btn btn-ghost btn-sm" data-rcp-delrow="${ti}-${ri}" title="حذف">✕</button>
       </div>`;
@@ -2814,7 +2833,26 @@ function renderReceiptMeasTables(){
   wrap.querySelectorAll('input').forEach(el=>{
     el.addEventListener('input', e=>{
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
-      receiptMeasTables[t].rows[r][f] = e.target.value;
+      let clean;
+      if(f === 'count'){
+        clean = e.target.value.replace(/[^0-9]/g, '');
+      } else {
+        const raw = e.target.value;
+        if(raw.includes('.')){
+          const parts = raw.replace(/[^0-9.]/g, '').split('.');
+          clean = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+        } else {
+          const digits = raw.replace(/[^0-9]/g, '');
+          if(digits.length === 0){ clean = ''; }
+          else if(digits[0] === '0' && digits.length > 1){
+            clean = '0.' + digits.slice(1);
+          } else {
+            clean = digits;
+          }
+        }
+      }
+      if(clean !== e.target.value) e.target.value = clean;
+      receiptMeasTables[t].rows[r][f] = clean;
       const row = receiptMeasTables[t].rows[r];
       const count = row.count===undefined || row.count===null || row.count==='' ? 1 : row.count;
       const base = measResultFor(receiptMeasTables[t].type, row.l, row.w, row.h);
