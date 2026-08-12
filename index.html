@@ -610,17 +610,18 @@
 
       <div class="panel">
         <div class="panel-head"><h2>الأقسام</h2></div>
-        <div id="priceCategoryChips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
-        <div style="display:flex; gap:8px;">
-          <input type="text" id="plNewCategory" placeholder="اسم قسم جديد (مثلاً: جرن)" style="max-width:280px;">
-          <button class="btn btn-primary" id="btnAddPriceCategory">+ إضافة قسم</button>
-        </div>
+        <p style="font-size:12.5px; color:var(--text-dim); margin-top:0;">دوسي على أي قسم تحت لتشوفي أصنافه. لإضافة قسم جديد، استخدمي خانة "القسم" بنموذج إضافة الصنف.</p>
+        <div id="priceCategoryChips" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
       </div>
 
       <div class="panel">
         <div class="panel-head"><h2>إضافة صنف جديد</h2></div>
         <div class="grid2">
-          <div class="field"><label>القسم</label><select id="plItemCategory"></select></div>
+          <div class="field">
+            <label>القسم</label>
+            <select id="plItemCategory"></select>
+            <input type="text" id="plNewCategoryInline" placeholder="اكتبي اسم القسم الجديد" style="display:none; margin-top:6px;">
+          </div>
           <div class="field"><label>النوع والتفاصيل</label><input type="text" id="plItemType" placeholder="مثلاً: جرن رخام كرارا"></div>
           <div class="field"><label>القياس</label><input type="text" id="plItemMeasurement" placeholder="مثلاً: 60×60 سم"></div>
           <div class="field"><label>اللون</label><input type="text" id="plItemColor" placeholder="مثلاً: أبيض"></div>
@@ -628,6 +629,7 @@
         <div style="display:flex; gap:10px; align-items:end;">
           <div class="field" style="max-width:160px;"><label>السعر</label><input type="number" id="plItemPrice" min="0"></div>
           <button class="btn btn-primary" id="btnAddPriceListItem" style="height:38px;">+ إضافة الصنف</button>
+          <button class="btn" id="btnCancelPriceListEdit" style="height:38px; display:none;">إلغاء</button>
         </div>
       </div>
 
@@ -1175,7 +1177,7 @@ function renderPriceCategoryChips(){
   const select = document.getElementById('plItemCategory');
   if(!wrap) return;
   if(priceCategories.length === 0){
-    wrap.innerHTML = `<span style="font-size:12.5px; color:var(--text-dim);">لا توجد أقسام بعد — أضيفي قسم أول.</span>`;
+    wrap.innerHTML = `<span style="font-size:12.5px; color:var(--text-dim);">لا توجد أقسام بعد — أضيفيها من خانة "القسم" تحت.</span>`;
   } else {
     wrap.innerHTML = priceCategories.map(c => `
       <span class="tag" style="background:var(--marble-2); color:var(--brass-deep); display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:13px;">
@@ -1207,19 +1209,24 @@ function renderPriceCategoryChips(){
     });
   }
   if(select){
-    select.innerHTML = priceCategories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+    const current = select.value;
+    select.innerHTML = priceCategories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')
+      + `<option value="__new__">+ قسم جديد...</option>`;
+    if([...select.options].some(o=>o.value===current)) select.value = current;
+    toggleNewCategoryInput();
   }
 }
 
-document.getElementById('btnAddPriceCategory').addEventListener('click', async ()=>{
-  const input = document.getElementById('plNewCategory');
-  const name = input.value.trim();
-  if(!name){ toast('اكتبي اسم القسم'); return; }
-  priceCategories.push({ id: uid(), name });
-  await savePriceList();
-  input.value = '';
-  renderPriceCategoryChips();
-});
+function toggleNewCategoryInput(){
+  const select = document.getElementById('plItemCategory');
+  const inline = document.getElementById('plNewCategoryInline');
+  if(!select || !inline) return;
+  inline.style.display = select.value === '__new__' ? 'block' : 'none';
+}
+document.getElementById('plItemCategory').addEventListener('change', toggleNewCategoryInput);
+
+let expandedPriceCategoryIds = new Set();
+let editingPriceItemId = null;
 
 function renderPriceListGrouped(){
   const wrap = document.getElementById('priceListGroupedWrap');
@@ -1231,48 +1238,116 @@ function renderPriceListGrouped(){
   let html = '';
   priceCategories.forEach(cat=>{
     const items = priceList.filter(p=>p.categoryId===cat.id);
-    html += `<div style="margin-top:16px;">
-      <div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${cat.name}</div>`;
-    if(items.length === 0){
-      html += `<div class="empty-state" style="padding:16px;">لا توجد أصناف بهذا القسم بعد.</div>`;
-    } else {
-      html += `<table><thead><tr><th>النوع والتفاصيل</th><th>القياس</th><th>اللون</th><th style="width:110px">السعر</th><th style="width:36px"></th></tr></thead><tbody>`;
-      items.forEach(p=>{
-        html += `<tr>
-          <td>${p.type||''}</td><td>${p.measurement||'—'}</td><td>${p.color||'—'}</td><td>${fmt(p.price)}</td>
-          <td><button class="btn btn-ghost btn-sm" data-item-remove="${p.id}">✕</button></td>
-        </tr>`;
-      });
-      html += `</tbody></table>`;
+    const isOpen = expandedPriceCategoryIds.has(cat.id);
+    html += `<div class="panel" style="margin-top:10px; padding:0; overflow:hidden;">
+      <div data-cat-toggle="${cat.id}" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; padding:14px 18px;">
+        <span style="font-weight:700; color:var(--brass-deep);">${cat.name} <span style="color:var(--text-dim); font-weight:400; font-size:12.5px;">(${items.length})</span></span>
+        <span style="color:var(--text-dim);">${isOpen ? '▲' : '▼'}</span>
+      </div>`;
+    if(isOpen){
+      html += `<div style="padding:0 18px 16px;">`;
+      if(items.length === 0){
+        html += `<div class="empty-state" style="padding:16px;">لا توجد أصناف بهذا القسم بعد.</div>`;
+      } else {
+        html += `<table><thead><tr><th>النوع والتفاصيل</th><th>القياس</th><th>اللون</th><th style="width:110px">السعر</th><th style="width:70px"></th></tr></thead><tbody>`;
+        items.forEach(p=>{
+          html += `<tr>
+            <td>${p.type||''}</td><td>${p.measurement||'—'}</td><td>${p.color||'—'}</td><td>${fmt(p.price)}</td>
+            <td>
+              <button class="btn btn-ghost btn-sm" data-item-edit="${p.id}" title="تعديل">✎</button>
+              <button class="btn btn-ghost btn-sm" data-item-remove="${p.id}" title="حذف">✕</button>
+            </td>
+          </tr>`;
+        });
+        html += `</tbody></table>`;
+      }
+      html += `</div>`;
     }
     html += `</div>`;
   });
   wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-cat-toggle]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const id = el.dataset.catToggle;
+      if(expandedPriceCategoryIds.has(id)) expandedPriceCategoryIds.delete(id);
+      else expandedPriceCategoryIds.add(id);
+      renderPriceListGrouped();
+    });
+  });
   wrap.querySelectorAll('[data-item-remove]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
+    btn.addEventListener('click', async (e)=>{
+      e.stopPropagation();
       priceList = priceList.filter(p=>p.id!==btn.dataset.itemRemove);
       await savePriceList();
       renderPriceListGrouped();
     });
   });
+  wrap.querySelectorAll('[data-item-edit]').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const item = priceList.find(p=>p.id===btn.dataset.itemEdit);
+      if(!item) return;
+      editingPriceItemId = item.id;
+      document.getElementById('plItemCategory').value = item.categoryId;
+      toggleNewCategoryInput();
+      document.getElementById('plItemType').value = item.type || '';
+      document.getElementById('plItemMeasurement').value = item.measurement || '';
+      document.getElementById('plItemColor').value = item.color || '';
+      document.getElementById('plItemPrice').value = item.price || '';
+      document.getElementById('btnAddPriceListItem').textContent = 'حفظ التعديل';
+      document.getElementById('btnCancelPriceListEdit').style.display = 'inline-flex';
+      document.getElementById('plItemType').scrollIntoView({behavior:'smooth', block:'center'});
+    });
+  });
 }
 
-document.getElementById('btnAddPriceListItem').addEventListener('click', async ()=>{
-  const categoryId = document.getElementById('plItemCategory').value;
-  const type = document.getElementById('plItemType').value.trim();
-  const measurement = document.getElementById('plItemMeasurement').value.trim();
-  const color = document.getElementById('plItemColor').value.trim();
-  const price = Number(document.getElementById('plItemPrice').value) || 0;
-  if(!categoryId){ toast('أضيفي قسم أول'); return; }
-  if(!type){ toast('اكتبي النوع والتفاصيل'); return; }
-  priceList.push({ id: uid(), categoryId, type, measurement, color, price });
-  await savePriceList();
+function resetPriceListForm(){
+  editingPriceItemId = null;
   document.getElementById('plItemType').value = '';
   document.getElementById('plItemMeasurement').value = '';
   document.getElementById('plItemColor').value = '';
   document.getElementById('plItemPrice').value = '';
+  document.getElementById('btnAddPriceListItem').textContent = '+ إضافة الصنف';
+  document.getElementById('btnCancelPriceListEdit').style.display = 'none';
+}
+document.getElementById('btnCancelPriceListEdit').addEventListener('click', resetPriceListForm);
+
+document.getElementById('btnAddPriceListItem').addEventListener('click', async ()=>{
+  let categoryId = document.getElementById('plItemCategory').value;
+  const type = document.getElementById('plItemType').value.trim();
+  const measurement = document.getElementById('plItemMeasurement').value.trim();
+  const color = document.getElementById('plItemColor').value.trim();
+  const price = Number(document.getElementById('plItemPrice').value) || 0;
+
+  if(categoryId === '__new__'){
+    const newName = document.getElementById('plNewCategoryInline').value.trim();
+    if(!newName){ toast('اكتبي اسم القسم الجديد'); return; }
+    const newCat = { id: uid(), name: newName };
+    priceCategories.push(newCat);
+    categoryId = newCat.id;
+    document.getElementById('plNewCategoryInline').value = '';
+  }
+  if(!categoryId){ toast('اختاري أو أضيفي قسم'); return; }
+  if(!type){ toast('اكتبي النوع والتفاصيل'); return; }
+
+  if(editingPriceItemId){
+    const item = priceList.find(p=>p.id===editingPriceItemId);
+    if(item){ Object.assign(item, {categoryId, type, measurement, color, price}); }
+    expandedPriceCategoryIds.add(categoryId);
+    resetPriceListForm();
+    toast('تم حفظ التعديل');
+  } else {
+    priceList.push({ id: uid(), categoryId, type, measurement, color, price });
+    expandedPriceCategoryIds.add(categoryId);
+    document.getElementById('plItemType').value = '';
+    document.getElementById('plItemMeasurement').value = '';
+    document.getElementById('plItemColor').value = '';
+    document.getElementById('plItemPrice').value = '';
+    toast('تم إضافة الصنف');
+  }
+  await savePriceList();
+  renderPriceCategoryChips();
   renderPriceListGrouped();
-  toast('تم إضافة الصنف');
 });
 
 function fillFirebaseForm(cfg){
