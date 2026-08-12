@@ -375,6 +375,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 3.5a3.2 3.2 0 010 6.2M18.5 14a5.5 5.5 0 013 5"/></svg>
         تقارير الزبائن
       </a>
+      <a class="nav-item" data-view="pricelist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7l6-4 6 4 6-4v14l-6 4-6-4-6 4V7z"/><path d="M9 3v14M15 7v14"/></svg>
+        قائمة الأسعار
+      </a>
       <a class="nav-item" data-view="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 13a7.9 7.9 0 000-2l2-1.5-2-3.5-2.4.6a8 8 0 00-1.7-1L14.8 3h-5.6l-.5 2.6a8 8 0 00-1.7 1l-2.4-.6-2 3.5L4.6 11a7.9 7.9 0 000 2l-2 1.5 2 3.5 2.4-.6a8 8 0 001.7 1L9.2 21h5.6l.5-2.6a8 8 0 001.7-1l2.4.6 2-3.5-2-1.5z"/></svg>
         الإعدادات
@@ -599,6 +603,35 @@
         <div class="panel-head"><h2>زبائن عندهم مدة تسليم</h2></div>
         <div id="deliveryTrackWrap"></div>
       </div>
+    </section>
+
+    <section class="view" id="view-pricelist">
+      <div class="topbar"><h1>قائمة الأسعار</h1></div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>الأقسام</h2></div>
+        <div id="priceCategoryChips" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;"></div>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="plNewCategory" placeholder="اسم قسم جديد (مثلاً: جرن)" style="max-width:280px;">
+          <button class="btn btn-primary" id="btnAddPriceCategory">+ إضافة قسم</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h2>إضافة صنف جديد</h2></div>
+        <div class="grid2">
+          <div class="field"><label>القسم</label><select id="plItemCategory"></select></div>
+          <div class="field"><label>النوع والتفاصيل</label><input type="text" id="plItemType" placeholder="مثلاً: جرن رخام كرارا"></div>
+          <div class="field"><label>القياس</label><input type="text" id="plItemMeasurement" placeholder="مثلاً: 60×60 سم"></div>
+          <div class="field"><label>اللون</label><input type="text" id="plItemColor" placeholder="مثلاً: أبيض"></div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:end;">
+          <div class="field" style="max-width:160px;"><label>السعر</label><input type="number" id="plItemPrice" min="0"></div>
+          <button class="btn btn-primary" id="btnAddPriceListItem" style="height:38px;">+ إضافة الصنف</button>
+        </div>
+      </div>
+
+      <div id="priceListGroupedWrap"></div>
     </section>
 
     <section class="view" id="view-settings">
@@ -1009,6 +1042,8 @@ let expenses = [];
 let invoices = [];
 let measurementsList = [];
 let paymentHistory = [];
+let priceList = [];
+let priceCategories = [];
 
 function makeSafeStorage(realStorage){
   const mem = {};
@@ -1098,11 +1133,13 @@ function startRealtimeSync(){
       if(data.invoices) invoices = data.invoices;
       if(data.measurementsList) measurementsList = data.measurementsList;
       if(data.paymentHistory) paymentHistory = data.paymentHistory;
+      if(data.priceList) priceList = data.priceList;
+      if(data.priceCategories) priceCategories = data.priceCategories;
     } else {
-      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory});
+      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories});
     }
     applySettingsToUI();
-    renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable();
+    renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped();
   }, (err)=>{
     console.error(err);
     toast('انقطع الاتصال بقاعدة البيانات السحابية');
@@ -1131,6 +1168,112 @@ async function saveExpenses(){ await cloudSet({expenses}); }
 async function saveInvoices(){ await cloudSet({invoices}); }
 async function saveMeasurementsList(){ await cloudSet({measurementsList}); }
 async function savePaymentHistory(){ await cloudSet({paymentHistory}); }
+async function savePriceList(){ await cloudSet({priceList, priceCategories}); }
+
+function renderPriceCategoryChips(){
+  const wrap = document.getElementById('priceCategoryChips');
+  const select = document.getElementById('plItemCategory');
+  if(!wrap) return;
+  if(priceCategories.length === 0){
+    wrap.innerHTML = `<span style="font-size:12.5px; color:var(--text-dim);">لا توجد أقسام بعد — أضيفي قسم أول.</span>`;
+  } else {
+    wrap.innerHTML = priceCategories.map(c => `
+      <span class="tag" style="background:var(--marble-2); color:var(--brass-deep); display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:13px;">
+        ${c.name}
+        <button type="button" data-cat-rename="${c.id}" style="border:none; background:none; cursor:pointer; color:var(--text-dim);" title="تعديل الاسم">✎</button>
+        <button type="button" data-cat-remove="${c.id}" style="border:none; background:none; cursor:pointer; color:var(--danger);" title="حذف القسم">✕</button>
+      </span>`).join('');
+    wrap.querySelectorAll('[data-cat-remove]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const catId = btn.dataset.catRemove;
+        if(priceList.some(p=>p.categoryId===catId)){
+          if(!confirm('هذا القسم فيه أصناف — حذفه رح يحذف كل الأصناف اللي فيه. متأكدة؟')) return;
+        }
+        priceCategories = priceCategories.filter(c=>c.id!==catId);
+        priceList = priceList.filter(p=>p.categoryId!==catId);
+        await savePriceList();
+        renderPriceCategoryChips(); renderPriceListGrouped();
+      });
+    });
+    wrap.querySelectorAll('[data-cat-rename]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const cat = priceCategories.find(c=>c.id===btn.dataset.catRename);
+        const newName = prompt('اسم القسم الجديد:', cat.name);
+        if(!newName || !newName.trim()) return;
+        cat.name = newName.trim();
+        await savePriceList();
+        renderPriceCategoryChips(); renderPriceListGrouped();
+      });
+    });
+  }
+  if(select){
+    select.innerHTML = priceCategories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  }
+}
+
+document.getElementById('btnAddPriceCategory').addEventListener('click', async ()=>{
+  const input = document.getElementById('plNewCategory');
+  const name = input.value.trim();
+  if(!name){ toast('اكتبي اسم القسم'); return; }
+  priceCategories.push({ id: uid(), name });
+  await savePriceList();
+  input.value = '';
+  renderPriceCategoryChips();
+});
+
+function renderPriceListGrouped(){
+  const wrap = document.getElementById('priceListGroupedWrap');
+  if(!wrap) return;
+  if(priceCategories.length === 0){
+    wrap.innerHTML = '';
+    return;
+  }
+  let html = '';
+  priceCategories.forEach(cat=>{
+    const items = priceList.filter(p=>p.categoryId===cat.id);
+    html += `<div style="margin-top:16px;">
+      <div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${cat.name}</div>`;
+    if(items.length === 0){
+      html += `<div class="empty-state" style="padding:16px;">لا توجد أصناف بهذا القسم بعد.</div>`;
+    } else {
+      html += `<table><thead><tr><th>النوع والتفاصيل</th><th>القياس</th><th>اللون</th><th style="width:110px">السعر</th><th style="width:36px"></th></tr></thead><tbody>`;
+      items.forEach(p=>{
+        html += `<tr>
+          <td>${p.type||''}</td><td>${p.measurement||'—'}</td><td>${p.color||'—'}</td><td>${fmt(p.price)}</td>
+          <td><button class="btn btn-ghost btn-sm" data-item-remove="${p.id}">✕</button></td>
+        </tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+    html += `</div>`;
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-item-remove]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      priceList = priceList.filter(p=>p.id!==btn.dataset.itemRemove);
+      await savePriceList();
+      renderPriceListGrouped();
+    });
+  });
+}
+
+document.getElementById('btnAddPriceListItem').addEventListener('click', async ()=>{
+  const categoryId = document.getElementById('plItemCategory').value;
+  const type = document.getElementById('plItemType').value.trim();
+  const measurement = document.getElementById('plItemMeasurement').value.trim();
+  const color = document.getElementById('plItemColor').value.trim();
+  const price = Number(document.getElementById('plItemPrice').value) || 0;
+  if(!categoryId){ toast('أضيفي قسم أول'); return; }
+  if(!type){ toast('اكتبي النوع والتفاصيل'); return; }
+  priceList.push({ id: uid(), categoryId, type, measurement, color, price });
+  await savePriceList();
+  document.getElementById('plItemType').value = '';
+  document.getElementById('plItemMeasurement').value = '';
+  document.getElementById('plItemColor').value = '';
+  document.getElementById('plItemPrice').value = '';
+  renderPriceListGrouped();
+  toast('تم إضافة الصنف');
+});
 
 function fillFirebaseForm(cfg){
   document.getElementById('fbApiKey').value = cfg.apiKey || '';
@@ -1185,6 +1328,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.view === 'expenses') renderExpensesTable();
     if(item.dataset.view === 'measurements') renderMeasurementsTable();
     if(item.dataset.view === 'reports'){ renderReports(); renderPaymentHistoryTable(); }
+    if(item.dataset.view === 'pricelist'){ renderPriceCategoryChips(); renderPriceListGrouped(); }
     if(item.dataset.view === 'customer-reports') renderCustomerReports();
     if(item.dataset.view === 'settings') fillSettingsForm();
   });
@@ -1398,7 +1542,7 @@ function exportExcelReport(silent){
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
-  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory };
+  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories };
   const blob = new Blob([JSON.stringify(restoreData)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1459,15 +1603,18 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       if(Array.isArray(data.invoices)) invoices = data.invoices;
       if(Array.isArray(data.measurementsList)) measurementsList = data.measurementsList;
       if(Array.isArray(data.paymentHistory)) paymentHistory = data.paymentHistory;
+      if(Array.isArray(data.priceList)) priceList = data.priceList;
+      if(Array.isArray(data.priceCategories)) priceCategories = data.priceCategories;
       if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
       await saveReceipts();
       await saveExpenses();
       await saveInvoices();
       await saveMeasurementsList();
       await savePaymentHistory();
+      await savePriceList();
       await saveSettings();
       applySettingsToUI();
-      renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable();
+      renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped();
       toast('تم استرجاع البيانات بنجاح');
     }catch(err){
       console.error(err);
