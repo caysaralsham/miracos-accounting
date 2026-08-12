@@ -3419,23 +3419,18 @@ function renderReports(){
 function renderCustomerReports(){
   const dWrap = document.getElementById('deliveryTrackWrap');
   const withDelivery = receipts
+    .filter(r => !r.delivered)
     .map(r=>({r, deliveryDate: computeDeliveryDate(r)}))
     .filter(x=>x.deliveryDate)
     .sort((a,b)=>a.deliveryDate.localeCompare(b.deliveryDate));
   if(withDelivery.length === 0){
-    dWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن مسجّل لهم مدة تسليم بعد.</div>';
+    dWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن قيد العمل عندهم مدة تسليم بعد.</div>';
   } else {
     dWrap.innerHTML = `<table><thead><tr>
-      <th>الاسم</th><th>التفاصيل</th><th>بداية (تاريخ الوصل)</th><th>المدة</th><th>موعد التسليم المتوقع</th><th>الحالة</th><th>الباقي (مبلغ)</th><th>حالة التسليم</th><th>حالة الدفع</th>
+      <th>الاسم</th><th>التفاصيل</th><th>بداية (تاريخ الوصل)</th><th>المدة</th><th>موعد التسليم المتوقع</th><th>الحالة</th><th>الباقي (مبلغ)</th>
     </tr></thead><tbody>${
       withDelivery.map(({r, deliveryDate})=>{
         const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
-        const deliveryStatus = r.delivered
-          ? `<span style="color:var(--verdigris-deep); font-weight:700;">تم التسليم</span>`
-          : `<span style="color:var(--text-dim);">لسا ما تسلّم</span>`;
-        const paymentStatus = r.remaining > 0
-          ? `<span style="color:var(--danger); font-weight:700;">دين</span>`
-          : `<span style="color:var(--verdigris-deep); font-weight:700;">مدفوع</span>`;
         return `<tr>
           <td>${r.name}</td>
           <td>${details}</td>
@@ -3444,8 +3439,6 @@ function renderCustomerReports(){
           <td>${deliveryDate}</td>
           <td>${daysUntilLabel(deliveryDate)}</td>
           <td>${fmt(r.remaining)}</td>
-          <td>${deliveryStatus}</td>
-          <td>${paymentStatus}</td>
         </tr>`;
       }).join('')
     }</tbody></table>`;
