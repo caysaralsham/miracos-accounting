@@ -438,6 +438,13 @@
 
       <div class="panel">
         <div class="panel-head">
+          <h2 style="color:var(--danger);">⚠ زبائن مستلمين البضاعة وعليهم دين</h2>
+        </div>
+        <div id="deliveredDueList"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
           <h2>آخر الحركات</h2>
         </div>
         <div id="recentList"></div>
@@ -600,8 +607,12 @@
     <section class="view" id="view-customer-reports">
       <div class="topbar"><h1>تقارير الزبائن</h1></div>
       <div class="panel">
-        <div class="panel-head"><h2>زبائن عندهم مدة تسليم</h2></div>
+        <div class="panel-head"><h2>زبائن قيد العمل (عندهم مدة تسليم)</h2></div>
         <div id="deliveryTrackWrap"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>زبائن تم تسليمهم</h2></div>
+        <div id="deliveredCustomersWrap"></div>
       </div>
     </section>
 
@@ -2066,7 +2077,7 @@ function daysUntilLabel(dateStr){
 function renderReceiptsTable(){
   const wrap = document.getElementById('receiptsTableWrap');
   const q = (document.getElementById('customerSearch').value || '').trim();
-  let list = [...receipts].reverse();
+  let list = receipts.filter(r => !r.delivered).reverse();
   if(q) list = list.filter(r =>
     r.name.includes(q) ||
     (r.phone||'').includes(q) ||
@@ -2089,7 +2100,7 @@ function renderReceiptsTable(){
       <td>${r.name}</td>
       <td>${details}</td>
       <td>${r.phone||'—'}</td>
-      <td>${daysUntilLabel(computeDeliveryDate(r))}</td>
+      <td>${r.delivered ? '<span style="color:var(--verdigris-deep); font-weight:700;">✔ تم التسليم</span>' : daysUntilLabel(computeDeliveryDate(r))}</td>
       <td>${fmt(r.total)}</td>
       <td>${fmt(r.remaining)}</td>
       <td>${statusTag(r)}</td>
@@ -3367,6 +3378,16 @@ function renderDashboard(){
     }</tbody></table>`;
   }
 
+  const deliveredDue = receipts.filter(r => r.delivered && r.remaining > 0);
+  const deliveredDueWrap = document.getElementById('deliveredDueList');
+  if(deliveredDue.length===0){
+    deliveredDueWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن مستلمين وعليهم دين 🎉</div>';
+  } else {
+    deliveredDueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th></tr></thead><tbody>${
+      deliveredDue.map(r=>`<tr><td>${r.name}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td></tr>`).join('')
+    }</tbody></table>`;
+  }
+
   const recentReceipts = receipts.slice(-5).reverse().map(r=>({type:'وصل', label:`${r.name} — #${r.no}`, amount:r.total, date:r.date}));
   const recentExp = expenses.slice(-5).reverse().map(e=>({type:'مصروف', label:e.desc, amount:-e.amount, date:e.date}));
   const combined = [...recentReceipts, ...recentExp].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,8);
@@ -3439,6 +3460,32 @@ function renderCustomerReports(){
           <td>${deliveryDate}</td>
           <td>${daysUntilLabel(deliveryDate)}</td>
           <td>${fmt(r.remaining)}</td>
+        </tr>`;
+      }).join('')
+    }</tbody></table>`;
+  }
+
+  const deliveredWrap = document.getElementById('deliveredCustomersWrap');
+  const delivered = [...receipts]
+    .filter(r => r.delivered)
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(delivered.length === 0){
+    deliveredWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن تم تسليمهم بعد.</div>';
+  } else {
+    deliveredWrap.innerHTML = `<table><thead><tr>
+      <th>الاسم</th><th>التفاصيل</th><th>تاريخ الوصل</th><th>المجموع</th><th>حالة الدفع</th>
+    </tr></thead><tbody>${
+      delivered.map(r=>{
+        const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
+        const paymentStatus = r.remaining > 0
+          ? `<span style="color:var(--danger); font-weight:700;">دين</span>`
+          : `<span style="color:var(--verdigris-deep); font-weight:700;">مدفوع</span>`;
+        return `<tr>
+          <td>${r.name}</td>
+          <td>${details}</td>
+          <td>${r.date||''}</td>
+          <td>${fmt(r.total)}</td>
+          <td>${paymentStatus}</td>
         </tr>`;
       }).join('')
     }</tbody></table>`;
