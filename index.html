@@ -359,6 +359,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="8.5" r="2.4"/><path d="M15.5 14.2c2.6.3 4.5 2.5 4.5 5.3"/></svg>
         الزبائن والوصولات
       </a>
+      <a class="nav-item" data-view="delivery">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="13" height="9" rx="1.5"/><path d="M16 11h3l2 2.5V17h-5"/><circle cx="7.5" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/></svg>
+        تسليم البضاعة
+      </a>
       <a class="nav-item" data-view="expenses">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/></svg>
         المصاريف
@@ -602,6 +606,20 @@
       <div class="panel">
         <div class="panel-head"><h2>زبائن عندهم مدة تسليم</h2></div>
         <div id="deliveryTrackWrap"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-delivery">
+      <div class="topbar"><h1>تسليم البضاعة</h1></div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2>الوصولات</h2>
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); cursor:pointer;">
+            <input type="checkbox" id="deliveryShowDelivered" style="width:auto;">
+            إظهار المُسلَّمة كمان
+          </label>
+        </div>
+        <div id="deliveryListWrap"></div>
       </div>
     </section>
 
@@ -1210,7 +1228,8 @@ function renderPriceCategoryChips(){
   }
   if(select){
     const current = select.value;
-    select.innerHTML = priceCategories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')
+    select.innerHTML = `<option value="">-- اختاري قسم --</option>`
+      + priceCategories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')
       + `<option value="__new__">+ قسم جديد...</option>`;
     if([...select.options].some(o=>o.value===current)) select.value = current;
     toggleNewCategoryInput();
@@ -1254,7 +1273,7 @@ function renderPriceListGrouped(){
           html += `<tr>
             <td>${p.type||''}</td><td>${p.measurement||'—'}</td><td>${p.color||'—'}</td><td>${fmt(p.price)}</td>
             <td>
-              <button class="btn btn-ghost btn-sm" data-item-edit="${p.id}" title="تعديل">✎</button>
+              <button class="btn btn-ghost btn-sm" data-item-edit="${p.id}" title="تعديل" style="color:var(--brass-deep);">تعديل</button>
               <button class="btn btn-ghost btn-sm" data-item-remove="${p.id}" title="حذف">✕</button>
             </td>
           </tr>`;
@@ -1303,6 +1322,8 @@ function renderPriceListGrouped(){
 
 function resetPriceListForm(){
   editingPriceItemId = null;
+  document.getElementById('plItemCategory').value = '';
+  toggleNewCategoryInput();
   document.getElementById('plItemType').value = '';
   document.getElementById('plItemMeasurement').value = '';
   document.getElementById('plItemColor').value = '';
@@ -1404,6 +1425,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.view === 'measurements') renderMeasurementsTable();
     if(item.dataset.view === 'reports'){ renderReports(); renderPaymentHistoryTable(); }
     if(item.dataset.view === 'pricelist'){ renderPriceCategoryChips(); renderPriceListGrouped(); }
+    if(item.dataset.view === 'delivery'){ renderDeliveryList(); }
     if(item.dataset.view === 'customer-reports') renderCustomerReports();
     if(item.dataset.view === 'settings') fillSettingsForm();
   });
@@ -3405,6 +3427,52 @@ function renderCustomerReports(){
     }</tbody></table>`;
   }
 }
+
+function renderDeliveryList(){
+  const wrap = document.getElementById('deliveryListWrap');
+  if(!wrap) return;
+  const showDelivered = document.getElementById('deliveryShowDelivered').checked;
+  const list = [...receipts]
+    .filter(r => showDelivered || !r.delivered)
+    .sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+  if(list.length === 0){
+    wrap.innerHTML = `<div class="empty-state" style="padding:20px;">${showDelivered ? 'لا توجد وصولات بعد.' : 'كل الوصولات متسلّمة — دوسي "إظهار المُسلَّمة" لعرضها.'}</div>`;
+    return;
+  }
+  wrap.innerHTML = `<table><thead><tr>
+    <th>التاريخ</th><th>الاسم</th><th>المبلغ الكلي</th><th>الباقي</th><th>الحالة</th><th style="width:140px"></th>
+  </tr></thead><tbody>${
+    list.map(r=>{
+      let statusBadge;
+      if(r.delivered && r.remaining > 0){
+        statusBadge = `<span class="tag tag-partial">تم التسليم — عليه دفعة متبقية</span>`;
+      } else if(r.delivered){
+        statusBadge = `<span class="tag tag-paid">تم التسليم</span>`;
+      } else {
+        statusBadge = `<span class="tag tag-due">لسا ما تسلّم</span>`;
+      }
+      return `<tr>
+        <td>${r.date||''}</td>
+        <td>${r.name}</td>
+        <td>${fmt(r.total)}</td>
+        <td>${fmt(r.remaining)}</td>
+        <td>${statusBadge}</td>
+        <td><button class="btn btn-sm ${r.delivered ? '' : 'btn-primary'}" data-delivery-toggle="${r.id}">${r.delivered ? 'إلغاء التسليم' : 'تم التسليم'}</button></td>
+      </tr>`;
+    }).join('')
+  }</tbody></table>`;
+  wrap.querySelectorAll('[data-delivery-toggle]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const r = receipts.find(x=>x.id===btn.dataset.deliveryToggle);
+      if(!r) return;
+      r.delivered = !r.delivered;
+      await saveReceipts();
+      renderDeliveryList();
+      toast(r.delivered ? 'تم تسجيل التسليم' : 'تم إلغاء التسليم');
+    });
+  });
+}
+document.getElementById('deliveryShowDelivered').addEventListener('change', renderDeliveryList);
 
 function getFilteredPaymentHistory(){
   const q = (document.getElementById('paymentHistorySearch').value || '').trim();
