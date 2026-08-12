@@ -775,7 +775,13 @@
       </table>
       <button class="btn btn-sm" id="btnAddItemRow" style="margin-top:8px;">+ إضافة سطر</button>
 
+      <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+        <label style="margin:0; white-space:nowrap;">خصم (اختياري)</label>
+        <input type="number" id="rcpDiscount" min="0" placeholder="0" style="max-width:160px;">
+      </div>
       <div class="totals-box">
+        <div class="totals-row"><span>المجموع قبل الخصم</span><span id="itemsSubtotalDisplay">0 دج</span></div>
+        <div class="totals-row" id="itemsDiscountRow" style="display:none; color:var(--danger);"><span>خصم</span><span id="itemsDiscountDisplay">0 دج</span></div>
         <div class="totals-row grand"><span>المجموع</span><span id="itemsTotalDisplay">0 دج</span></div>
 
         <div style="margin-top:12px;">
@@ -789,7 +795,7 @@
 
         <div class="totals-row" style="margin-top:12px;"><span>مجموع المدفوع</span><span id="paidTotalDisplay">0 دج</span></div>
         <div class="totals-row"><span>الباقي</span><span id="remainingDisplay" style="font-weight:800;">0 دج</span></div>
-        <div id="rcpDeliveredWrap" style="display:none; margin-top:12px; padding-top:10px; border-top:1px dashed var(--line);">
+        <div id="rcpDeliveredWrap" style="margin-top:12px; padding-top:10px; border-top:1px dashed var(--line);">
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
             <input type="checkbox" id="rcpDelivered" style="width:auto;">
             <span style="color:var(--verdigris-deep); font-weight:700;">تم تسليم البضاعة</span>
@@ -1830,14 +1836,25 @@ function openItemMeasureTool(row, qtyInput){
 }
 
 function recalcTotals(){
-  let total = 0;
+  let subtotal = 0;
   document.querySelectorAll('#itemsBody tr').forEach(row=>{
     const qtyEl = row.querySelector('.it-qty');
     if(!qtyEl) return;
     const qty = Number(qtyEl.value)||0;
     const price = Number(row.querySelector('.it-price').value)||0;
-    total += qty*price;
+    subtotal += qty*price;
   });
+  const discount = Number(document.getElementById('rcpDiscount').value)||0;
+  const total = Math.max(0, subtotal - discount);
+  const discountRow = document.getElementById('itemsDiscountRow');
+  if(discount > 0){
+    discountRow.style.display = 'flex';
+    document.getElementById('itemsSubtotalDisplay').textContent = fmt(subtotal);
+    document.getElementById('itemsDiscountDisplay').textContent = '-' + fmt(discount);
+  } else {
+    discountRow.style.display = 'none';
+    document.getElementById('itemsSubtotalDisplay').textContent = fmt(subtotal);
+  }
   document.getElementById('itemsTotalDisplay').textContent = fmt(total);
   let paid = 0;
   document.querySelectorAll('#paymentsBody tr').forEach(row=>{
@@ -1846,15 +1863,6 @@ function recalcTotals(){
   document.getElementById('paidTotalDisplay').textContent = fmt(paid);
   const remaining = total - paid;
   document.getElementById('remainingDisplay').textContent = fmt(remaining);
-  const deliveredWrap = document.getElementById('rcpDeliveredWrap');
-  if(deliveredWrap){
-    if(remaining <= 0 && total > 0){
-      deliveredWrap.style.display = 'block';
-    } else {
-      deliveredWrap.style.display = 'none';
-      document.getElementById('rcpDelivered').checked = false;
-    }
-  }
   return total;
 }
 
@@ -1880,6 +1888,7 @@ function newPaymentRow(payment){
 }
 document.getElementById('btnAddPaymentRow').addEventListener('click', ()=>newPaymentRow());
 document.getElementById('btnAddItemRow').addEventListener('click', ()=>newItemRow());
+document.getElementById('rcpDiscount').addEventListener('input', recalcTotals);
 
 function getReceiptPayments(receipt){
   if(receipt.payments && receipt.payments.length) return receipt.payments;
@@ -1902,6 +1911,7 @@ function openReceiptModal(receipt){
     document.getElementById('rcpPhone').value = receipt.phone || '';
     document.getElementById('rcpAddress').value = receipt.address || '';
     document.getElementById('rcpNote').value = receipt.note || '';
+    document.getElementById('rcpDiscount').value = receipt.discount || '';
     (receipt.items||[]).forEach(it=>newItemRow(it));
     const pays = getReceiptPayments(receipt);
     if(pays.length) pays.forEach(p=>newPaymentRow(p));
@@ -1916,14 +1926,13 @@ function openReceiptModal(receipt){
     document.getElementById('rcpPhone').value = '';
     document.getElementById('rcpAddress').value = '';
     document.getElementById('rcpNote').value = '';
+    document.getElementById('rcpDiscount').value = '';
     newItemRow();
     receiptMeasTables = [];
   }
   renderReceiptMeasTables();
   recalcTotals();
-  if(receipt && receipt.delivered && document.getElementById('rcpDeliveredWrap').style.display !== 'none'){
-    document.getElementById('rcpDelivered').checked = true;
-  }
+  document.getElementById('rcpDelivered').checked = !!(receipt && receipt.delivered);
   document.getElementById('receiptOverlay').classList.add('show');
 }
 
@@ -1966,7 +1975,9 @@ async function buildAndSaveReceiptFromForm(){
   });
   const hasDetails = items.some(it=>it.desc);
   if(!hasDetails){ toast('يرجى كتابة تفاصيل البند (النوع) — خانة إجبارية'); return null; }
-  const total = items.reduce((s,it)=>s+it.amount,0);
+  const subtotal = items.reduce((s,it)=>s+it.amount,0);
+  const discount = Number(document.getElementById('rcpDiscount').value)||0;
+  const total = Math.max(0, subtotal - discount);
   const payments = [];
   document.querySelectorAll('#paymentsBody tr').forEach(row=>{
     const date = row.querySelector('.pm-date').value;
@@ -1990,11 +2001,11 @@ async function buildAndSaveReceiptFromForm(){
     name,
     phone: document.getElementById('rcpPhone').value.trim(),
     address: document.getElementById('rcpAddress').value.trim(),
-    items, total, payments,
+    items, total, discount, payments,
     remaining: total - paid,
     note: document.getElementById('rcpNote').value.trim(),
     measurementTables: measTablesToSave,
-    delivered: document.getElementById('rcpDeliveredWrap').style.display !== 'none' && document.getElementById('rcpDelivered').checked
+    delivered: document.getElementById('rcpDelivered').checked
   };
 
   if(id){
@@ -2193,6 +2204,9 @@ function viewReceipt(id){
       <tbody>${itemsRows}</tbody>
     </table>
     <div class="totals-box">
+      ${r.discount > 0 ? `
+      <div class="totals-row"><span>المجموع قبل الخصم</span><span>${fmt(r.items.reduce((s,it)=>s+it.amount,0))}</span></div>
+      <div class="totals-row" style="color:var(--danger);"><span>خصم</span><span>-${fmt(r.discount)}</span></div>` : ''}
       <div class="totals-row grand"><span>المجموع</span><span>${fmt(r.total)}</span></div>
       ${paymentsRows}
       <div class="totals-row" style="color:var(--danger); font-weight:700;"><span>الباقي</span><span>${fmt(r.remaining)}</span></div>
