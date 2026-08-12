@@ -359,10 +359,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="8.5" r="2.4"/><path d="M15.5 14.2c2.6.3 4.5 2.5 4.5 5.3"/></svg>
         الزبائن والوصولات
       </a>
-      <a class="nav-item" data-view="delivery">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="13" height="9" rx="1.5"/><path d="M16 11h3l2 2.5V17h-5"/><circle cx="7.5" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/></svg>
-        تسليم البضاعة
-      </a>
       <a class="nav-item" data-view="expenses">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h4"/></svg>
         المصاريف
@@ -609,20 +605,6 @@
       </div>
     </section>
 
-    <section class="view" id="view-delivery">
-      <div class="topbar"><h1>تسليم البضاعة</h1></div>
-      <div class="panel">
-        <div class="panel-head">
-          <h2>الوصولات</h2>
-          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); cursor:pointer;">
-            <input type="checkbox" id="deliveryShowDelivered" style="width:auto;">
-            إظهار المُسلَّمة كمان
-          </label>
-        </div>
-        <div id="deliveryListWrap"></div>
-      </div>
-    </section>
-
     <section class="view" id="view-pricelist">
       <div class="topbar"><h1>قائمة الأسعار</h1></div>
 
@@ -807,6 +789,12 @@
 
         <div class="totals-row" style="margin-top:12px;"><span>مجموع المدفوع</span><span id="paidTotalDisplay">0 دج</span></div>
         <div class="totals-row"><span>الباقي</span><span id="remainingDisplay" style="font-weight:800;">0 دج</span></div>
+        <div id="rcpDeliveredWrap" style="display:none; margin-top:12px; padding-top:10px; border-top:1px dashed var(--line);">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+            <input type="checkbox" id="rcpDelivered" style="width:auto;">
+            <span style="color:var(--verdigris-deep); font-weight:700;">تم تسليم البضاعة</span>
+          </label>
+        </div>
       </div>
 
       <div class="field" style="margin-top:10px;">
@@ -1425,7 +1413,6 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.view === 'measurements') renderMeasurementsTable();
     if(item.dataset.view === 'reports'){ renderReports(); renderPaymentHistoryTable(); }
     if(item.dataset.view === 'pricelist'){ renderPriceCategoryChips(); renderPriceListGrouped(); }
-    if(item.dataset.view === 'delivery'){ renderDeliveryList(); }
     if(item.dataset.view === 'customer-reports') renderCustomerReports();
     if(item.dataset.view === 'settings') fillSettingsForm();
   });
@@ -1857,7 +1844,17 @@ function recalcTotals(){
     paid += Number(row.querySelector('.pm-amount').value)||0;
   });
   document.getElementById('paidTotalDisplay').textContent = fmt(paid);
-  document.getElementById('remainingDisplay').textContent = fmt(total - paid);
+  const remaining = total - paid;
+  document.getElementById('remainingDisplay').textContent = fmt(remaining);
+  const deliveredWrap = document.getElementById('rcpDeliveredWrap');
+  if(deliveredWrap){
+    if(remaining <= 0 && total > 0){
+      deliveredWrap.style.display = 'block';
+    } else {
+      deliveredWrap.style.display = 'none';
+      document.getElementById('rcpDelivered').checked = false;
+    }
+  }
   return total;
 }
 
@@ -1924,6 +1921,9 @@ function openReceiptModal(receipt){
   }
   renderReceiptMeasTables();
   recalcTotals();
+  if(receipt && receipt.delivered && document.getElementById('rcpDeliveredWrap').style.display !== 'none'){
+    document.getElementById('rcpDelivered').checked = true;
+  }
   document.getElementById('receiptOverlay').classList.add('show');
 }
 
@@ -1993,7 +1993,8 @@ async function buildAndSaveReceiptFromForm(){
     items, total, payments,
     remaining: total - paid,
     note: document.getElementById('rcpNote').value.trim(),
-    measurementTables: measTablesToSave
+    measurementTables: measTablesToSave,
+    delivered: document.getElementById('rcpDeliveredWrap').style.display !== 'none' && document.getElementById('rcpDelivered').checked
   };
 
   if(id){
@@ -2007,6 +2008,7 @@ async function buildAndSaveReceiptFromForm(){
   renderReceiptsTable();
   renderDashboard();
   renderPaymentHistoryTable();
+  renderCustomerReports();
   return data.id;
 }
 
@@ -3410,10 +3412,16 @@ function renderCustomerReports(){
     dWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن مسجّل لهم مدة تسليم بعد.</div>';
   } else {
     dWrap.innerHTML = `<table><thead><tr>
-      <th>الاسم</th><th>التفاصيل</th><th>بداية (تاريخ الوصل)</th><th>المدة</th><th>موعد التسليم المتوقع</th><th>الحالة</th><th>الباقي (مبلغ)</th>
+      <th>الاسم</th><th>التفاصيل</th><th>بداية (تاريخ الوصل)</th><th>المدة</th><th>موعد التسليم المتوقع</th><th>الحالة</th><th>الباقي (مبلغ)</th><th>حالة التسليم</th><th>حالة الدفع</th>
     </tr></thead><tbody>${
       withDelivery.map(({r, deliveryDate})=>{
         const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
+        const deliveryStatus = r.delivered
+          ? `<span style="color:var(--verdigris-deep); font-weight:700;">تم التسليم</span>`
+          : `<span style="color:var(--text-dim);">لسا ما تسلّم</span>`;
+        const paymentStatus = r.remaining > 0
+          ? `<span style="color:var(--danger); font-weight:700;">دين</span>`
+          : `<span style="color:var(--verdigris-deep); font-weight:700;">مدفوع</span>`;
         return `<tr>
           <td>${r.name}</td>
           <td>${details}</td>
@@ -3422,57 +3430,13 @@ function renderCustomerReports(){
           <td>${deliveryDate}</td>
           <td>${daysUntilLabel(deliveryDate)}</td>
           <td>${fmt(r.remaining)}</td>
+          <td>${deliveryStatus}</td>
+          <td>${paymentStatus}</td>
         </tr>`;
       }).join('')
     }</tbody></table>`;
   }
 }
-
-function renderDeliveryList(){
-  const wrap = document.getElementById('deliveryListWrap');
-  if(!wrap) return;
-  const showDelivered = document.getElementById('deliveryShowDelivered').checked;
-  const list = [...receipts]
-    .filter(r => showDelivered || !r.delivered)
-    .sort((a,b)=> (b.date||'').localeCompare(a.date||''));
-  if(list.length === 0){
-    wrap.innerHTML = `<div class="empty-state" style="padding:20px;">${showDelivered ? 'لا توجد وصولات بعد.' : 'كل الوصولات متسلّمة — دوسي "إظهار المُسلَّمة" لعرضها.'}</div>`;
-    return;
-  }
-  wrap.innerHTML = `<table><thead><tr>
-    <th>التاريخ</th><th>الاسم</th><th>المبلغ الكلي</th><th>الباقي</th><th>الحالة</th><th style="width:140px"></th>
-  </tr></thead><tbody>${
-    list.map(r=>{
-      let statusBadge;
-      if(r.delivered && r.remaining > 0){
-        statusBadge = `<span class="tag tag-partial">تم التسليم — عليه دفعة متبقية</span>`;
-      } else if(r.delivered){
-        statusBadge = `<span class="tag tag-paid">تم التسليم</span>`;
-      } else {
-        statusBadge = `<span class="tag tag-due">لسا ما تسلّم</span>`;
-      }
-      return `<tr>
-        <td>${r.date||''}</td>
-        <td>${r.name}</td>
-        <td>${fmt(r.total)}</td>
-        <td>${fmt(r.remaining)}</td>
-        <td>${statusBadge}</td>
-        <td><button class="btn btn-sm ${r.delivered ? '' : 'btn-primary'}" data-delivery-toggle="${r.id}">${r.delivered ? 'إلغاء التسليم' : 'تم التسليم'}</button></td>
-      </tr>`;
-    }).join('')
-  }</tbody></table>`;
-  wrap.querySelectorAll('[data-delivery-toggle]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const r = receipts.find(x=>x.id===btn.dataset.deliveryToggle);
-      if(!r) return;
-      r.delivered = !r.delivered;
-      await saveReceipts();
-      renderDeliveryList();
-      toast(r.delivered ? 'تم تسجيل التسليم' : 'تم إلغاء التسليم');
-    });
-  });
-}
-document.getElementById('deliveryShowDelivered').addEventListener('change', renderDeliveryList);
 
 function getFilteredPaymentHistory(){
   const q = (document.getElementById('paymentHistorySearch').value || '').trim();
