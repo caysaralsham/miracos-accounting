@@ -3383,9 +3383,15 @@ function renderDashboard(){
   if(deliveredDue.length===0){
     deliveredDueWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن مستلمين وعليهم دين 🎉</div>';
   } else {
-    deliveredDueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th></tr></thead><tbody>${
-      deliveredDue.map(r=>`<tr><td>${r.name}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td></tr>`).join('')
+    deliveredDueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th><th style="width:90px"></th></tr></thead><tbody>${
+      deliveredDue.map(r=>`<tr><td>${r.name}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td><button class="btn btn-sm btn-primary" data-dashboard-edit-receipt="${r.id}">تعديل</button></td></tr>`).join('')
     }</tbody></table>`;
+    deliveredDueWrap.querySelectorAll('[data-dashboard-edit-receipt]').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const r = receipts.find(x=>x.id===btn.dataset.dashboardEditReceipt);
+        if(r) openReceiptModal(r);
+      });
+    });
   }
 
   const recentReceipts = receipts.slice(-5).reverse().map(r=>({type:'وصل', label:`${r.name} — #${r.no}`, amount:r.total, date:r.date}));
