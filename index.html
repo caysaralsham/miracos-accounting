@@ -1438,6 +1438,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
 document.querySelectorAll('[data-close]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.getElementById(btn.dataset.close).classList.remove('show');
+    if(btn.dataset.close === 'receiptOverlay') convertingFromInvoiceId = null;
   });
 });
 
@@ -2027,6 +2028,12 @@ async function buildAndSaveReceiptFromForm(){
   }
   await saveReceipts();
   await logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no});
+  if(convertingFromInvoiceId){
+    invoices = invoices.filter(i=>i.id!==convertingFromInvoiceId);
+    await saveInvoices();
+    renderInvoicesTable();
+    convertingFromInvoiceId = null;
+  }
   renderReceiptsTable();
   renderDashboard();
   renderPaymentHistoryTable();
@@ -2132,6 +2139,7 @@ async function deleteReceipt(id){
   toast('تم حذف الوصل');
 }
 let currentViewedReceiptId = null;
+let convertingFromInvoiceId = null;
 function viewReceipt(id){
   const r = receipts.find(r=>r.id===id);
   if(!r) return;
@@ -2612,7 +2620,8 @@ function editInvoice(id){
 function convertInvoiceToReceipt(id){
   const inv = invoices.find(i=>i.id===id);
   if(!inv) return;
-  if(!confirm(`تحويل "${inv.clientName}" إلى وصل زبون جديد؟ رح تقدر تضيف الدفعات وتحفظه كزبون فعلي.`)) return;
+  if(!confirm(`تحويل "${inv.clientName}" إلى وصل زبون جديد؟ عرض السعر الأصلي رح ينحذف نهائيًا بمجرد ما تحفظي الوصل.`)) return;
+  convertingFromInvoiceId = id;
   const pseudoReceipt = {
     id: '',
     no: String(receipts.length + 1).padStart(3,'0'),
@@ -2948,6 +2957,27 @@ function renderMeasTotals(tables, targetEl){
 
 function emptyMeasRow(){ return {l:'', w:'', h:'', count:1}; }
 
+// تنقل بين خانات جدول القياسات بالأسهم متل الإكسل: فوق/تحت = نفس الخانة بالصف
+// يلي قبل/بعد، يمين/يسار = الخانة يلي قبل/بعد بنفس الصف (بس إذا المؤشر بأول أو آخر النص).
+function handleMeasArrowNav(e, scopeEl){
+  const t = e.target.dataset.t, r = parseInt(e.target.dataset.r, 10), f = e.target.dataset.f;
+  if(e.key === 'ArrowUp' || e.key === 'ArrowDown'){
+    const targetR = e.key === 'ArrowUp' ? r - 1 : r + 1;
+    const targetEl = scopeEl.querySelector(`input[data-t="${t}"][data-r="${targetR}"][data-f="${f}"]`);
+    if(targetEl){ e.preventDefault(); targetEl.focus(); targetEl.select(); }
+  } else if(e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
+    const pos = e.target.selectionStart;
+    const atStart = pos === 0;
+    const atEnd = pos === e.target.value.length;
+    if((e.key === 'ArrowLeft' && atStart) || (e.key === 'ArrowRight' && atEnd)){
+      const rowFields = [...scopeEl.querySelectorAll(`input[data-t="${t}"][data-r="${r}"]`)];
+      const idx = rowFields.indexOf(e.target);
+      const targetIdx = e.key === 'ArrowLeft' ? idx - 1 : idx + 1;
+      if(rowFields[targetIdx]){ e.preventDefault(); rowFields[targetIdx].focus(); rowFields[targetIdx].select(); }
+    }
+  }
+}
+
 let measTables = [
   {type:'مربع', rows: Array.from({length:10}, emptyMeasRow)}
 ];
@@ -2963,7 +2993,7 @@ function renderMeasTables(){
     let rowsHtml = tbl.rows.map((r,ri)=>{
       let inputs = spec.cols.map((c,ci)=>{
         const field = ci===0?'l':ci===1?'w':'h';
-        return `<input type="text" inputmode="decimal" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
+        return `<input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
       }).join('');
       const pad = spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '';
       const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
@@ -2974,7 +3004,7 @@ function renderMeasTables(){
       return `<div class="meas-row-grid">
         <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
         ${inputs}${pad}
-        <input type="text" inputmode="numeric" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
+        <input type="text" inputmode="numeric" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
         <span class="meas-result" data-result-t="${ti}" data-result-r="${ri}">${resLabel}</span>
         <button type="button" class="btn btn-ghost btn-sm" data-delrow="${ti}-${ri}" title="حذف">✕</button>
       </div>`;
@@ -2995,6 +3025,7 @@ function renderMeasTables(){
   renderMeasTotals(measTables);
 
   wrap.querySelectorAll('input').forEach(el=>{
+    el.addEventListener('keydown', e=>handleMeasArrowNav(e, wrap));
     el.addEventListener('input', e=>{
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
       let clean;
@@ -3071,7 +3102,7 @@ function renderReceiptMeasTables(){
     let rowsHtml = tbl.rows.map((r,ri)=>{
       let inputs = spec.cols.map((c,ci)=>{
         const field = ci===0?'l':ci===1?'w':'h';
-        return `<input type="text" inputmode="decimal" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
+        return `<input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
       }).join('');
       const pad = spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '';
       const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
@@ -3082,7 +3113,7 @@ function renderReceiptMeasTables(){
       return `<div class="meas-row-grid">
         <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
         ${inputs}${pad}
-        <input type="text" inputmode="numeric" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
+        <input type="text" inputmode="numeric" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
         <span class="meas-result" data-rcp-result-t="${ti}" data-rcp-result-r="${ri}">${resLabel}</span>
         <button type="button" class="btn btn-ghost btn-sm" data-rcp-delrow="${ti}-${ri}" title="حذف">✕</button>
       </div>`;
@@ -3102,6 +3133,7 @@ function renderReceiptMeasTables(){
   });
 
   wrap.querySelectorAll('input').forEach(el=>{
+    el.addEventListener('keydown', e=>handleMeasArrowNav(e, wrap));
     el.addEventListener('input', e=>{
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
       let clean;
