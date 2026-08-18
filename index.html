@@ -612,6 +612,13 @@
       </div>
       <div class="panel">
         <div class="panel-head"><h2>زبائن تم تسليمهم</h2></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+          <div class="search-box" style="max-width:280px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+            <input type="text" id="deliveredCustomerSearch" placeholder="بحث بالاسم أو الهاتف أو النوع...">
+          </div>
+          <input type="date" id="deliveredCustomerDate" title="بحث بتاريخ الوصل" style="max-width:170px;">
+        </div>
         <div id="deliveredCustomersWrap"></div>
       </div>
     </section>
@@ -3505,14 +3512,22 @@ function renderCustomerReports(){
   }
 
   const deliveredWrap = document.getElementById('deliveredCustomersWrap');
-  const delivered = [...receipts]
+  const dq = (document.getElementById('deliveredCustomerSearch').value || '').trim();
+  const dDate = document.getElementById('deliveredCustomerDate').value;
+  let delivered = [...receipts]
     .filter(r => r.delivered)
     .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  if(dq) delivered = delivered.filter(r =>
+    (r.name||'').includes(dq) ||
+    (r.phone||'').includes(dq) ||
+    (r.items||[]).some(it => (it.desc||'').includes(dq))
+  );
+  if(dDate) delivered = delivered.filter(r => (r.date||'') === dDate);
   if(delivered.length === 0){
     deliveredWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن تم تسليمهم بعد.</div>';
   } else {
     deliveredWrap.innerHTML = `<table><thead><tr>
-      <th>الاسم</th><th>التفاصيل</th><th>تاريخ الوصل</th><th>المجموع</th><th>حالة الدفع</th>
+      <th>الاسم</th><th>التفاصيل</th><th>الهاتف</th><th>تاريخ الوصل</th><th>المجموع</th><th>حالة الدفع</th><th style="width:60px"></th>
     </tr></thead><tbody>${
       delivered.map(r=>{
         const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
@@ -3522,14 +3537,22 @@ function renderCustomerReports(){
         return `<tr>
           <td>${r.name}</td>
           <td>${details}</td>
+          <td>${r.phone||'—'}</td>
           <td>${r.date||''}</td>
           <td>${fmt(r.total)}</td>
           <td>${paymentStatus}</td>
+          <td>
+            <div class="row-actions">
+              <button class="btn btn-sm btn-ghost" onclick="editReceipt('${r.id}')" title="تعديل">✎</button>
+            </div>
+          </td>
         </tr>`;
       }).join('')
     }</tbody></table>`;
   }
 }
+document.getElementById('deliveredCustomerSearch').addEventListener('input', renderCustomerReports);
+document.getElementById('deliveredCustomerDate').addEventListener('input', renderCustomerReports);
 
 function getFilteredPaymentHistory(){
   const q = (document.getElementById('paymentHistorySearch').value || '').trim();
