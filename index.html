@@ -1292,42 +1292,9 @@ function renderExpenseCategoryChips(){
     wrap.innerHTML = `<span style="font-size:12.5px; color:var(--text-dim);">لا توجد فئات بعد — أضف واحدة بزر "+ فئة جديدة".</span>`;
   } else {
     wrap.innerHTML = expenseCategories.map(name => `
-      <span class="tag" style="background:var(--marble-2); color:var(--brass-deep); display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:13px;">
+      <span class="tag" style="background:var(--marble-2); color:var(--brass-deep); padding:6px 12px; font-size:13px;">
         ${name}
-        <button type="button" data-exp-cat-rename="${name}" style="border:none; background:none; cursor:pointer; color:var(--text-dim);" title="تعديل الاسم">✎</button>
-        <button type="button" data-exp-cat-remove="${name}" style="border:none; background:none; cursor:pointer; color:var(--danger);" title="حذف الفئة">✕</button>
       </span>`).join('');
-    wrap.querySelectorAll('[data-exp-cat-remove]').forEach(btn=>{
-      btn.addEventListener('click', async ()=>{
-        const name = btn.dataset.expCatRemove;
-        if(name === 'أخرى'){ toast('فئة "أخرى" هي الفئة الاحتياطية ولا يمكن حذفها'); return; }
-        const usedCount = expenses.filter(e=>e.category===name).length;
-        if(usedCount > 0){
-          if(!confirm(`هذه الفئة مستعملة في ${usedCount} مصروف — حذفها رح ينقل هاذوك المصاريف لفئة "أخرى". متأكد؟`)) return;
-          expenses.forEach(e=>{ if(e.category===name) e.category = 'أخرى'; });
-          await saveExpenses();
-          renderExpensesTable();
-        }
-        expenseCategories = expenseCategories.filter(c=>c!==name);
-        await saveExpenseCategories();
-        renderExpenseCategoryChips();
-      });
-    });
-    wrap.querySelectorAll('[data-exp-cat-rename]').forEach(btn=>{
-      btn.addEventListener('click', async ()=>{
-        const oldName = btn.dataset.expCatRename;
-        const newName = prompt('اسم الفئة الجديد:', oldName);
-        if(!newName || !newName.trim() || newName.trim() === oldName) return;
-        const trimmed = newName.trim();
-        if(expenseCategories.includes(trimmed)){ toast('هذا الاسم موجود عند فئة أخرى أصلاً'); return; }
-        expenseCategories = expenseCategories.map(c => c===oldName ? trimmed : c);
-        let changedExpenses = false;
-        expenses.forEach(e=>{ if(e.category===oldName){ e.category = trimmed; changedExpenses = true; } });
-        await saveExpenseCategories();
-        if(changedExpenses){ await saveExpenses(); renderExpensesTable(); }
-        renderExpenseCategoryChips();
-      });
-    });
   }
   if(select){
     const current = select.value;
