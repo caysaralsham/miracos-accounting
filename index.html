@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -142,10 +142,10 @@
   .grid3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;}
 
   table{width:100%; border-collapse:collapse; font-size:13.5px;}
-  #receiptsTableWrap, #invoicesTableWrap, #expensesTableWrap, #deliveryTrackWrap, #measurementsTableWrap{
+  #receiptsTableWrap, #invoicesTableWrap, #expensesTableWrap, #deliveryTrackWrap, #measurementsTableWrap, #paymentHistoryTableWrap, #deliveredCustomersWrap, #priceListGroupedWrap{
     overflow-x:auto; -webkit-overflow-scrolling:touch;
   }
-  #receiptsTableWrap table, #invoicesTableWrap table, #expensesTableWrap table, #deliveryTrackWrap table, #measurementsTableWrap table{
+  #receiptsTableWrap table, #invoicesTableWrap table, #expensesTableWrap table, #deliveryTrackWrap table, #measurementsTableWrap table, #paymentHistoryTableWrap table, #deliveredCustomersWrap table, #priceListGroupedWrap table{
     min-width:640px;
   }
   th,td{padding:10px 10px; text-align:right; border-bottom:1px solid var(--line);}
@@ -3678,7 +3678,8 @@ function getFilteredPaymentHistory(){
   return list.sort((a,b)=>{
     const byDate = (b.date||'').localeCompare(a.date||'');
     if(byDate !== 0) return byDate;
-    return (b.loggedAt||'').localeCompare(a.loggedAt||'');
+    const timeOf = (iso)=> iso ? new Date(iso).toTimeString().slice(0,8) : '';
+    return timeOf(b.loggedAt).localeCompare(timeOf(a.loggedAt));
   });
 }
 
