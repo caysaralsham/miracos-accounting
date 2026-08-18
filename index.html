@@ -1079,6 +1079,24 @@ let priceList = [];
 let priceCategories = [];
 let expenseCategories = [];
 const DEFAULT_EXPENSE_CATEGORIES = ['معرض','كميون','اجار عمال','ماصو','اجار باسل','اجار معرض','أخرى'];
+let lastReceiptNo = 0;
+function computeMaxReceiptNo(){
+  return receipts.reduce((max, r)=>{
+    const n = parseInt(String(r.no||'').replace(/\D/g,''), 10);
+    return (!isNaN(n) && n > max) ? n : max;
+  }, 0);
+}
+function getNextReceiptNo(){
+  return String(lastReceiptNo + 1).padStart(3,'0');
+}
+async function saveLastReceiptNo(){ await cloudSet({lastReceiptNo}); }
+function noteReceiptNoUsed(noStr){
+  const n = parseInt(String(noStr||'').replace(/\D/g,''), 10);
+  if(!isNaN(n) && n > lastReceiptNo){
+    lastReceiptNo = n;
+    saveLastReceiptNo();
+  }
+}
 
 function makeSafeStorage(realStorage){
   const mem = {};
@@ -1176,9 +1194,16 @@ function startRealtimeSync(){
         expenseCategories = DEFAULT_EXPENSE_CATEGORIES.slice();
         await saveExpenseCategories();
       }
+      if(typeof data.lastReceiptNo === 'number'){
+        lastReceiptNo = data.lastReceiptNo;
+      } else {
+        lastReceiptNo = computeMaxReceiptNo();
+        await saveLastReceiptNo();
+      }
     } else {
       expenseCategories = DEFAULT_EXPENSE_CATEGORIES.slice();
-      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories});
+      lastReceiptNo = computeMaxReceiptNo();
+      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo});
     }
     applySettingsToUI();
     renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
@@ -1723,7 +1748,7 @@ function exportExcelReport(silent){
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
-  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories };
+  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo };
   const blob = new Blob([JSON.stringify(restoreData)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1788,6 +1813,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       if(Array.isArray(data.priceCategories)) priceCategories = data.priceCategories;
       if(Array.isArray(data.expenseCategories)) expenseCategories = data.expenseCategories;
       if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
+      lastReceiptNo = (typeof data.lastReceiptNo === 'number') ? data.lastReceiptNo : computeMaxReceiptNo();
       await saveReceipts();
       await saveExpenses();
       await saveInvoices();
@@ -1795,6 +1821,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       await savePaymentHistory();
       await savePriceList();
       await saveExpenseCategories();
+      await saveLastReceiptNo();
       await saveSettings();
       applySettingsToUI();
       renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
@@ -1813,9 +1840,11 @@ document.getElementById('btnResetAll').addEventListener('click', async ()=>{
   receipts = [];
   expenses = [];
   invoices = [];
+  lastReceiptNo = 0;
   await saveReceipts();
   await saveExpenses();
   await saveInvoices();
+  await saveLastReceiptNo();
   renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports();
   toast('تم حذف جميع البيانات');
 });
@@ -2012,7 +2041,7 @@ function openReceiptModal(receipt){
   } else {
     document.getElementById('receiptModalTitle').textContent = 'وصل دفع جديد';
     document.getElementById('rcpId').value = '';
-    document.getElementById('rcpNo').value = String(receipts.length + 1).padStart(3,'0');
+    document.getElementById('rcpNo').value = getNextReceiptNo();
     document.getElementById('rcpDate').value = new Date().toISOString().slice(0,10);
     document.getElementById('rcpDuration').value = '';
     document.getElementById('rcpName').value = '';
@@ -2116,6 +2145,7 @@ async function buildAndSaveReceiptFromForm(){
   } else {
     receipts.push(data);
   }
+  noteReceiptNoUsed(data.no);
   await saveReceipts();
   await logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no});
   if(convertingFromInvoiceId){
@@ -2714,7 +2744,7 @@ function convertInvoiceToReceipt(id){
   convertingFromInvoiceId = id;
   const pseudoReceipt = {
     id: '',
-    no: String(receipts.length + 1).padStart(3,'0'),
+    no: getNextReceiptNo(),
     date: new Date().toISOString().slice(0,10),
     duration: '',
     name: inv.clientName || '',
@@ -3343,7 +3373,7 @@ document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
   if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: 'متر مكعب', price:''});
   const pseudoReceipt = {
     id: '',
-    no: String(receipts.length + 1).padStart(3,'0'),
+    no: getNextReceiptNo(),
     date: new Date().toISOString().slice(0,10),
     duration: '',
     name: rec.customerName,
