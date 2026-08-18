@@ -3516,7 +3516,7 @@ function renderDashboard(){
     dueWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا توجد مبالغ متبقية على أي زبون 🎉</div>';
   } else {
     dueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th></tr></thead><tbody>${
-      due.slice(0,8).map(r=>`<tr><td>${r.name}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td></tr>`).join('')
+      due.map(r=>`<tr><td>${r.name}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td></tr>`).join('')
     }</tbody></table>`;
   }
 
@@ -3536,8 +3536,13 @@ function renderDashboard(){
     });
   }
 
-  const recentReceipts = receipts.slice(-5).reverse().map(r=>({type:'وصل', label:`${r.name} — #${r.no}`, amount:r.total, date:r.date}));
-  const recentExp = expenses.slice(-5).reverse().map(e=>({type:'مصروف', label:e.desc, amount:-e.amount, date:e.date}));
+  function latestReceiptActivityDate(r){
+    let d = r.date || '';
+    (r.payments||[]).forEach(p=>{ if(p.date && p.date > d) d = p.date; });
+    return d;
+  }
+  const recentReceipts = receipts.map(r=>({type:'وصل', label:`${r.name} — #${r.no}`, amount:r.total, date: latestReceiptActivityDate(r)}));
+  const recentExp = expenses.map(e=>({type:'مصروف', label:e.desc, amount:-e.amount, date:e.date}));
   const combined = [...recentReceipts, ...recentExp].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,8);
   const recentWrap = document.getElementById('recentList');
   if(combined.length===0){
