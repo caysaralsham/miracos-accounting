@@ -134,6 +134,7 @@
     border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink);
     width:100%;
   }
+  input[type="date"]{ -webkit-locale:"en"; }
   input:focus, select:focus, textarea:focus{outline:2px solid rgba(176,141,62,.35); border-color:var(--brass);}
   label{font-size:12.5px; font-weight:600; color:var(--text-dim); margin-bottom:5px; display:block;}
   .field{margin-bottom:13px;}
@@ -510,6 +511,14 @@
 
       <div class="panel">
         <div class="panel-head">
+          <h2>فئات المصاريف</h2>
+          <button class="btn btn-sm" id="btnAddExpenseCategory">+ فئة جديدة</button>
+        </div>
+        <div id="expenseCategoryChips" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
           <h2>سجل المصاريف</h2>
           <div class="search-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
@@ -596,8 +605,8 @@
             <input type="text" id="paymentHistorySearch" placeholder="بحث باسم الزبون أو رقم الوصل/الفاتورة...">
           </div>
           <div style="display:flex; gap:8px;">
-            <input type="date" id="paymentHistoryFrom" title="من تاريخ">
-            <input type="date" id="paymentHistoryTo" title="إلى تاريخ">
+            <input type="date" id="paymentHistoryFrom" title="من تاريخ" class="date-en">
+            <input type="date" id="paymentHistoryTo" title="إلى تاريخ" class="date-en">
           </div>
         </div>
         <div id="paymentHistoryTableWrap"></div>
@@ -617,7 +626,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
             <input type="text" id="deliveredCustomerSearch" placeholder="بحث بالاسم أو الهاتف أو النوع...">
           </div>
-          <input type="date" id="deliveredCustomerDate" title="بحث بتاريخ الوصل" style="max-width:170px;">
+          <input type="date" id="deliveredCustomerDate" title="بحث بتاريخ الوصل" style="max-width:170px;" class="date-en">
         </div>
         <div id="deliveredCustomersWrap"></div>
       </div>
@@ -1030,15 +1039,7 @@
       <div class="field"><label>البيان</label><input type="text" id="expDesc" placeholder="مثال: شراء مواد، وقود، كهرباء..."></div>
       <div class="field">
         <label>الفئة</label>
-        <select id="expCategory">
-          <option value="معرض">معرض</option>
-          <option value="كميون">كميون</option>
-          <option value="اجار عمال">اجار عمال</option>
-          <option value="ماصو">ماصو</option>
-          <option value="اجار باسل">اجار باسل</option>
-          <option value="اجار معرض">اجار معرض</option>
-          <option value="أخرى">أخرى</option>
-        </select>
+        <select id="expCategory"></select>
       </div>
       <div class="field"><label>المبلغ</label><input type="number" id="expAmount"></div>
     </div>
@@ -1076,6 +1077,8 @@ let measurementsList = [];
 let paymentHistory = [];
 let priceList = [];
 let priceCategories = [];
+let expenseCategories = [];
+const DEFAULT_EXPENSE_CATEGORIES = ['معرض','كميون','اجار عمال','ماصو','اجار باسل','اجار معرض','أخرى'];
 
 function makeSafeStorage(realStorage){
   const mem = {};
@@ -1167,11 +1170,18 @@ function startRealtimeSync(){
       if(data.paymentHistory) paymentHistory = data.paymentHistory;
       if(data.priceList) priceList = data.priceList;
       if(data.priceCategories) priceCategories = data.priceCategories;
+      if(Array.isArray(data.expenseCategories)){
+        expenseCategories = data.expenseCategories;
+      } else if(expenseCategories.length === 0){
+        expenseCategories = DEFAULT_EXPENSE_CATEGORIES.slice();
+        await saveExpenseCategories();
+      }
     } else {
-      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories});
+      expenseCategories = DEFAULT_EXPENSE_CATEGORIES.slice();
+      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories});
     }
     applySettingsToUI();
-    renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped();
+    renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
   }, (err)=>{
     console.error(err);
     toast('انقطع الاتصال بقاعدة البيانات السحابية');
@@ -1197,6 +1207,7 @@ async function cloudSet(partial){
 async function saveSettings(){ await cloudSet({settings}); }
 async function saveReceipts(){ await cloudSet({receipts}); }
 async function saveExpenses(){ await cloudSet({expenses}); }
+async function saveExpenseCategories(){ await cloudSet({expenseCategories}); }
 async function saveInvoices(){ await cloudSet({invoices}); }
 async function saveMeasurementsList(){ await cloudSet({measurementsList}); }
 async function savePaymentHistory(){ await cloudSet({paymentHistory}); }
@@ -1247,6 +1258,67 @@ function renderPriceCategoryChips(){
     toggleNewCategoryInput();
   }
 }
+
+function renderExpenseCategoryChips(){
+  const wrap = document.getElementById('expenseCategoryChips');
+  const select = document.getElementById('expCategory');
+  if(!wrap) return;
+  if(expenseCategories.length === 0){
+    wrap.innerHTML = `<span style="font-size:12.5px; color:var(--text-dim);">لا توجد فئات بعد — أضف واحدة بزر "+ فئة جديدة".</span>`;
+  } else {
+    wrap.innerHTML = expenseCategories.map(name => `
+      <span class="tag" style="background:var(--marble-2); color:var(--brass-deep); display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:13px;">
+        ${name}
+        <button type="button" data-exp-cat-rename="${name}" style="border:none; background:none; cursor:pointer; color:var(--text-dim);" title="تعديل الاسم">✎</button>
+        <button type="button" data-exp-cat-remove="${name}" style="border:none; background:none; cursor:pointer; color:var(--danger);" title="حذف الفئة">✕</button>
+      </span>`).join('');
+    wrap.querySelectorAll('[data-exp-cat-remove]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const name = btn.dataset.expCatRemove;
+        if(name === 'أخرى'){ toast('فئة "أخرى" هي الفئة الاحتياطية ولا يمكن حذفها'); return; }
+        const usedCount = expenses.filter(e=>e.category===name).length;
+        if(usedCount > 0){
+          if(!confirm(`هذه الفئة مستعملة في ${usedCount} مصروف — حذفها رح ينقل هاذوك المصاريف لفئة "أخرى". متأكد؟`)) return;
+          expenses.forEach(e=>{ if(e.category===name) e.category = 'أخرى'; });
+          await saveExpenses();
+          renderExpensesTable();
+        }
+        expenseCategories = expenseCategories.filter(c=>c!==name);
+        await saveExpenseCategories();
+        renderExpenseCategoryChips();
+      });
+    });
+    wrap.querySelectorAll('[data-exp-cat-rename]').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const oldName = btn.dataset.expCatRename;
+        const newName = prompt('اسم الفئة الجديد:', oldName);
+        if(!newName || !newName.trim() || newName.trim() === oldName) return;
+        const trimmed = newName.trim();
+        if(expenseCategories.includes(trimmed)){ toast('هذا الاسم موجود عند فئة أخرى أصلاً'); return; }
+        expenseCategories = expenseCategories.map(c => c===oldName ? trimmed : c);
+        let changedExpenses = false;
+        expenses.forEach(e=>{ if(e.category===oldName){ e.category = trimmed; changedExpenses = true; } });
+        await saveExpenseCategories();
+        if(changedExpenses){ await saveExpenses(); renderExpensesTable(); }
+        renderExpenseCategoryChips();
+      });
+    });
+  }
+  if(select){
+    const current = select.value;
+    select.innerHTML = expenseCategories.map(name=>`<option value="${name}">${name}</option>`).join('');
+    if([...select.options].some(o=>o.value===current)) select.value = current;
+  }
+}
+document.getElementById('btnAddExpenseCategory').addEventListener('click', async ()=>{
+  const name = prompt('اسم الفئة الجديدة:');
+  if(!name || !name.trim()) return;
+  const trimmed = name.trim();
+  if(expenseCategories.includes(trimmed)){ toast('هذه الفئة موجودة أصلاً'); return; }
+  expenseCategories.push(trimmed);
+  await saveExpenseCategories();
+  renderExpenseCategoryChips();
+});
 
 function toggleNewCategoryInput(){
   const select = document.getElementById('plItemCategory');
@@ -1416,7 +1488,7 @@ document.getElementById('btnDisconnectFirebase').addEventListener('click', ()=>{
 });
 
 function uid(){ return 'id' + Date.now() + Math.floor(Math.random()*1000); }
-function fmt(n){ return (Number(n)||0).toLocaleString('ar-DZ') + ' دج'; }
+function fmt(n){ return (Number(n)||0).toLocaleString('ar-DZ-u-nu-latn') + ' دج'; }
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -1433,7 +1505,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     document.getElementById('view-' + item.dataset.view).classList.add('active');
     if(item.dataset.view === 'dashboard') renderDashboard();
     if(item.dataset.view === 'customers') renderReceiptsTable();
-    if(item.dataset.view === 'expenses') renderExpensesTable();
+    if(item.dataset.view === 'expenses'){ renderExpensesTable(); renderExpenseCategoryChips(); }
     if(item.dataset.view === 'measurements') renderMeasurementsTable();
     if(item.dataset.view === 'reports'){ renderReports(); renderPaymentHistoryTable(); }
     if(item.dataset.view === 'pricelist'){ renderPriceCategoryChips(); renderPriceListGrouped(); }
@@ -1581,7 +1653,7 @@ if(btnLogoutApp){
 
 function exportExcelReport(silent){
   try{
-    const fmt2 = (n)=> (Number(n)||0).toLocaleString('ar-DZ');
+    const fmt2 = (n)=> (Number(n)||0).toLocaleString('ar-DZ-u-nu-latn');
     const th = (text, colspan)=>`<th colspan="${colspan||1}" style="border:1px solid #444; background:#B08D3E; color:#fff; padding:6px 10px; font-weight:bold; text-align:center;">${text}</th>`;
     const td = (text, opts)=>{
       opts = opts || {};
@@ -1595,7 +1667,7 @@ function exportExcelReport(silent){
 
     let rows = '';
     rows += `<tr><td colspan="6" style="text-align:center; font-size:18px; font-weight:bold; padding:10px; border:1px solid #444;">${settings.companyName||'ميراكوس كنستريكسون'}</td></tr>`;
-    rows += `<tr><td colspan="6" style="text-align:center; font-size:13px; padding:6px; border:1px solid #999; color:#555;">تقرير مالي — ${new Date().toLocaleDateString('ar-DZ')}</td></tr>`;
+    rows += `<tr><td colspan="6" style="text-align:center; font-size:13px; padding:6px; border:1px solid #999; color:#555;">تقرير مالي — ${new Date().toLocaleDateString('ar-DZ-u-nu-latn')}</td></tr>`;
     rows += blankRow();
 
     rows += sectionTitle('قسم الدخل — الزبائن');
@@ -1651,7 +1723,7 @@ function exportExcelReport(silent){
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
-  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories };
+  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories };
   const blob = new Blob([JSON.stringify(restoreData)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1714,6 +1786,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       if(Array.isArray(data.paymentHistory)) paymentHistory = data.paymentHistory;
       if(Array.isArray(data.priceList)) priceList = data.priceList;
       if(Array.isArray(data.priceCategories)) priceCategories = data.priceCategories;
+      if(Array.isArray(data.expenseCategories)) expenseCategories = data.expenseCategories;
       if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
       await saveReceipts();
       await saveExpenses();
@@ -1721,9 +1794,10 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       await saveMeasurementsList();
       await savePaymentHistory();
       await savePriceList();
+      await saveExpenseCategories();
       await saveSettings();
       applySettingsToUI();
-      renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped();
+      renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
       toast('تم استرجاع البيانات بنجاح');
     }catch(err){
       console.error(err);
@@ -2012,6 +2086,14 @@ async function buildAndSaveReceiptFromForm(){
     .filter(tbl => tbl.rows.length > 0);
 
   const id = document.getElementById('rcpId').value;
+  const prevReceipt = id ? receipts.find(r=>r.id===id) : null;
+  const isDelivered = document.getElementById('rcpDelivered').checked;
+  let deliveredDate = '';
+  if(isDelivered){
+    deliveredDate = (prevReceipt && prevReceipt.delivered && prevReceipt.deliveredDate)
+      ? prevReceipt.deliveredDate
+      : new Date().toISOString().slice(0,10);
+  }
   const data = {
     id: id || uid(),
     no: document.getElementById('rcpNo').value.trim(),
@@ -2024,7 +2106,8 @@ async function buildAndSaveReceiptFromForm(){
     remaining: total - paid,
     note: document.getElementById('rcpNote').value.trim(),
     measurementTables: measTablesToSave,
-    delivered: document.getElementById('rcpDelivered').checked
+    delivered: isDelivered,
+    deliveredDate
   };
 
   if(id){
@@ -2848,7 +2931,7 @@ function openExpenseModal(exp){
     document.getElementById('expId').value = '';
     document.getElementById('expDate').value = new Date().toISOString().slice(0,10);
     document.getElementById('expDesc').value = '';
-    document.getElementById('expCategory').value = 'معرض';
+    document.getElementById('expCategory').value = expenseCategories[0] || 'أخرى';
     document.getElementById('expAmount').value = '';
   }
   document.getElementById('expenseOverlay').classList.add('show');
@@ -3516,7 +3599,7 @@ function renderCustomerReports(){
   const dDate = document.getElementById('deliveredCustomerDate').value;
   let delivered = [...receipts]
     .filter(r => r.delivered)
-    .sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    .sort((a,b)=>((b.deliveredDate||b.date||'')).localeCompare(a.deliveredDate||a.date||''));
   if(dq) delivered = delivered.filter(r =>
     (r.name||'').includes(dq) ||
     (r.phone||'').includes(dq) ||
@@ -3527,7 +3610,7 @@ function renderCustomerReports(){
     deliveredWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن تم تسليمهم بعد.</div>';
   } else {
     deliveredWrap.innerHTML = `<table><thead><tr>
-      <th>الاسم</th><th>التفاصيل</th><th>الهاتف</th><th>تاريخ الوصل</th><th>المجموع</th><th>حالة الدفع</th><th style="width:60px"></th>
+      <th>الاسم</th><th>التفاصيل</th><th>الهاتف</th><th>تاريخ الوصل</th><th>تاريخ التسليم</th><th>المجموع</th><th>حالة الدفع</th><th style="width:60px"></th>
     </tr></thead><tbody>${
       delivered.map(r=>{
         const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
@@ -3539,6 +3622,7 @@ function renderCustomerReports(){
           <td>${details}</td>
           <td>${r.phone||'—'}</td>
           <td>${r.date||''}</td>
+          <td>${r.deliveredDate||'—'}</td>
           <td>${fmt(r.total)}</td>
           <td>${paymentStatus}</td>
           <td>
@@ -3562,7 +3646,11 @@ function getFilteredPaymentHistory(){
   if(q) list = list.filter(h => (h.customerName||'').includes(q) || (h.docNo||'').includes(q));
   if(from) list = list.filter(h => (h.date||'') >= from);
   if(to) list = list.filter(h => (h.date||'') <= to);
-  return list.sort((a,b)=> (b.loggedAt||'').localeCompare(a.loggedAt||''));
+  return list.sort((a,b)=>{
+    const byDate = (b.date||'').localeCompare(a.date||'');
+    if(byDate !== 0) return byDate;
+    return (b.loggedAt||'').localeCompare(a.loggedAt||'');
+  });
 }
 
 function renderPaymentHistoryTable(){
@@ -3581,7 +3669,7 @@ function renderPaymentHistoryTable(){
     <th>التاريخ</th><th>الوقت</th><th>الزبون</th><th>المبلغ</th><th>المستند</th><th>طريقة الدفع</th>
   </tr></thead><tbody>`;
   list.forEach(h=>{
-    const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ', {hour:'2-digit', minute:'2-digit'}) : '—';
+    const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ-u-nu-latn', {hour:'2-digit', minute:'2-digit'}) : '—';
     html += `<tr>
       <td>${h.date||'—'}</td>
       <td>${loggedTime}</td>
@@ -3605,7 +3693,7 @@ document.getElementById('btnPrintPaymentHistory').addEventListener('click', ()=>
   const list = getFilteredPaymentHistory();
   if(list.length === 0){ toast('لا توجد دفعات لطباعتها'); return; }
   const rows = list.map(h=>{
-    const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ', {hour:'2-digit', minute:'2-digit'}) : '';
+    const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ-u-nu-latn', {hour:'2-digit', minute:'2-digit'}) : '';
     const docPart = h.docType ? `${h.docType}${h.docNo?' #'+h.docNo:''}` : '';
     return {
       date: h.date || '',
@@ -3635,7 +3723,7 @@ function showLedger(title, rows){
               <img src="${settings.logo}" style="width:60px; height:60px;">
               <div>
                 <div class="name" style="font-size:16px;">${settings.companyName}</div>
-                <div class="meta" style="font-size:12px;">${title} — ${new Date().toLocaleDateString('ar-DZ')}</div>
+                <div class="meta" style="font-size:12px;">${title} — ${new Date().toLocaleDateString('ar-DZ-u-nu-latn')}</div>
               </div>
             </div>
           </div>
@@ -3685,7 +3773,7 @@ document.getElementById('btnPrintExpenseLedger').addEventListener('click', ()=>{
 
 document.getElementById('btnPrintLedger').addEventListener('click', ()=>window.print());
 
-document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ar-DZ', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
+document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ar-DZ-u-nu-latn', {weekday:'long', year:'numeric', month:'long', day:'numeric'});
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
@@ -3712,6 +3800,7 @@ if('serviceWorker' in navigator){
     renderInvoicesTable();
     renderCustomerReports();
     renderMeasurementsTable();
+    renderExpenseCategoryChips();
   });
 })();
 </script>
