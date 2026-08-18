@@ -3536,19 +3536,24 @@ function renderDashboard(){
     });
   }
 
-  function latestReceiptActivityDate(r){
-    let d = r.date || '';
-    (r.payments||[]).forEach(p=>{ if(p.date && p.date > d) d = p.date; });
-    return d;
+  function latestReceiptActivity(r){
+    const payments = getReceiptPayments(r);
+    let latestDate = r.date || '';
+    payments.forEach(p=>{ if(p.date && p.date > latestDate) latestDate = p.date; });
+    const received = payments.filter(p=>p.date===latestDate).reduce((s,p)=>s+(Number(p.amount)||0), 0);
+    return { date: latestDate, received };
   }
-  const recentReceipts = receipts.map(r=>({type:'وصل', label:`${r.name} — #${r.no}`, amount:r.total, date: latestReceiptActivityDate(r)}));
+  const recentReceipts = receipts.map(r=>{
+    const act = latestReceiptActivity(r);
+    return {type:'وصل', label:`${r.name} — #${r.no}`, amount: act.received, date: act.date};
+  }).filter(x=>x.amount > 0);
   const recentExp = expenses.map(e=>({type:'مصروف', label:e.desc, amount:-e.amount, date:e.date}));
   const combined = [...recentReceipts, ...recentExp].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,8);
   const recentWrap = document.getElementById('recentList');
   if(combined.length===0){
     recentWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا توجد حركات بعد.</div>';
   } else {
-    recentWrap.innerHTML = `<table><thead><tr><th>النوع</th><th>البيان</th><th>التاريخ</th><th>المبلغ</th></tr></thead><tbody>${
+    recentWrap.innerHTML = `<table><thead><tr><th>النوع</th><th>البيان</th><th>التاريخ</th><th>المبلغ المقبوض</th></tr></thead><tbody>${
       combined.map(c=>`<tr><td>${c.type}</td><td>${c.label}</td><td>${c.date||''}</td><td style="color:${c.amount<0?'var(--danger)':'var(--verdigris-deep)'};font-weight:700;">${c.amount<0?'-':''}${fmt(Math.abs(c.amount))}</td></tr>`).join('')
     }</tbody></table>`;
   }
