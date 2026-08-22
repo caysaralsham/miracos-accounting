@@ -3087,17 +3087,11 @@ function handleMeasArrowNav(e, scopeEl){
     const targetEl = scopeEl.querySelector(`input[data-t="${t}"][data-r="${targetR}"][data-f="${f}"]`);
     if(targetEl){ e.preventDefault(); targetEl.focus(); targetEl.select(); }
   } else if(e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
-    // الخانات كلها dir="ltr" (أرقام)، فحركة المؤشر جوا النص عادية: يمين = نهاية النص.
-    // فلازم "السهم يمين" ينقلني للخانة يلي بصريًا على يميني لما نكون في نهاية النص (مش بدايته).
-    const pos = e.target.selectionStart;
-    const atStart = pos === 0;
-    const atEnd = pos === e.target.value.length;
-    if((e.key === 'ArrowRight' && atEnd) || (e.key === 'ArrowLeft' && atStart)){
-      const rowFields = [...scopeEl.querySelectorAll(`input[data-t="${t}"][data-r="${r}"]`)];
-      const idx = rowFields.indexOf(e.target);
-      const targetIdx = e.key === 'ArrowRight' ? idx - 1 : idx + 1;
-      if(rowFields[targetIdx]){ e.preventDefault(); rowFields[targetIdx].focus(); rowFields[targetIdx].select(); }
-    }
+    // نقلة فورية بين الخانات بالأسهم يمين/يسار، متل الإكسل — بلا شرط على مكان المؤشر جوا النص.
+    const rowFields = [...scopeEl.querySelectorAll(`input[data-t="${t}"][data-r="${r}"]`)];
+    const idx = rowFields.indexOf(e.target);
+    const targetIdx = e.key === 'ArrowRight' ? idx - 1 : idx + 1;
+    if(rowFields[targetIdx]){ e.preventDefault(); rowFields[targetIdx].focus(); rowFields[targetIdx].select(); }
   }
 }
 
