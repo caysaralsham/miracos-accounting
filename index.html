@@ -1,4 +1,4 @@
-\<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -2241,8 +2241,20 @@ function editReceipt(id){
 }
 async function deleteReceipt(id){
   if(!confirm('هل تريد حذف هذا الوصل؟')) return;
+  const target = receipts.find(r=>r.id===id);
   receipts = receipts.filter(r=>r.id!==id);
   await saveReceipts();
+  if(target){
+    const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
+    if(paymentIds.size > 0){
+      const before = paymentHistory.length;
+      paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
+      if(paymentHistory.length !== before){
+        await savePaymentHistory();
+        renderPaymentHistoryTable();
+      }
+    }
+  }
   renderReceiptsTable();
   renderDashboard();
   toast('تم حذف الوصل');
@@ -3075,11 +3087,12 @@ function handleMeasArrowNav(e, scopeEl){
     const targetEl = scopeEl.querySelector(`input[data-t="${t}"][data-r="${targetR}"][data-f="${f}"]`);
     if(targetEl){ e.preventDefault(); targetEl.focus(); targetEl.select(); }
   } else if(e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
-    // الصفحة عربي (RTL)، فالسهم يمين بصريًا لازم يوديكي للخانة يلي قبلها بترتيب الصف، والعكس
+    // الخانات كلها dir="ltr" (أرقام)، فحركة المؤشر جوا النص عادية: يمين = نهاية النص.
+    // فلازم "السهم يمين" ينقلني للخانة يلي بصريًا على يميني لما نكون في نهاية النص (مش بدايته).
     const pos = e.target.selectionStart;
     const atStart = pos === 0;
     const atEnd = pos === e.target.value.length;
-    if((e.key === 'ArrowRight' && atStart) || (e.key === 'ArrowLeft' && atEnd)){
+    if((e.key === 'ArrowRight' && atEnd) || (e.key === 'ArrowLeft' && atStart)){
       const rowFields = [...scopeEl.querySelectorAll(`input[data-t="${t}"][data-r="${r}"]`)];
       const idx = rowFields.indexOf(e.target);
       const targetIdx = e.key === 'ArrowRight' ? idx - 1 : idx + 1;
@@ -3114,7 +3127,7 @@ function renderMeasTables(){
       return `<div class="meas-row-grid">
         <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
         ${inputs}${pad}
-        <input type="text" inputmode="numeric" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
+        <input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
         <span class="meas-result" data-result-t="${ti}" data-result-r="${ri}">${resLabel}</span>
         <button type="button" class="btn btn-ghost btn-sm" data-delrow="${ti}-${ri}" title="حذف">✕</button>
       </div>`;
@@ -3139,9 +3152,7 @@ function renderMeasTables(){
     el.addEventListener('input', e=>{
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
       let clean;
-      if(f === 'count'){
-        clean = e.target.value.replace(/[^0-9]/g, '');
-      } else {
+      {
         const raw = e.target.value;
         if(raw.includes('.')){
           const parts = raw.replace(/[^0-9.]/g, '').split('.');
@@ -3223,7 +3234,7 @@ function renderReceiptMeasTables(){
       return `<div class="meas-row-grid">
         <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
         ${inputs}${pad}
-        <input type="text" inputmode="numeric" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
+        <input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
         <span class="meas-result" data-rcp-result-t="${ti}" data-rcp-result-r="${ri}">${resLabel}</span>
         <button type="button" class="btn btn-ghost btn-sm" data-rcp-delrow="${ti}-${ri}" title="حذف">✕</button>
       </div>`;
@@ -3247,9 +3258,7 @@ function renderReceiptMeasTables(){
     el.addEventListener('input', e=>{
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
       let clean;
-      if(f === 'count'){
-        clean = e.target.value.replace(/[^0-9]/g, '');
-      } else {
+      {
         const raw = e.target.value;
         if(raw.includes('.')){
           const parts = raw.replace(/[^0-9.]/g, '').split('.');
@@ -3696,7 +3705,7 @@ function renderPaymentHistoryTable(){
   }
   const totalAmount = list.reduce((s,h)=>s+(Number(h.amount)||0), 0);
   let html = `<table><thead><tr>
-    <th>التاريخ</th><th>الوقت</th><th>الزبون</th><th>المبلغ</th><th>المستند</th><th>طريقة الدفع</th>
+    <th>التاريخ</th><th>الوقت</th><th>الزبون</th><th>المبلغ</th><th>المستند</th><th>طريقة الدفع</th><th style="width:50px"></th>
   </tr></thead><tbody>`;
   list.forEach(h=>{
     const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ-u-nu-latn', {hour:'2-digit', minute:'2-digit'}) : '—';
@@ -3707,6 +3716,7 @@ function renderPaymentHistoryTable(){
       <td>${fmt(h.amount)}</td>
       <td>${h.docType||''} ${h.docNo?'#'+h.docNo:''}</td>
       <td>${h.method||'—'}</td>
+      <td><button class="btn btn-sm btn-ghost" onclick="deletePaymentHistoryEntry('${h.id}')" title="حذف من السجل">✕</button></td>
     </tr>`;
   });
   html += `</tbody></table>
@@ -3714,6 +3724,13 @@ function renderPaymentHistoryTable(){
       <div class="totals-row grand"><span>عدد الدفعات: ${list.length}</span><span>الإجمالي: ${fmt(totalAmount)}</span></div>
     </div>`;
   wrap.innerHTML = html;
+}
+async function deletePaymentHistoryEntry(id){
+  if(!confirm('حذف هذه الدفعة من سجل الدفعات؟ هذا ما يأثرش على الوصل الأصلي إذا كان مازال موجود.')) return;
+  paymentHistory = paymentHistory.filter(h=>h.id!==id);
+  await savePaymentHistory();
+  renderPaymentHistoryTable();
+  toast('تم حذف الدفعة من السجل');
 }
 document.getElementById('paymentHistorySearch').addEventListener('input', renderPaymentHistoryTable);
 document.getElementById('paymentHistoryFrom').addEventListener('input', renderPaymentHistoryTable);
