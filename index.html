@@ -3153,7 +3153,7 @@ function renderMeasTables(){
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
       let clean;
       {
-        const raw = e.target.value;
+        const raw = e.target.value.replace(/,/g, '.');
         if(raw.includes('.')){
           const parts = raw.replace(/[^0-9.]/g, '').split('.');
           clean = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
@@ -3259,7 +3259,7 @@ function renderReceiptMeasTables(){
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
       let clean;
       {
-        const raw = e.target.value;
+        const raw = e.target.value.replace(/,/g, '.');
         if(raw.includes('.')){
           const parts = raw.replace(/[^0-9.]/g, '').split('.');
           clean = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
