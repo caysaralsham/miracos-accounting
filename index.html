@@ -1229,6 +1229,7 @@ function startRealtimeSync(){
     }
     applySettingsToUI();
     renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
+    runDailyBackupIfNeeded();
   }, (err)=>{
     console.error(err);
     toast('انقطع الاتصال بقاعدة البيانات السحابية');
@@ -1765,20 +1766,28 @@ function updateLastDailyBackupLabel(){
 }
 
 function runDailyBackupIfNeeded(){
-  const now = new Date();
-  if(now.getHours() < DAILY_BACKUP_HOUR) return;
-  const today = now.toISOString().slice(0,10);
-  const last = safeLocal.getItem(DAILY_BACKUP_KEY);
-  if(last === today) return;
-  if(receipts.length === 0 && expenses.length === 0 && invoices.length === 0) return;
-  // فاصل زمني بسيط بين التحميلين، حتى ما يحجب المتصفح ثاني تحميل تلقائي متتالي بدون تفاعل من المستخدم
-  exportExcelReport(true);
-  setTimeout(()=>{
-    exportRestoreJSON(true);
-    safeLocal.setItem(DAILY_BACKUP_KEY, today);
-    updateLastDailyBackupLabel();
-    toast('تم إنشاء نسخة احتياطية يومية تلقائيًا — تفقّدي مجلد التنزيلات');
-  }, 700);
+  try{
+    const now = new Date();
+    if(now.getHours() < DAILY_BACKUP_HOUR) return;
+    const today = now.toISOString().slice(0,10);
+    const last = safeLocal.getItem(DAILY_BACKUP_KEY);
+    if(last === today) return;
+    if(receipts.length === 0 && expenses.length === 0 && invoices.length === 0) return;
+    // نستنى شوية أول ما يفتح البرنامج حتى ما يتزاحمش الباكأب مع تحميل الصفحة نفسها
+    setTimeout(()=>{
+      try{
+        exportExcelReport(true);
+        setTimeout(()=>{
+          try{
+            exportRestoreJSON(true);
+            safeLocal.setItem(DAILY_BACKUP_KEY, today);
+            updateLastDailyBackupLabel();
+            toast('تم إنشاء نسخة احتياطية يومية تلقائيًا — تفقّدي مجلد التنزيلات');
+          }catch(err){ console.error('daily backup (restore file) failed', err); }
+        }, 700);
+      }catch(err){ console.error('daily backup (excel file) failed', err); }
+    }, 3000);
+  }catch(err){ console.error('runDailyBackupIfNeeded failed', err); }
 }
 setInterval(runDailyBackupIfNeeded, 5 * 60 * 1000);
 
