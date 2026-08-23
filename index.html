@@ -1753,6 +1753,7 @@ function exportRestoreJSON(silent){
 document.getElementById('btnExportRestore').addEventListener('click', ()=>exportRestoreJSON(false));
 
 const DAILY_BACKUP_KEY = 'miracos_last_daily_backup';
+const DAILY_BACKUP_HOUR = 17; // 5 مساءً
 function isMobileDevice(){
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 }
@@ -1764,7 +1765,9 @@ function updateLastDailyBackupLabel(){
 }
 
 function runDailyBackupIfNeeded(){
-  const today = new Date().toISOString().slice(0,10);
+  const now = new Date();
+  if(now.getHours() < DAILY_BACKUP_HOUR) return;
+  const today = now.toISOString().slice(0,10);
   const last = safeLocal.getItem(DAILY_BACKUP_KEY);
   if(last === today) return;
   if(receipts.length === 0 && expenses.length === 0 && invoices.length === 0) return;
@@ -1777,6 +1780,7 @@ function runDailyBackupIfNeeded(){
     toast('تم إنشاء نسخة احتياطية يومية تلقائيًا — تفقّدي مجلد التنزيلات');
   }, 700);
 }
+setInterval(runDailyBackupIfNeeded, 5 * 60 * 1000);
 
 document.getElementById('btnImportRestore').addEventListener('click', ()=>{
   document.getElementById('restoreFileInput').click();
