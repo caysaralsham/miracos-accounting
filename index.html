@@ -767,6 +767,12 @@
       </div>
 
       <div class="panel" style="max-width:520px;">
+        <div class="panel-head"><h2>🗑 سلة المهملات (الوصولات المحذوفة)</h2></div>
+        <p style="font-size:13px; color:var(--text-dim); margin-top:0;">أي وصل تحذفه يبقى هنا 30 يوم قبل ما يمسح نهائيًا، ومبلغه ينشال من "إجمالي المقبوضات" فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.</p>
+        <div id="trashWrap"></div>
+      </div>
+
+      <div class="panel" style="max-width:520px;">
         <div class="panel-head"><h2>إدارة البيانات</h2></div>
         <p style="font-size:13px; color:var(--text-dim); margin-top:0;">يمكنك حذف كافة البيانات المخزنة في هذا التطبيق (الوصولات، المصاريف). هذا الإجراء لا رجعة فيه.</p>
         <button class="btn btn-danger" id="btnResetAll">حذف كل البيانات</button>
@@ -1094,6 +1100,7 @@ const DEFAULT_SETTINGS = {
 
 let receipts = [];
 let expenses = [];
+let deletedReceipts = [];
 let invoices = [];
 let measurementsList = [];
 let paymentHistory = [];
@@ -1208,6 +1215,7 @@ function startRealtimeSync(){
       if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
       if(data.receipts) receipts = data.receipts;
       if(data.expenses) expenses = data.expenses;
+      if(Array.isArray(data.deletedReceipts)) deletedReceipts = data.deletedReceipts;
       if(data.invoices) invoices = data.invoices;
       if(data.measurementsList) measurementsList = data.measurementsList;
       if(data.paymentHistory) paymentHistory = data.paymentHistory;
@@ -1228,10 +1236,12 @@ function startRealtimeSync(){
     } else {
       expenseCategories = DEFAULT_EXPENSE_CATEGORIES.slice();
       lastReceiptNo = computeMaxReceiptNo();
-      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo});
+      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts});
     }
     applySettingsToUI();
     renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
+    renderTrash();
+    purgeOldTrash();
     runDailyBackupIfNeeded();
   }, (err)=>{
     console.error(err);
@@ -1257,6 +1267,7 @@ async function cloudSet(partial){
 }
 async function saveSettings(){ await cloudSet({settings}); }
 async function saveReceipts(){ await cloudSet({receipts}); }
+async function saveDeletedReceipts(){ await cloudSet({deletedReceipts}); }
 async function saveExpenses(){ await cloudSet({expenses}); }
 async function saveExpenseCategories(){ await cloudSet({expenseCategories}); }
 async function saveInvoices(){ await cloudSet({invoices}); }
@@ -1528,7 +1539,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.view === 'reports'){ renderReports(); renderPaymentHistoryTable(); }
     if(item.dataset.view === 'pricelist'){ renderPriceCategoryChips(); renderPriceListGrouped(); }
     if(item.dataset.view === 'customer-reports') renderCustomerReports();
-    if(item.dataset.view === 'settings') fillSettingsForm();
+    if(item.dataset.view === 'settings'){ fillSettingsForm(); renderTrash(); }
   });
 });
 
@@ -1741,7 +1752,7 @@ function exportExcelReport(silent){
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
-  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo };
+  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts };
   const blob = new Blob([JSON.stringify(restoreData)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1817,6 +1828,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       if(Array.isArray(data.priceList)) priceList = data.priceList;
       if(Array.isArray(data.priceCategories)) priceCategories = data.priceCategories;
       if(Array.isArray(data.expenseCategories)) expenseCategories = data.expenseCategories;
+      if(Array.isArray(data.deletedReceipts)) deletedReceipts = data.deletedReceipts;
       if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
       lastReceiptNo = (typeof data.lastReceiptNo === 'number') ? data.lastReceiptNo : computeMaxReceiptNo();
       await saveReceipts();
@@ -1827,9 +1839,11 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       await savePriceList();
       await saveExpenseCategories();
       await saveLastReceiptNo();
+      await saveDeletedReceipts();
       await saveSettings();
       applySettingsToUI();
       renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
+      renderTrash();
       toast('تم استرجاع البيانات بنجاح');
     }catch(err){
       console.error(err);
@@ -2256,24 +2270,82 @@ function editReceipt(id){
   if(r) openReceiptModal(r);
 }
 async function deleteReceipt(id){
-  if(!confirm('هل تريد حذف هذا الوصل؟')) return;
+  if(!confirm('هل تريد حذف هذا الوصل؟ رح ينحط في سلة المهملات 30 يوم وينشال مبلغه من الدخل فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.')) return;
   const target = receipts.find(r=>r.id===id);
+  if(!target) return;
   receipts = receipts.filter(r=>r.id!==id);
   await saveReceipts();
-  if(target){
-    const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
-    if(paymentIds.size > 0){
-      const before = paymentHistory.length;
-      paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
-      if(paymentHistory.length !== before){
-        await savePaymentHistory();
-        renderPaymentHistoryTable();
-      }
-    }
+  const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
+  const trashedPaymentEntries = paymentIds.size > 0 ? paymentHistory.filter(h=>paymentIds.has(h.paymentId)) : [];
+  if(trashedPaymentEntries.length > 0){
+    paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
+    await savePaymentHistory();
+    renderPaymentHistoryTable();
   }
+  deletedReceipts.push({...target, deletedAt: new Date().toISOString(), trashedPaymentEntries});
+  await saveDeletedReceipts();
   renderReceiptsTable();
   renderDashboard();
-  toast('تم حذف الوصل');
+  renderTrash();
+  toast('تم نقل الوصل لسلة المهملات وتحديث الدخل');
+}
+async function restoreReceiptFromTrash(id){
+  const target = deletedReceipts.find(r=>r.id===id);
+  if(!target) return;
+  deletedReceipts = deletedReceipts.filter(r=>r.id!==id);
+  const {deletedAt, trashedPaymentEntries, ...receiptData} = target;
+  receipts.push(receiptData);
+  await saveReceipts();
+  if(trashedPaymentEntries && trashedPaymentEntries.length > 0){
+    paymentHistory = [...paymentHistory, ...trashedPaymentEntries];
+    await savePaymentHistory();
+    renderPaymentHistoryTable();
+  }
+  await saveDeletedReceipts();
+  renderReceiptsTable();
+  renderDashboard();
+  renderTrash();
+  toast('تم استرجاع الوصل وإرجاع مبلغه للدخل بتاريخه الأصلي');
+}
+async function permanentlyDeleteFromTrash(id){
+  const target = deletedReceipts.find(r=>r.id===id);
+  if(!target) return;
+  const typed = prompt(`حذف نهائي لا رجعة فيه لوصل رقم ${target.no} (${fmt(target.total)}).\nلتأكيد الحذف، اكتب رقم الوصل بالضبط: ${target.no}`);
+  if(typed === null) return;
+  if(typed.trim() !== String(target.no)){ toast('الرقم ما يطابقش — تم إلغاء الحذف'); return; }
+  deletedReceipts = deletedReceipts.filter(r=>r.id!==id);
+  await saveDeletedReceipts();
+  renderTrash();
+  toast('تم الحذف النهائي');
+}
+async function purgeOldTrash(){
+  const cutoff = Date.now() - 30*24*60*60*1000;
+  const expired = deletedReceipts.filter(r => new Date(r.deletedAt).getTime() < cutoff);
+  if(expired.length === 0) return;
+  deletedReceipts = deletedReceipts.filter(r => new Date(r.deletedAt).getTime() >= cutoff);
+  await saveDeletedReceipts();
+}
+function renderTrash(){
+  const wrap = document.getElementById('trashWrap');
+  if(!wrap) return;
+  if(deletedReceipts.length === 0){
+    wrap.innerHTML = '<div class="empty-state" style="padding:16px 0;">السلة فارغة.</div>';
+    return;
+  }
+  const sorted = [...deletedReceipts].sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||''));
+  wrap.innerHTML = sorted.map(r=>{
+    const delDate = r.deletedAt ? r.deletedAt.slice(0,10) : '—';
+    return `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
+      <div style="font-size:13px;">
+        <b>${r.name}</b> — وصل #${r.no} — ${fmt(r.total)}
+        <div style="color:var(--text-dim); font-size:12px;">اتحذف بتاريخ ${delDate}</div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-sm" onclick="restoreReceiptFromTrash('${r.id}')">↺ استرجاع</button>
+        <button class="btn btn-sm btn-danger" onclick="permanentlyDeleteFromTrash('${r.id}')">حذف نهائي</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 let currentViewedReceiptId = null;
 let convertingFromInvoiceId = null;
@@ -3515,7 +3587,7 @@ window.addEventListener('afterprint', ()=>{
 });
 
 function renderDashboard(){
-  const income = receipts.reduce((s,r)=>s + getReceiptPayments(r).reduce((a,p)=>a+p.amount,0), 0);
+  const income = paymentHistory.reduce((s,h)=>s+(Number(h.amount)||0), 0);
   const expTotal = expenses.reduce((s,e)=>s+e.amount,0);
   const commissionPercent = Number(settings.commissionPercent)||0;
   const commission = income * (commissionPercent/100);
@@ -3858,6 +3930,7 @@ if('serviceWorker' in navigator){
     renderCustomerReports();
     renderMeasurementsTable();
     renderExpenseCategoryChips();
+    renderTrash();
   });
 })();
 </script>
