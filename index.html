@@ -1267,6 +1267,27 @@ async function cloudSet(partial){
 }
 async function saveSettings(){ await cloudSet({settings}); }
 async function saveReceipts(){ await cloudSet({receipts}); }
+// حفظ آمن للوصولات: يقرأ آخر نسخة من السيرفر جوا معاملة (transaction) ويطبق عليها
+// التعديل المطلوب بس، بدل ما يكتب فوق كامل القائمة بنسخة قد تكون قديمة عند هذا الجهاز
+// (مثلاً بعد فترة بلا نت، أو جهاز ثاني زاد وصل بنفس اللحظة).
+async function saveReceiptsTx(mutateFn){
+  if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
+  try{
+    const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
+    await db.runTransaction(async (tx)=>{
+      const doc = await tx.get(ref);
+      const serverReceipts = (doc.exists && Array.isArray(doc.data().receipts)) ? doc.data().receipts : [];
+      const updated = mutateFn(serverReceipts);
+      tx.set(ref, {receipts: updated}, {merge:true});
+      receipts = updated;
+    });
+    return true;
+  }catch(e){
+    console.error(e);
+    toast('تعذر الحفظ على السحابة');
+    return false;
+  }
+}
 async function saveDeletedReceipts(){ await cloudSet({deletedReceipts}); }
 async function saveExpenses(){ await cloudSet({expenses}); }
 async function saveExpenseCategories(){ await cloudSet({expenseCategories}); }
@@ -2158,14 +2179,16 @@ async function buildAndSaveReceiptFromForm(){
     deliveredDate
   };
 
-  if(id){
-    const idx = receipts.findIndex(r=>r.id===id);
-    if(idx>-1) receipts[idx] = data;
-  } else {
-    receipts.push(data);
-  }
   noteReceiptNoUsed(data.no);
-  await saveReceipts();
+  await saveReceiptsTx(serverReceipts=>{
+    const idx = serverReceipts.findIndex(r=>r.id===id);
+    if(idx>-1){
+      const updated = [...serverReceipts];
+      updated[idx] = data;
+      return updated;
+    }
+    return [...serverReceipts, data];
+  });
   await logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no});
   if(convertingFromInvoiceId){
     invoices = invoices.filter(i=>i.id!==convertingFromInvoiceId);
@@ -2273,8 +2296,7 @@ async function deleteReceipt(id){
   if(!confirm('هل تريد حذف هذا الوصل؟ رح ينحط في سلة المهملات 30 يوم وينشال مبلغه من الدخل فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.')) return;
   const target = receipts.find(r=>r.id===id);
   if(!target) return;
-  receipts = receipts.filter(r=>r.id!==id);
-  await saveReceipts();
+  await saveReceiptsTx(serverReceipts => serverReceipts.filter(r=>r.id!==id));
   const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
   const trashedPaymentEntries = paymentIds.size > 0 ? paymentHistory.filter(h=>paymentIds.has(h.paymentId)) : [];
   if(trashedPaymentEntries.length > 0){
@@ -2294,8 +2316,7 @@ async function restoreReceiptFromTrash(id){
   if(!target) return;
   deletedReceipts = deletedReceipts.filter(r=>r.id!==id);
   const {deletedAt, trashedPaymentEntries, ...receiptData} = target;
-  receipts.push(receiptData);
-  await saveReceipts();
+  await saveReceiptsTx(serverReceipts => [...serverReceipts, receiptData]);
   if(trashedPaymentEntries && trashedPaymentEntries.length > 0){
     paymentHistory = [...paymentHistory, ...trashedPaymentEntries];
     await savePaymentHistory();
