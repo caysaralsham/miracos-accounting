@@ -1183,6 +1183,9 @@ function connectFirebase(cfg){
     if(fbApp){ firebase.app().delete(); fbApp = null; }
     fbApp = firebase.initializeApp(cfg);
     db = firebase.firestore();
+    db.enablePersistence({synchronizeTabs:true}).catch(err=>{
+      console.warn('Firestore offline persistence not enabled:', err.code);
+    });
     if(firebase.auth().currentUser){
       startRealtimeSync();
       setFbStatus(true);
