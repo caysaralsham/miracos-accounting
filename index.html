@@ -1717,7 +1717,13 @@ function doLogin(){
     hideLoginScreen();
   }).catch(err=>{
     console.error(err);
-    document.getElementById('loginError').style.display = 'block';
+    const errEl = document.getElementById('loginError');
+    if(err.code === 'auth/network-request-failed' || !navigator.onLine){
+      errEl.textContent = 'ما فيه اتصال بالإنترنت — تسجيل الدخول أول مرة يحتاج نت. تأكد من الاتصال وحاول من جديد.';
+    } else {
+      errEl.textContent = 'البريد الإلكتروني أو كلمة السر غير صحيحة';
+    }
+    errEl.style.display = 'block';
   }).finally(()=>{
     isLoggingIn = false;
     btn.disabled = false;
@@ -2173,7 +2179,7 @@ async function logPaymentHistoryEntries(payments, meta){
     });
     changed = true;
   });
-  if(changed) await savePaymentHistory();
+  if(changed) savePaymentHistory();
 }
 
 async function buildAndSaveReceiptFromForm(){
@@ -2239,11 +2245,11 @@ async function buildAndSaveReceiptFromForm(){
   } else {
     receipts.push(data);
   }
-  await saveReceipts();
-  await logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no});
+  saveReceipts();
+  logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no});
   if(convertingFromInvoiceId){
     invoices = invoices.filter(i=>i.id!==convertingFromInvoiceId);
-    await saveInvoices();
+    saveInvoices();
     renderInvoicesTable();
     convertingFromInvoiceId = null;
   }
@@ -2361,16 +2367,16 @@ async function deleteReceipt(id){
   const target = receipts.find(r=>r.id===id);
   if(!target) return;
   receipts = receipts.filter(r=>r.id!==id);
-  await saveReceipts();
+  saveReceipts();
   const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
   const trashedPaymentEntries = paymentIds.size > 0 ? paymentHistory.filter(h=>paymentIds.has(h.paymentId)) : [];
   if(trashedPaymentEntries.length > 0){
     paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
-    await savePaymentHistory();
+    savePaymentHistory();
     renderPaymentHistoryTable();
   }
   deletedReceipts.push({...target, deletedAt: new Date().toISOString(), trashedPaymentEntries});
-  await saveDeletedReceipts();
+  saveDeletedReceipts();
   renderReceiptsTable();
   renderDashboard();
   renderTrash();
@@ -2382,13 +2388,13 @@ async function restoreReceiptFromTrash(id){
   deletedReceipts = deletedReceipts.filter(r=>r.id!==id);
   const {deletedAt, trashedPaymentEntries, ...receiptData} = target;
   receipts.push(receiptData);
-  await saveReceipts();
+  saveReceipts();
   if(trashedPaymentEntries && trashedPaymentEntries.length > 0){
     paymentHistory = [...paymentHistory, ...trashedPaymentEntries];
-    await savePaymentHistory();
+    savePaymentHistory();
     renderPaymentHistoryTable();
   }
-  await saveDeletedReceipts();
+  saveDeletedReceipts();
   renderReceiptsTable();
   renderDashboard();
   renderTrash();
@@ -2401,7 +2407,7 @@ async function permanentlyDeleteFromTrash(id){
   if(typed === null) return;
   if(typed.trim() !== String(target.no)){ toast('الرقم ما يطابقش — تم إلغاء الحذف'); return; }
   deletedReceipts = deletedReceipts.filter(r=>r.id!==id);
-  await saveDeletedReceipts();
+  saveDeletedReceipts();
   renderTrash();
   toast('تم الحذف النهائي');
 }
@@ -2410,7 +2416,7 @@ async function purgeOldTrash(){
   const expired = deletedReceipts.filter(r => new Date(r.deletedAt).getTime() < cutoff);
   if(expired.length === 0) return;
   deletedReceipts = deletedReceipts.filter(r => new Date(r.deletedAt).getTime() >= cutoff);
-  await saveDeletedReceipts();
+  saveDeletedReceipts();
 }
 function renderTrash(){
   const wrap = document.getElementById('trashWrap');
@@ -2845,8 +2851,8 @@ async function buildAndSaveInvoiceFromForm(){
   } else {
     invoices.push(data);
   }
-  await saveInvoices();
-  await logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no});
+  saveInvoices();
+  logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no});
   renderInvoicesTable();
   renderDashboard();
   renderPaymentHistoryTable();
@@ -2939,7 +2945,7 @@ function convertInvoiceToReceipt(id){
 async function deleteInvoice(id){
   if(!confirm('هل تريد حذف هذه الفاتورة؟')) return;
   invoices = invoices.filter(i=>i.id!==id);
-  await saveInvoices();
+  saveInvoices();
   renderInvoicesTable();
   renderDashboard();
   toast('تم حذف الفاتورة');
@@ -3161,7 +3167,7 @@ document.getElementById('btnSaveExpense').addEventListener('click', async ()=>{
   } else {
     expenses.push(data);
   }
-  await saveExpenses();
+  saveExpenses();
   document.getElementById('expenseOverlay').classList.remove('show');
   renderExpensesTable();
   renderDashboard();
@@ -3214,7 +3220,7 @@ function editExpense(id){
 async function deleteExpense(id){
   if(!confirm('هل تريد حذف هذا المصروف؟')) return;
   expenses = expenses.filter(e=>e.id!==id);
-  await saveExpenses();
+  saveExpenses();
   renderExpensesTable();
   renderDashboard();
   toast('تم حذف المصروف');
@@ -3501,7 +3507,7 @@ function buildMeasurementRecord(){
 
 async function saveMeasurementRecord(rec){
   measurementsList.push(rec);
-  await saveMeasurementsList();
+  saveMeasurementsList();
   renderMeasurementsTable();
 }
 
@@ -3589,7 +3595,7 @@ function renderMeasurementsTable(){
 async function deleteMeasurementRecord(id){
   if(!confirm('هل تريد حذف هذا السجل؟')) return;
   measurementsList = measurementsList.filter(r=>r.id!==id);
-  await saveMeasurementsList();
+  saveMeasurementsList();
   renderMeasurementsTable();
   toast('تم الحذف');
 }
