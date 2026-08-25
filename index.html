@@ -1697,10 +1697,17 @@ function hideLoginScreen(){
   updateLastDailyBackupLabel();
   runDailyBackupIfNeeded();
 }
+let isLoggingIn = false;
 function doLogin(){
+  if(isLoggingIn) return;
   const email = document.getElementById('loginUsername').value.trim();
   const pass = document.getElementById('loginPassword').value;
   document.getElementById('loginError').style.display = 'none';
+  isLoggingIn = true;
+  const btn = document.getElementById('btnLogin');
+  const prevText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'جارٍ الدخول...';
   firebase.auth().signInWithEmailAndPassword(email, pass).then(()=>{
     safeLocal.setItem(REMEMBER_KEY, JSON.stringify({email, pass}));
     document.getElementById('loginUsername').value = '';
@@ -1711,6 +1718,10 @@ function doLogin(){
   }).catch(err=>{
     console.error(err);
     document.getElementById('loginError').style.display = 'block';
+  }).finally(()=>{
+    isLoggingIn = false;
+    btn.disabled = false;
+    btn.textContent = prevText;
   });
 }
 document.getElementById('btnLogin').addEventListener('click', doLogin);
@@ -2222,15 +2233,13 @@ async function buildAndSaveReceiptFromForm(){
   };
 
   noteReceiptNoUsed(data.no);
-  await saveReceiptsTx(serverReceipts=>{
-    const idx = serverReceipts.findIndex(r=>r.id===id);
-    if(idx>-1){
-      const updated = [...serverReceipts];
-      updated[idx] = data;
-      return updated;
-    }
-    return [...serverReceipts, data];
-  });
+  if(id){
+    const idx = receipts.findIndex(r=>r.id===id);
+    if(idx>-1) receipts[idx] = data;
+  } else {
+    receipts.push(data);
+  }
+  await saveReceipts();
   await logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no});
   if(convertingFromInvoiceId){
     invoices = invoices.filter(i=>i.id!==convertingFromInvoiceId);
@@ -2351,7 +2360,8 @@ async function deleteReceipt(id){
   if(!confirm('هل تريد حذف هذا الوصل؟ رح ينحط في سلة المهملات 30 يوم وينشال مبلغه من الدخل فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.')) return;
   const target = receipts.find(r=>r.id===id);
   if(!target) return;
-  await saveReceiptsTx(serverReceipts => serverReceipts.filter(r=>r.id!==id));
+  receipts = receipts.filter(r=>r.id!==id);
+  await saveReceipts();
   const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
   const trashedPaymentEntries = paymentIds.size > 0 ? paymentHistory.filter(h=>paymentIds.has(h.paymentId)) : [];
   if(trashedPaymentEntries.length > 0){
@@ -2371,7 +2381,8 @@ async function restoreReceiptFromTrash(id){
   if(!target) return;
   deletedReceipts = deletedReceipts.filter(r=>r.id!==id);
   const {deletedAt, trashedPaymentEntries, ...receiptData} = target;
-  await saveReceiptsTx(serverReceipts => [...serverReceipts, receiptData]);
+  receipts.push(receiptData);
+  await saveReceipts();
   if(trashedPaymentEntries && trashedPaymentEntries.length > 0){
     paymentHistory = [...paymentHistory, ...trashedPaymentEntries];
     await savePaymentHistory();
