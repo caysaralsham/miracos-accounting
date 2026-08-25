@@ -2,7 +2,7 @@
 // باش يفتح البرنامج حتى بلا نت خالص. البيانات المالية نفسها ما تتخزنش هنا —
 // هذي مسؤولية Firestore offline persistence (مفعّلة من كود التطبيق نفسه).
 
-const CACHE_NAME = 'miracos-cache-v1';
+const CACHE_NAME = 'miracos-cache-v2';
 
 const APP_SHELL = [
   './',
@@ -44,18 +44,17 @@ self.addEventListener('fetch', (event) => {
     (req.headers.get('accept') || '').includes('text/html');
 
   if (isHTMLPage) {
-    // الصفحة الرئيسية: نجرب الشبكة أول باش أي تحديث يوصلك فورًا وقت عندك نت،
-    // ولو ما فماش نت نرجع للنسخة المخزنة محليًا بدل ما تطلع شاشة فارغة/خطأ.
+    // الصفحة الرئيسية: نوريك النسخة المخزنة فورًا (بلا ما نستنى النت حتى لو بطيء)،
+    // وبنفس الوقت نجيب نسخة جديدة من النت في الخلفية ونحدث الكاش بيها للمرة الجاية.
     event.respondWith(
-      fetch(req)
-        .then((res) => {
+      caches.match(req).then((cached) => {
+        const networkUpdate = fetch(req).then((res) => {
           const resClone = res.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(req, resClone));
           return res;
-        })
-        .catch(() =>
-          caches.match(req).then((cached) => cached || caches.match('./index.html'))
-        )
+        }).catch(() => null);
+        return cached || networkUpdate || caches.match('./index.html');
+      })
     );
     return;
   }
