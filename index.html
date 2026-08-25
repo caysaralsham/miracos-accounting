@@ -1290,9 +1290,51 @@ async function saveReceiptsTx(mutateFn){
 }
 async function saveDeletedReceipts(){ await cloudSet({deletedReceipts}); }
 async function saveExpenses(){ await cloudSet({expenses}); }
-async function saveExpenseCategories(){ await cloudSet({expenseCategories}); }
+async function saveExpensesTx(mutateFn){
+  if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
+  try{
+    const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
+    await db.runTransaction(async (tx)=>{
+      const doc = await tx.get(ref);
+      const serverExpenses = (doc.exists && Array.isArray(doc.data().expenses)) ? doc.data().expenses : [];
+      const updated = mutateFn(serverExpenses);
+      tx.set(ref, {expenses: updated}, {merge:true});
+      expenses = updated;
+    });
+    return true;
+  }catch(e){ console.error(e); toast('تعذر الحفظ على السحابة'); return false; }
+}
 async function saveInvoices(){ await cloudSet({invoices}); }
+async function saveInvoicesTx(mutateFn){
+  if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
+  try{
+    const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
+    await db.runTransaction(async (tx)=>{
+      const doc = await tx.get(ref);
+      const serverInvoices = (doc.exists && Array.isArray(doc.data().invoices)) ? doc.data().invoices : [];
+      const updated = mutateFn(serverInvoices);
+      tx.set(ref, {invoices: updated}, {merge:true});
+      invoices = updated;
+    });
+    return true;
+  }catch(e){ console.error(e); toast('تعذر الحفظ على السحابة'); return false; }
+}
 async function saveMeasurementsList(){ await cloudSet({measurementsList}); }
+async function saveExpenseCategories(){ await cloudSet({expenseCategories}); }
+async function saveMeasurementsListTx(mutateFn){
+  if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
+  try{
+    const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
+    await db.runTransaction(async (tx)=>{
+      const doc = await tx.get(ref);
+      const serverList = (doc.exists && Array.isArray(doc.data().measurementsList)) ? doc.data().measurementsList : [];
+      const updated = mutateFn(serverList);
+      tx.set(ref, {measurementsList: updated}, {merge:true});
+      measurementsList = updated;
+    });
+    return true;
+  }catch(e){ console.error(e); toast('تعذر الحفظ على السحابة'); return false; }
+}
 async function savePaymentHistory(){ await cloudSet({paymentHistory}); }
 async function savePriceList(){ await cloudSet({priceList, priceCategories}); }
 
@@ -2191,8 +2233,7 @@ async function buildAndSaveReceiptFromForm(){
   });
   await logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no});
   if(convertingFromInvoiceId){
-    invoices = invoices.filter(i=>i.id!==convertingFromInvoiceId);
-    await saveInvoices();
+    await saveInvoicesTx(serverInvoices => serverInvoices.filter(i=>i.id!==convertingFromInvoiceId));
     renderInvoicesTable();
     convertingFromInvoiceId = null;
   }
@@ -2203,21 +2244,34 @@ async function buildAndSaveReceiptFromForm(){
   return data.id;
 }
 
-document.getElementById('btnSaveReceipt').addEventListener('click', async ()=>{
-  const id = await buildAndSaveReceiptFromForm();
-  if(!id) return;
-  document.getElementById('receiptOverlay').classList.remove('show');
-  toast('تم حفظ الوصل بنجاح');
-});
+let isSavingReceipt = false;
+async function guardedSaveReceipt(afterSave){
+  if(isSavingReceipt) return;
+  isSavingReceipt = true;
+  const btnSave = document.getElementById('btnSaveReceipt');
+  const btnPrint = document.getElementById('btnSaveAndPrint');
+  const prevSaveText = btnSave.textContent, prevPrintText = btnPrint.textContent;
+  btnSave.disabled = true; btnPrint.disabled = true;
+  btnSave.textContent = 'جارٍ الحفظ...'; btnPrint.textContent = 'جارٍ الحفظ...';
+  try{
+    const id = await buildAndSaveReceiptFromForm();
+    if(!id) return;
+    document.getElementById('receiptOverlay').classList.remove('show');
+    toast('تم حفظ الوصل بنجاح');
+    if(afterSave) afterSave(id);
+  } finally {
+    isSavingReceipt = false;
+    btnSave.disabled = false; btnPrint.disabled = false;
+    btnSave.textContent = prevSaveText; btnPrint.textContent = prevPrintText;
+  }
+}
 
-document.getElementById('btnSaveAndPrint').addEventListener('click', async ()=>{
-  const id = await buildAndSaveReceiptFromForm();
-  if(!id) return;
-  document.getElementById('receiptOverlay').classList.remove('show');
-  toast('تم حفظ الوصل بنجاح');
+document.getElementById('btnSaveReceipt').addEventListener('click', ()=> guardedSaveReceipt());
+
+document.getElementById('btnSaveAndPrint').addEventListener('click', ()=> guardedSaveReceipt((id)=>{
   viewReceipt(id);
   setTimeout(()=>window.print(), 300);
-});
+}));
 
 function statusTag(r){
   if(r.remaining <= 0) return '<span class="tag tag-paid">مدفوع بالكامل</span>';
@@ -2773,13 +2827,15 @@ async function buildAndSaveInvoiceFromForm(){
     note: document.getElementById('invNote').value.trim()
   };
 
-  if(id){
-    const idx = invoices.findIndex(i=>i.id===id);
-    if(idx>-1) invoices[idx] = data;
-  } else {
-    invoices.push(data);
-  }
-  await saveInvoices();
+  await saveInvoicesTx(serverInvoices=>{
+    const idx = serverInvoices.findIndex(i=>i.id===id);
+    if(idx>-1){
+      const updated = [...serverInvoices];
+      updated[idx] = data;
+      return updated;
+    }
+    return [...serverInvoices, data];
+  });
   await logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no});
   renderInvoicesTable();
   renderDashboard();
@@ -2872,8 +2928,7 @@ function convertInvoiceToReceipt(id){
 
 async function deleteInvoice(id){
   if(!confirm('هل تريد حذف هذه الفاتورة؟')) return;
-  invoices = invoices.filter(i=>i.id!==id);
-  await saveInvoices();
+  await saveInvoicesTx(serverInvoices => serverInvoices.filter(i=>i.id!==id));
   renderInvoicesTable();
   renderDashboard();
   toast('تم حذف الفاتورة');
@@ -3089,13 +3144,15 @@ document.getElementById('btnSaveExpense').addEventListener('click', async ()=>{
     category: document.getElementById('expCategory').value,
     amount: Number(document.getElementById('expAmount').value)||0
   };
-  if(id){
-    const idx = expenses.findIndex(e=>e.id===id);
-    if(idx>-1) expenses[idx] = data;
-  } else {
-    expenses.push(data);
-  }
-  await saveExpenses();
+  await saveExpensesTx(serverExpenses=>{
+    const idx = serverExpenses.findIndex(e=>e.id===id);
+    if(idx>-1){
+      const updated = [...serverExpenses];
+      updated[idx] = data;
+      return updated;
+    }
+    return [...serverExpenses, data];
+  });
   document.getElementById('expenseOverlay').classList.remove('show');
   renderExpensesTable();
   renderDashboard();
@@ -3147,8 +3204,7 @@ function editExpense(id){
 }
 async function deleteExpense(id){
   if(!confirm('هل تريد حذف هذا المصروف؟')) return;
-  expenses = expenses.filter(e=>e.id!==id);
-  await saveExpenses();
+  await saveExpensesTx(serverExpenses => serverExpenses.filter(e=>e.id!==id));
   renderExpensesTable();
   renderDashboard();
   toast('تم حذف المصروف');
@@ -3434,8 +3490,7 @@ function buildMeasurementRecord(){
 }
 
 async function saveMeasurementRecord(rec){
-  measurementsList.push(rec);
-  await saveMeasurementsList();
+  await saveMeasurementsListTx(serverList => [...serverList, rec]);
   renderMeasurementsTable();
 }
 
@@ -3522,8 +3577,7 @@ function renderMeasurementsTable(){
 
 async function deleteMeasurementRecord(id){
   if(!confirm('هل تريد حذف هذا السجل؟')) return;
-  measurementsList = measurementsList.filter(r=>r.id!==id);
-  await saveMeasurementsList();
+  await saveMeasurementsListTx(serverList => serverList.filter(r=>r.id!==id));
   renderMeasurementsTable();
   toast('تم الحذف');
 }
