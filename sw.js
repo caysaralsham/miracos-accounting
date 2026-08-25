@@ -2,7 +2,7 @@
 // باش يفتح البرنامج حتى بلا نت خالص. البيانات المالية نفسها ما تتخزنش هنا —
 // هذي مسؤولية Firestore offline persistence (مفعّلة من كود التطبيق نفسه).
 
-const CACHE_NAME = 'miracos-cache-v2';
+const CACHE_NAME = 'miracos-cache-v3';
 
 const APP_SHELL = [
   './',
