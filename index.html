@@ -2550,7 +2550,7 @@ document.getElementById('btnShareReceipt').addEventListener('click', async ()=>{
   const area = document.getElementById('receiptPrintArea');
   let blob;
   try{
-    const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff', useCORS:true});
+    const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:1200, width:area.scrollWidth});
     blob = await new Promise(res=>canvas.toBlob(res, 'image/jpeg', 0.92));
   }catch(e){
     console.error(e);
@@ -3089,7 +3089,7 @@ async function shareInvoiceById(id){
   const area = document.getElementById('invoicePrintArea');
   let blob;
   try{
-    const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff', useCORS:true});
+    const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:1200, width:area.scrollWidth});
     blob = await new Promise(res=>canvas.toBlob(res, 'image/jpeg', 0.92));
   }catch(e){
     console.error(e);
