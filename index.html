@@ -2126,18 +2126,40 @@ function getReceiptPayments(receipt){
 
 function populateCustomerDatalists(){
   const names = new Set();
-  const phones = new Set();
+  const allPhones = new Set();
+  const nameToPhones = new Map();
   const consider = (name, phone)=>{
     if(name) names.add(name);
-    if(phone) phones.add(phone);
+    if(phone) allPhones.add(phone);
+    if(name && phone){
+      if(!nameToPhones.has(name)) nameToPhones.set(name, new Set());
+      nameToPhones.get(name).add(phone);
+    }
   };
   receipts.forEach(r=> consider(r.name, r.phone));
   invoices.forEach(i=> consider(i.clientName, i.clientPhone));
   const namesList = document.getElementById('customerNamesList');
-  const phonesList = document.getElementById('customerPhonesList');
   if(namesList) namesList.innerHTML = [...names].map(n=>`<option value="${n}"></option>`).join('');
-  if(phonesList) phonesList.innerHTML = [...phones].map(p=>`<option value="${p}"></option>`).join('');
+  window._customerAllPhones = allPhones;
+  window._customerNameToPhones = nameToPhones;
+  updatePhoneSuggestions('');
 }
+function updatePhoneSuggestions(typedName){
+  const phonesList = document.getElementById('customerPhonesList');
+  if(!phonesList) return;
+  const nameToPhones = window._customerNameToPhones;
+  const match = nameToPhones && nameToPhones.get((typedName||'').trim());
+  const phones = match && match.size > 0 ? match : (window._customerAllPhones || new Set());
+  phonesList.innerHTML = [...phones].map(p=>`<option value="${p}"></option>`).join('');
+}
+function wireNameFilteredPhoneSuggestions(nameInputId){
+  const nameEl = document.getElementById(nameInputId);
+  if(!nameEl || nameEl.dataset.phoneFilterWired) return;
+  nameEl.dataset.phoneFilterWired = '1';
+  nameEl.addEventListener('input', ()=> updatePhoneSuggestions(nameEl.value));
+}
+wireNameFilteredPhoneSuggestions('rcpName');
+wireNameFilteredPhoneSuggestions('invClientName');
 
 function openReceiptModal(receipt){
   populateCustomerDatalists();
