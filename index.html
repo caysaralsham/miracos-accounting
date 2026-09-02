@@ -796,10 +796,8 @@
         <div class="field"><label>مدة التسليم (بالأيام)</label><input type="number" id="rcpDuration" min="0" placeholder="مثال: 15"></div>
       </div>
       <div class="grid3">
-        <div class="field"><label>الاسم</label><input type="text" id="rcpName" list="customerNamesList" autocomplete="off"></div>
-        <div class="field"><label>الهاتف</label><input type="text" id="rcpPhone" list="customerPhonesList" autocomplete="off"></div>
-        <datalist id="customerNamesList"></datalist>
-        <datalist id="customerPhonesList"></datalist>
+        <div class="field" style="position:relative;"><label>الاسم</label><input type="text" id="rcpName" autocomplete="off"></div>
+        <div class="field" style="position:relative;"><label>الهاتف</label><input type="text" id="rcpPhone" autocomplete="off"></div>
         <div class="field"><label>العنوان</label><input type="text" id="rcpAddress"></div>
       </div>
 
@@ -919,8 +917,8 @@
 
       <label style="margin-bottom:8px;" id="invClientSectionLabel">Informations Client</label>
       <div class="grid3">
-        <div class="field"><label id="invClientNameLabel">الاسم / Société</label><input type="text" id="invClientName" list="customerNamesList" autocomplete="off"></div>
-        <div class="field"><label>الهاتف</label><input type="text" id="invClientPhone" list="customerPhonesList" autocomplete="off"></div>
+        <div class="field" style="position:relative;"><label id="invClientNameLabel">الاسم / Société</label><input type="text" id="invClientName" autocomplete="off"></div>
+        <div class="field" style="position:relative;"><label>الهاتف</label><input type="text" id="invClientPhone" autocomplete="off"></div>
         <div class="field"><label id="invClientAddressLabel">Adresse</label><input type="text" id="invClientAddress"></div>
       </div>
       <div class="grid3" id="invClientLegalFields">
@@ -2138,28 +2136,65 @@ function populateCustomerDatalists(){
   };
   receipts.forEach(r=> consider(r.name, r.phone));
   invoices.forEach(i=> consider(i.clientName, i.clientPhone));
-  const namesList = document.getElementById('customerNamesList');
-  if(namesList) namesList.innerHTML = [...names].map(n=>`<option value="${n}"></option>`).join('');
+  window._customerAllNames = names;
   window._customerAllPhones = allPhones;
   window._customerNameToPhones = nameToPhones;
-  updatePhoneSuggestions('');
 }
-function updatePhoneSuggestions(typedName){
-  const phonesList = document.getElementById('customerPhonesList');
-  if(!phonesList) return;
-  const nameToPhones = window._customerNameToPhones;
-  const match = nameToPhones && nameToPhones.get((typedName||'').trim());
-  const phones = match && match.size > 0 ? match : (window._customerAllPhones || new Set());
-  phonesList.innerHTML = [...phones].map(p=>`<option value="${p}"></option>`).join('');
+
+// حقل اقتراحات مخصص: يبان بس وقت تكتب حرف على الأقل، وبيعرض المطابقات فقط
+// (بعكس datalist الأصلية يلي كانت تفتح قائمة كاملة بالضغط على السهم)
+function attachAutocomplete(inputEl, getMatches, onPick){
+  if(!inputEl || inputEl.dataset.autocompleteWired) return;
+  inputEl.dataset.autocompleteWired = '1';
+  const box = document.createElement('div');
+  box.className = 'autocomplete-box';
+  box.style.cssText = 'position:absolute; top:100%; right:0; left:0; z-index:50; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.12); max-height:180px; overflow-y:auto; display:none; margin-top:2px;';
+  inputEl.parentElement.appendChild(box);
+  function hide(){ box.style.display = 'none'; box.innerHTML = ''; }
+  function render(){
+    const q = inputEl.value.trim();
+    if(!q){ hide(); return; }
+    const matches = getMatches(q).slice(0, 8);
+    if(matches.length === 0){ hide(); return; }
+    box.innerHTML = matches.map(m=>`<div class="ac-item" style="padding:8px 10px; cursor:pointer; font-size:13.5px;">${m}</div>`).join('');
+    box.style.display = 'block';
+    [...box.children].forEach((el, i)=>{
+      el.addEventListener('mousedown', (e)=>{
+        e.preventDefault();
+        inputEl.value = matches[i];
+        hide();
+        if(onPick) onPick(matches[i]);
+        inputEl.dispatchEvent(new Event('input'));
+      });
+      el.addEventListener('mouseenter', ()=>{ el.style.background = 'var(--marble-2)'; });
+      el.addEventListener('mouseleave', ()=>{ el.style.background = ''; });
+    });
+  }
+  inputEl.addEventListener('input', render);
+  inputEl.addEventListener('focus', render);
+  inputEl.addEventListener('blur', ()=> setTimeout(hide, 150));
 }
-function wireNameFilteredPhoneSuggestions(nameInputId){
+
+function wireCustomerNameAutocomplete(nameInputId, phoneInputId){
   const nameEl = document.getElementById(nameInputId);
-  if(!nameEl || nameEl.dataset.phoneFilterWired) return;
-  nameEl.dataset.phoneFilterWired = '1';
-  nameEl.addEventListener('input', ()=> updatePhoneSuggestions(nameEl.value));
+  if(!nameEl) return;
+  attachAutocomplete(nameEl, (q)=>{
+    const all = window._customerAllNames || new Set();
+    return [...all].filter(n => n.includes(q));
+  });
+  if(phoneInputId){
+    const phoneEl = document.getElementById(phoneInputId);
+    attachAutocomplete(phoneEl, (q)=>{
+      const typedName = nameEl.value.trim();
+      const nameToPhones = window._customerNameToPhones;
+      const scoped = nameToPhones && nameToPhones.get(typedName);
+      const pool = (scoped && scoped.size > 0) ? scoped : (window._customerAllPhones || new Set());
+      return [...pool].filter(p => p.includes(q));
+    });
+  }
 }
-wireNameFilteredPhoneSuggestions('rcpName');
-wireNameFilteredPhoneSuggestions('invClientName');
+wireCustomerNameAutocomplete('rcpName', 'rcpPhone');
+wireCustomerNameAutocomplete('invClientName', 'invClientPhone');
 
 function openReceiptModal(receipt){
   populateCustomerDatalists();
