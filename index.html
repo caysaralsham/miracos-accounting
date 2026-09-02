@@ -796,8 +796,10 @@
         <div class="field"><label>مدة التسليم (بالأيام)</label><input type="number" id="rcpDuration" min="0" placeholder="مثال: 15"></div>
       </div>
       <div class="grid3">
-        <div class="field"><label>الاسم</label><input type="text" id="rcpName"></div>
-        <div class="field"><label>الهاتف</label><input type="text" id="rcpPhone"></div>
+        <div class="field"><label>الاسم</label><input type="text" id="rcpName" list="customerNamesList" autocomplete="off"></div>
+        <div class="field"><label>الهاتف</label><input type="text" id="rcpPhone" list="customerPhonesList" autocomplete="off"></div>
+        <datalist id="customerNamesList"></datalist>
+        <datalist id="customerPhonesList"></datalist>
         <div class="field"><label>العنوان</label><input type="text" id="rcpAddress"></div>
       </div>
 
@@ -917,8 +919,8 @@
 
       <label style="margin-bottom:8px;" id="invClientSectionLabel">Informations Client</label>
       <div class="grid3">
-        <div class="field"><label id="invClientNameLabel">الاسم / Société</label><input type="text" id="invClientName"></div>
-        <div class="field"><label>الهاتف</label><input type="text" id="invClientPhone"></div>
+        <div class="field"><label id="invClientNameLabel">الاسم / Société</label><input type="text" id="invClientName" list="customerNamesList" autocomplete="off"></div>
+        <div class="field"><label>الهاتف</label><input type="text" id="invClientPhone" list="customerPhonesList" autocomplete="off"></div>
         <div class="field"><label id="invClientAddressLabel">Adresse</label><input type="text" id="invClientAddress"></div>
       </div>
       <div class="grid3" id="invClientLegalFields">
@@ -1095,7 +1097,8 @@ const DEFAULT_SETTINGS = {
   bank: "AL SALAM BANK 03801605325215600131",
   email: "miracus.2021@gmail.com",
   commissionPercent: 10,
-  logo: LOGO_B64
+  logo: LOGO_B64,
+  lastDailyBackupDate: ''
 };
 
 let receipts = [];
@@ -1847,7 +1850,6 @@ function exportRestoreJSON(silent){
 }
 document.getElementById('btnExportRestore').addEventListener('click', ()=>exportRestoreJSON(false));
 
-const DAILY_BACKUP_KEY = 'miracos_last_daily_backup';
 const DAILY_BACKUP_HOUR = 17; // 5 مساءً
 function isMobileDevice(){
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -1855,18 +1857,19 @@ function isMobileDevice(){
 function updateLastDailyBackupLabel(){
   const el = document.getElementById('lastDailyBackupLabel');
   if(!el) return;
-  const last = safeLocal.getItem(DAILY_BACKUP_KEY);
-  el.textContent = last || 'لسا ما صارت';
+  el.textContent = settings.lastDailyBackupDate || 'لسا ما صارت';
 }
 
+let isRunningDailyBackup = false;
 function runDailyBackupIfNeeded(){
   try{
+    if(isRunningDailyBackup) return;
     const now = new Date();
     if(now.getHours() < DAILY_BACKUP_HOUR) return;
     const today = now.toISOString().slice(0,10);
-    const last = safeLocal.getItem(DAILY_BACKUP_KEY);
-    if(last === today) return;
+    if(settings.lastDailyBackupDate === today) return;
     if(receipts.length === 0 && expenses.length === 0 && invoices.length === 0) return;
+    isRunningDailyBackup = true;
     // نستنى شوية أول ما يفتح البرنامج حتى ما يتزاحمش الباكأب مع تحميل الصفحة نفسها
     setTimeout(()=>{
       try{
@@ -1874,14 +1877,16 @@ function runDailyBackupIfNeeded(){
         setTimeout(()=>{
           try{
             exportRestoreJSON(true);
-            safeLocal.setItem(DAILY_BACKUP_KEY, today);
+            settings.lastDailyBackupDate = today;
+            saveSettings();
             updateLastDailyBackupLabel();
             toast('تم إنشاء نسخة احتياطية يومية تلقائيًا — تفقّدي مجلد التنزيلات');
           }catch(err){ console.error('daily backup (restore file) failed', err); }
+          finally{ isRunningDailyBackup = false; }
         }, 700);
-      }catch(err){ console.error('daily backup (excel file) failed', err); }
+      }catch(err){ console.error('daily backup (excel file) failed', err); isRunningDailyBackup = false; }
     }, 3000);
-  }catch(err){ console.error('runDailyBackupIfNeeded failed', err); }
+  }catch(err){ console.error('runDailyBackupIfNeeded failed', err); isRunningDailyBackup = false; }
 }
 setInterval(runDailyBackupIfNeeded, 5 * 60 * 1000);
 
@@ -2119,7 +2124,23 @@ function getReceiptPayments(receipt){
   return migrated;
 }
 
+function populateCustomerDatalists(){
+  const names = new Set();
+  const phones = new Set();
+  const consider = (name, phone)=>{
+    if(name) names.add(name);
+    if(phone) phones.add(phone);
+  };
+  receipts.forEach(r=> consider(r.name, r.phone));
+  invoices.forEach(i=> consider(i.clientName, i.clientPhone));
+  const namesList = document.getElementById('customerNamesList');
+  const phonesList = document.getElementById('customerPhonesList');
+  if(namesList) namesList.innerHTML = [...names].map(n=>`<option value="${n}"></option>`).join('');
+  if(phonesList) phonesList.innerHTML = [...phones].map(p=>`<option value="${p}"></option>`).join('');
+}
+
 function openReceiptModal(receipt){
+  populateCustomerDatalists();
   document.getElementById('itemsBody').innerHTML = '';
   document.getElementById('paymentsBody').innerHTML = '';
   if(receipt){
@@ -2550,7 +2571,7 @@ document.getElementById('btnShareReceipt').addEventListener('click', async ()=>{
   const area = document.getElementById('receiptPrintArea');
   let blob;
   try{
-    const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:1200, width:area.scrollWidth});
+    const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:1200});
     blob = await new Promise(res=>canvas.toBlob(res, 'image/jpeg', 0.92));
   }catch(e){
     console.error(e);
@@ -2760,6 +2781,7 @@ document.getElementById('invDocType').addEventListener('change', ()=>{
 });
 
 function openInvoiceModal(invoice){
+  populateCustomerDatalists();
   document.getElementById('invItemsBody').innerHTML = '';
   document.getElementById('invPaymentsBody').innerHTML = '';
   if(invoice){
@@ -3089,7 +3111,7 @@ async function shareInvoiceById(id){
   const area = document.getElementById('invoicePrintArea');
   let blob;
   try{
-    const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:1200, width:area.scrollWidth});
+    const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:1200});
     blob = await new Promise(res=>canvas.toBlob(res, 'image/jpeg', 0.92));
   }catch(e){
     console.error(e);
