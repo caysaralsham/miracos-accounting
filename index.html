@@ -3005,11 +3005,13 @@ function viewInvoice(id){
                   <div class="no">عرض سعر</div>
                   <div class="lbl">رقم ${inv.no}</div>
                 </div>
-                <div style="font-size:13px; font-weight:700; color:var(--text-dim);">التاريخ: ${inv.date||''}</div>
               </div>
             </div>
-            <div style="margin-bottom:14px; font-size:13.5px; line-height:1.6;">
-              <div><b>الزبون:</b> ${inv.clientName} ${inv.clientAddress ? '— '+inv.clientAddress : ''}${inv.clientPhone ? ' — '+inv.clientPhone : ''}</div>
+            <div class="receipt-info-grid">
+              <div><span>الاسم: </span>${inv.clientName}</div>
+              <div><span>التاريخ: </span>${inv.date||''}</div>
+              <div><span>الهاتف: </span>${inv.clientPhone||'—'}</div>
+              <div><span>العنوان: </span>${inv.clientAddress||'—'}</div>
             </div>
           </td></tr>
           <tr><th>العدد</th><th>البيان</th><th>الوحدة</th><th>السعر</th><th>المجموع</th></tr>
