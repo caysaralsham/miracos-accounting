@@ -1611,6 +1611,7 @@ document.querySelectorAll('[data-close]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.getElementById(btn.dataset.close).classList.remove('show');
     if(btn.dataset.close === 'receiptOverlay') convertingFromInvoiceId = null;
+    if(btn.dataset.close === 'invoiceOverlay') convertingFromReceiptId = null;
   });
 });
 
@@ -2425,6 +2426,7 @@ function renderReceiptsTable(){
         <div class="row-actions">
           <button class="btn btn-sm btn-ghost" onclick="viewReceipt('${r.id}')" title="عرض/طباعة">👁</button>
           <button class="btn btn-sm btn-ghost" onclick="editReceipt('${r.id}')" title="تعديل">✎</button>
+          <button class="btn btn-sm btn-ghost" onclick="convertReceiptToInvoice('${r.id}')" title="تحويل لعرض سعر">🧾</button>
           <button class="btn btn-sm btn-ghost" onclick="deleteReceipt('${r.id}')" title="حذف">🗑</button>
         </div>
       </td>
@@ -2520,6 +2522,7 @@ function renderTrash(){
 }
 let currentViewedReceiptId = null;
 let convertingFromInvoiceId = null;
+let convertingFromReceiptId = null;
 function viewReceipt(id){
   const r = receipts.find(r=>r.id===id);
   if(!r) return;
@@ -2932,6 +2935,12 @@ async function buildAndSaveInvoiceFromForm(){
   }
   saveInvoices();
   logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no});
+  if(convertingFromReceiptId){
+    receipts = receipts.filter(r=>r.id!==convertingFromReceiptId);
+    saveReceipts();
+    renderReceiptsTable();
+    convertingFromReceiptId = null;
+  }
   renderInvoicesTable();
   renderDashboard();
   renderPaymentHistoryTable();
@@ -2996,6 +3005,33 @@ function renderInvoicesTable(){
 function editInvoice(id){
   const inv = invoices.find(i=>i.id===id);
   if(inv) openInvoiceModal(inv);
+}
+
+function convertReceiptToInvoice(id){
+  const r = receipts.find(x=>x.id===id);
+  if(!r) return;
+  if(!confirm(`تحويل وصل "${r.name}" إلى عرض سعر؟ الوصل الأصلي رح ينحذف نهائيًا بمجرد ما تحفظي عرض السعر.`)) return;
+  convertingFromReceiptId = id;
+  const pseudoInvoice = {
+    id: '',
+    docType: 'simple',
+    no: nextInvoiceNo('devis'),
+    date: new Date().toISOString().slice(0,10),
+    delay: '',
+    clientName: r.name || '',
+    clientAddress: r.address || '',
+    clientRC: '',
+    clientNIF: '',
+    clientNIS: '',
+    clientPhone: r.phone || '',
+    items: (r.items||[]).map(it=>({qty: it.qty, desc: it.desc, unit: '', price: it.price, amount: it.amount})),
+    payments: [],
+    note: `محوّل من وصل رقم ${r.no}`
+  };
+  openInvoiceModal(pseudoInvoice);
+  document.getElementById('invId').value = '';
+  document.getElementById('invoiceModalTitle').textContent = 'عرض سعر جديد (محوّل من وصل)';
+  toast('عدّل البيانات إذا احتجت، ثم احفظ عرض السعر');
 }
 
 function convertInvoiceToReceipt(id){
