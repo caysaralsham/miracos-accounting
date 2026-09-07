@@ -772,6 +772,7 @@
         <button class="btn btn-primary" id="btnRunDataAudit">تشغيل الفحص</button>
         <button class="btn btn-sm" id="btnResyncPayments" style="margin-inline-start:8px;">إصلاح تلقائي: مزامنة سجل الدفعات</button>
         <button class="btn btn-sm" id="btnFillDeliveryDates" style="margin-inline-start:8px;">إصلاح تلقائي: تعبئة تواريخ التسليم الناقصة</button>
+        <button class="btn btn-sm" id="btnCleanDuplicateOrphans" style="margin-inline-start:8px;">تنظيف الدفعات المكررة (يتيمة+حالية لنفس الدفعة)</button>
         <div id="dataAuditResults" style="margin-top:14px;"></div>
       </div>
 
@@ -3947,6 +3948,29 @@ function nearlyEqual(a, b, eps){
 }
 
 // فحص شامل يمر على كل الوصولات والفواتير وسجل الدفعات والمصاريف ويرجع لائحة تناقضات (بدون تعديل أي بيانات).
+// بيلقط دفعات "يتيمة" بسجل الدفعات (مالها معرّف حالي بوصل/فاتورة) بس هي فعليًا نسخة قديمة/مكررة
+// لنفس الدفعة الحقيقية اللي عم تتتبّع صح تحت معرّف جديد (نفس المبلغ + التاريخ + اسم الزبون).
+// آمن نحذفها لأنو المبلغ نفسه محسوب أصلاً بمكان تاني بالسجل.
+function findDuplicateOrphanPaymentEntries(){
+  const liveIds = new Set();
+  const liveSignatures = new Set();
+  receipts.forEach(r=>(r.payments||[]).forEach(p=>{
+    if(!p.id) return;
+    liveIds.add(p.id);
+    liveSignatures.add(`${Number(p.amount)||0}|${p.date||''}|${r.name||''}`);
+  }));
+  invoices.forEach(inv=>(inv.payments||[]).forEach(p=>{
+    if(!p.id) return;
+    liveIds.add(p.id);
+    liveSignatures.add(`${Number(p.amount)||0}|${p.date||''}|${inv.clientName||''}`);
+  }));
+  return paymentHistory.filter(h=>{
+    if(liveIds.has(h.paymentId)) return false;
+    const sig = `${Number(h.amount)||0}|${h.date||''}|${h.customerName||''}`;
+    return liveSignatures.has(sig);
+  });
+}
+
 function runDataIntegrityCheck(){
   const issues = []; // {level:'error'|'warning', text}
   const addErr = (text)=>issues.push({level:'error', text});
@@ -4002,10 +4026,15 @@ function runDataIntegrityCheck(){
   invoices.forEach(inv=>(inv.payments||[]).forEach(p=>{ if(p.id) livePayments.set(p.id, {amount:p.amount, date:p.date||'', method:p.method||'نقدي', customerName:inv.clientName, docType: inv.docType==='facture'?'فاتورة':(inv.docType==='devis'?'Devis':'عرض سعر'), docNo:inv.no}); }));
 
   const historyIds = new Set(paymentHistory.map(h=>h.paymentId));
+  const duplicateOrphanIds = new Set(findDuplicateOrphanPaymentEntries().map(h=>h.id));
   paymentHistory.forEach(h=>{
     const live = livePayments.get(h.paymentId);
     if(!live){
-      addWarn(`سجل الدفعات فيه دفعة (${fmt(h.amount)} بتاريخ ${h.date||'—'} للزبون ${h.customerName||'—'}) مالها وصل أو فاتورة موجودة حاليًا — ممكن تكون من مستند انحذف`);
+      if(duplicateOrphanIds.has(h.id)){
+        addWarn(`دفعة (${fmt(h.amount)} بتاريخ ${h.date||'—'} للزبون ${h.customerName||'—'}) مسجّلة مرتين بسجل الدفعات (نسخة قديمة + نسخة حالية) — استعمل زر "تنظيف الدفعات المكررة" بالأسفل`);
+      } else {
+        addWarn(`سجل الدفعات فيه دفعة (${fmt(h.amount)} بتاريخ ${h.date||'—'} للزبون ${h.customerName||'—'}) مالها وصل أو فاتورة موجودة حاليًا — ممكن تكون من مستند انحذف`);
+      }
     } else if(!nearlyEqual(live.amount, h.amount) || live.date!==h.date || live.docNo!==h.docNo || live.docType!==h.docType || live.customerName!==h.customerName){
       addErr(`دفعة الزبون ${h.customerName||'—'} بسجل الدفعات (${fmt(h.amount)}) ما تطابقش القيمة الحالية بـ${live.docType} رقم ${live.docNo} (${fmt(live.amount)})`);
     }
@@ -4090,6 +4119,22 @@ document.getElementById('btnFillDeliveryDates').addEventListener('click', async 
   if(!confirm('رح يعبّي تاريخ التسليم لكل وصل محدّد "تم التسليم" وناقصه التاريخ، باستعمال تاريخ الوصل نفسه كافتراض. إذا تاريخ التسليم الحقيقي مختلف، لازم تعدّليه يدويًا بعدها من كل وصل. متابعة؟')) return;
   const count = await fillMissingDeliveryDates();
   toast(count ? `تم تعبئة تاريخ التسليم لـ${count} وصل` : 'ما في ولا وصل ناقصه تاريخ التسليم');
+});
+
+// يشيل من سجل الدفعات بس النسخ اليتيمة اللي هي فعليًا مكررة عن دفعة حالية متتبّعة صح تحت معرّف تاني —
+// ما بيلمس ولا دفعة يتيمة حقيقية (من مستند انحذف نهائيًا بلا بديل).
+document.getElementById('btnCleanDuplicateOrphans').addEventListener('click', async ()=>{
+  const dups = findDuplicateOrphanPaymentEntries();
+  if(dups.length === 0){ toast('ما في ولا دفعة مكررة يتيمة حاليًا'); return; }
+  const listText = dups.map(h=>`- ${fmt(h.amount)} بتاريخ ${h.date||'—'} للزبون ${h.customerName||'—'}`).join('\n');
+  if(!confirm(`في ${dups.length} دفعة بسجل الدفعات مكررة عن دفعة حالية متتبّعة صح (نفس المبلغ والتاريخ والزبون بس تحت معرّف قديم):\n${listText}\n\nرح تنشال النسخة القديمة بس — المبلغ يضل محسوب صح من النسخة الحالية. متابعة؟`)) return;
+  const dupIds = new Set(dups.map(h=>h.id));
+  paymentHistory = paymentHistory.filter(h=>!dupIds.has(h.id));
+  await savePaymentHistory();
+  renderPaymentHistoryTable();
+  renderReports();
+  renderCustomerReports();
+  toast(`تم حذف ${dups.length} نسخة مكررة من سجل الدفعات`);
 });
 
 function renderReports(){
