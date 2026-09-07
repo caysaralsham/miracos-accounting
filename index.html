@@ -2551,10 +2551,9 @@ function editReceipt(id){
   const r = receipts.find(r=>r.id===id);
   if(r) openReceiptModal(r);
 }
-async function deleteReceipt(id){
-  if(!confirm('هل تريد حذف هذا الوصل؟ رح ينحط في سلة المهملات 30 يوم وينشال مبلغه من الدخل فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.')) return;
+async function deleteReceiptCore(id){
   const target = receipts.find(r=>r.id===id);
-  if(!target) return;
+  if(!target) return false;
   receipts = receipts.filter(r=>r.id!==id);
   saveReceipts();
   const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
@@ -2562,7 +2561,6 @@ async function deleteReceipt(id){
   if(trashedPaymentEntries.length > 0){
     paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
     savePaymentHistory();
-    renderPaymentHistoryTable();
   }
   deletedReceipts.push({...target, deletedAt: new Date().toISOString(), trashedPaymentEntries});
   saveDeletedReceipts();
@@ -2572,7 +2570,12 @@ async function deleteReceipt(id){
   renderReports();
   renderCustomerReports();
   renderPaymentHistoryTable();
-  toast('تم نقل الوصل لسلة المهملات وتحديث الدخل');
+  return true;
+}
+async function deleteReceipt(id){
+  if(!confirm('هل تريد حذف هذا الوصل؟ رح ينحط في سلة المهملات 30 يوم وينشال مبلغه من الدخل فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.')) return;
+  const ok = await deleteReceiptCore(id);
+  if(ok) toast('تم نقل الوصل لسلة المهملات وتحديث الدخل');
 }
 async function restoreReceiptFromTrash(id){
   const target = deletedReceipts.find(r=>r.id===id);
@@ -3179,24 +3182,27 @@ function convertReceiptToInvoice(id){
   toast('غيّري نوع المستند إذا بدك Devis أو Facture، وعبّي الدفعة إذا احتجت، ثم احفظي');
 }
 
-async function deleteInvoice(id){
-  if(!confirm('هل تريد حذف هذه الفاتورة؟')) return;
+async function deleteInvoiceCore(id){
   const target = invoices.find(i=>i.id===id);
+  if(!target) return false;
   invoices = invoices.filter(i=>i.id!==id);
   saveInvoices();
-  if(target){
-    const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
-    if(paymentIds.size > 0){
-      paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
-      savePaymentHistory();
-    }
+  const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
+  if(paymentIds.size > 0){
+    paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
+    savePaymentHistory();
   }
   renderInvoicesTable();
   renderDashboard();
   renderReports();
   renderCustomerReports();
   renderPaymentHistoryTable();
-  toast('تم حذف الفاتورة');
+  return true;
+}
+async function deleteInvoice(id){
+  if(!confirm('هل تريد حذف هذه الفاتورة؟')) return;
+  const ok = await deleteInvoiceCore(id);
+  if(ok) toast('تم حذف الفاتورة');
 }
 
 let currentViewedInvoiceId = null;
@@ -4291,6 +4297,7 @@ function renderCustomerReports(){
           <td>
             <div class="row-actions">
               <button class="btn btn-sm btn-ghost" onclick="editReceipt('${r.id}')" title="تعديل">✎</button>
+              <button class="btn btn-sm btn-ghost" onclick="deleteReceipt('${r.id}')" title="حذف">🗑</button>
             </div>
           </td>
         </tr>`;
@@ -4351,10 +4358,30 @@ function renderPaymentHistoryTable(){
   wrap.innerHTML = html;
 }
 async function deletePaymentHistoryEntry(id){
-  if(!confirm('حذف هذه الدفعة من سجل الدفعات؟ هذا ما يأثرش على الوصل الأصلي إذا كان مازال موجود.')) return;
-  paymentHistory = paymentHistory.filter(h=>h.id!==id);
+  const h = paymentHistory.find(x=>x.id===id);
+  if(!h) return;
+  const liveReceipt = receipts.find(r=>(r.payments||[]).some(p=>p.id===h.paymentId));
+  const liveInvoice = !liveReceipt ? invoices.find(inv=>(inv.payments||[]).some(p=>p.id===h.paymentId)) : null;
+
+  if(liveReceipt){
+    if(!confirm(`هاي الدفعة جزء من وصل رقم ${liveReceipt.no} (${liveReceipt.name}). حذفها من هون رح يحذف الوصل كامل (كل بنوده ودفعاته)، مش بس هاي الدفعة — وينحط بسلة المهملات 30 يوم متل أي حذف عادي. متابعة؟`)) return;
+    const ok = await deleteReceiptCore(liveReceipt.id);
+    if(ok) toast('تم حذف الوصل كامل مع كل دفعاته');
+    return;
+  }
+  if(liveInvoice){
+    const label = liveInvoice.docType==='facture'?'الفاتورة':(liveInvoice.docType==='devis'?'الـDevis':'عرض السعر');
+    if(!confirm(`هاي الدفعة جزء من ${label} رقم ${liveInvoice.no} (${liveInvoice.clientName}). حذفها من هون رح يحذف المستند كامل نهائيًا، مش بس هاي الدفعة. متابعة؟`)) return;
+    const ok = await deleteInvoiceCore(liveInvoice.id);
+    if(ok) toast('تم حذف المستند كامل مع كل دفعاته');
+    return;
+  }
+
+  if(!confirm('حذف هذه الدفعة من سجل الدفعات؟ ما إلها وصل أو فاتورة موجودة حاليًا مرتبطة فيها، فبتنشال هي بس.')) return;
+  paymentHistory = paymentHistory.filter(x=>x.id!==id);
   await savePaymentHistory();
   renderPaymentHistoryTable();
+  renderDashboard();
   toast('تم حذف الدفعة من السجل');
 }
 document.getElementById('paymentHistorySearch').addEventListener('input', renderPaymentHistoryTable);
