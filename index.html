@@ -1611,7 +1611,6 @@ document.querySelectorAll('[data-close]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.getElementById(btn.dataset.close).classList.remove('show');
     if(btn.dataset.close === 'receiptOverlay') convertingFromInvoiceId = null;
-    if(btn.dataset.close === 'invoiceOverlay') convertingFromReceiptId = null;
   });
 });
 
@@ -1999,6 +1998,28 @@ function measurementNoteText(t, l, w, h, count, total){
   return `(${dims}${countPart} = ${total.toFixed(3).replace(/\.?0+$/,'')} ${unit})`;
 }
 
+// تنقل بالأسهم بين خانات صف أداة القياس (طول/عرض/سماكة/عدد) داخل صف الوصل أو الفاتورة.
+// يمين/يسار = بين خانات نفس الصف (بالترتيب المرئي RTL). فوق/تحت = نفس الخانة بصف قياس آخر مفتوح (إذا موجود).
+function handleItemMeasureArrowNav(e){
+  const el = e.target;
+  const mRow = el.closest('tr');
+  if(!mRow) return;
+  const visible = [...mRow.querySelectorAll('.mt-field')].filter(f => f.style.display !== 'none');
+  if(e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
+    const idx = visible.indexOf(el);
+    const targetIdx = e.key === 'ArrowRight' ? idx - 1 : idx + 1;
+    if(visible[targetIdx]){ e.preventDefault(); visible[targetIdx].focus(); visible[targetIdx].select(); }
+  } else if(e.key === 'ArrowUp' || e.key === 'ArrowDown'){
+    const mf = el.dataset.mf;
+    const rowClass = mRow.classList.contains('it-measure-row') ? 'it-measure-row' : 'inv-it-measure-row';
+    const allRows = [...document.querySelectorAll('tr.' + rowClass)];
+    const rIdx = allRows.indexOf(mRow);
+    const targetRow = e.key === 'ArrowUp' ? allRows[rIdx-1] : allRows[rIdx+1];
+    const targetField = targetRow ? targetRow.querySelector(`.mt-field[data-mf="${mf}"]`) : null;
+    if(targetField && targetField.style.display !== 'none'){ e.preventDefault(); targetField.focus(); targetField.select(); }
+  }
+}
+
 function openItemMeasureTool(row, qtyInput){
   const existing = row.nextElementSibling;
   if(existing && existing.classList && existing.classList.contains('it-measure-row')){
@@ -2015,10 +2036,10 @@ function openItemMeasureTool(row, qtyInput){
           <option value="طول">متر طول</option>
           <option value="مكعب">متر مكعب</option>
         </select>
-        <input type="number" class="im-l" placeholder="طول (م)" step="0.01" style="width:100px;">
-        <input type="number" class="im-w" placeholder="عرض (م)" step="0.01" style="width:100px;">
-        <input type="number" class="im-h" placeholder="سماكة (م)" step="0.01" style="width:100px; display:none;">
-        <input type="number" class="im-count" placeholder="عدد القطع" value="1" min="1" style="width:100px;">
+        <input type="number" class="im-l mt-field" data-mf="l" dir="ltr" placeholder="طول (م)" step="0.01" style="width:100px; direction:ltr; text-align:right;">
+        <input type="number" class="im-w mt-field" data-mf="w" dir="ltr" placeholder="عرض (م)" step="0.01" style="width:100px; direction:ltr; text-align:right;">
+        <input type="number" class="im-h mt-field" data-mf="h" dir="ltr" placeholder="سماكة (م)" step="0.01" style="width:100px; display:none; direction:ltr; text-align:right;">
+        <input type="number" class="im-count mt-field" data-mf="count" dir="ltr" placeholder="عدد القطع" value="1" min="1" style="width:100px; direction:ltr; text-align:right;">
         <span class="im-result" style="font-size:13px; font-weight:700; color:var(--brass-deep); min-width:90px;">0.00 م²</span>
         <button type="button" class="btn btn-sm im-apply">تطبيق على العدد</button>
       </div>
@@ -2043,6 +2064,7 @@ function openItemMeasureTool(row, qtyInput){
     resultEl.textContent = (r.value*count).toFixed(3).replace(/\.?0+$/,'') + (t==='طول'?' م.ط':(t==='مكعب'?' م³':' م²'));
   }
   [typeSel,lIn,wIn,hIn,countIn].forEach(el=>el.addEventListener('input', ()=>{ updateVisibility(); recalcMeasure(); }));
+  [lIn,wIn,hIn,countIn].forEach(el=>el.addEventListener('keydown', handleItemMeasureArrowNav));
   updateVisibility(); recalcMeasure();
   mRow.querySelector('.im-apply').addEventListener('click', ()=>{
     const t = typeSel.value;
@@ -2426,7 +2448,6 @@ function renderReceiptsTable(){
         <div class="row-actions">
           <button class="btn btn-sm btn-ghost" onclick="viewReceipt('${r.id}')" title="عرض/طباعة">👁</button>
           <button class="btn btn-sm btn-ghost" onclick="editReceipt('${r.id}')" title="تعديل">✎</button>
-          <button class="btn btn-sm btn-ghost" onclick="convertReceiptToInvoice('${r.id}')" title="تحويل لعرض سعر">🧾</button>
           <button class="btn btn-sm btn-ghost" onclick="deleteReceipt('${r.id}')" title="حذف">🗑</button>
         </div>
       </td>
@@ -2522,7 +2543,6 @@ function renderTrash(){
 }
 let currentViewedReceiptId = null;
 let convertingFromInvoiceId = null;
-let convertingFromReceiptId = null;
 function viewReceipt(id){
   const r = receipts.find(r=>r.id===id);
   if(!r) return;
@@ -2703,10 +2723,10 @@ function openInvoiceItemMeasureTool(row, qtyInput){
           <option value="طول">متر طول</option>
           <option value="مكعب">متر مكعب</option>
         </select>
-        <input type="number" class="iim-l" placeholder="طول (م)" step="0.01" style="width:100px;">
-        <input type="number" class="iim-w" placeholder="عرض (م)" step="0.01" style="width:100px;">
-        <input type="number" class="iim-h" placeholder="سماكة (م)" step="0.01" style="width:100px; display:none;">
-        <input type="number" class="iim-count" placeholder="عدد القطع" value="1" min="1" style="width:100px;">
+        <input type="number" class="iim-l mt-field" data-mf="l" dir="ltr" placeholder="طول (م)" step="0.01" style="width:100px; direction:ltr; text-align:right;">
+        <input type="number" class="iim-w mt-field" data-mf="w" dir="ltr" placeholder="عرض (م)" step="0.01" style="width:100px; direction:ltr; text-align:right;">
+        <input type="number" class="iim-h mt-field" data-mf="h" dir="ltr" placeholder="سماكة (م)" step="0.01" style="width:100px; display:none; direction:ltr; text-align:right;">
+        <input type="number" class="iim-count mt-field" data-mf="count" dir="ltr" placeholder="عدد القطع" value="1" min="1" style="width:100px; direction:ltr; text-align:right;">
         <span class="iim-result" style="font-size:13px; font-weight:700; color:var(--brass-deep); min-width:90px;">0.00 م²</span>
         <button type="button" class="btn btn-sm iim-apply">تطبيق على العدد</button>
       </div>
@@ -2731,6 +2751,7 @@ function openInvoiceItemMeasureTool(row, qtyInput){
     resultEl.textContent = (r.value*count).toFixed(3).replace(/\.?0+$/,'') + (t==='طول'?' م.ط':(t==='مكعب'?' م³':' م²'));
   }
   [typeSel,lIn,wIn,hIn,countIn].forEach(el=>el.addEventListener('input', ()=>{ updateVisibility(); recalcMeasure(); }));
+  [lIn,wIn,hIn,countIn].forEach(el=>el.addEventListener('keydown', handleItemMeasureArrowNav));
   updateVisibility(); recalcMeasure();
   mRow.querySelector('.iim-apply').addEventListener('click', ()=>{
     const t = typeSel.value;
@@ -2935,12 +2956,6 @@ async function buildAndSaveInvoiceFromForm(){
   }
   saveInvoices();
   logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no});
-  if(convertingFromReceiptId){
-    receipts = receipts.filter(r=>r.id!==convertingFromReceiptId);
-    saveReceipts();
-    renderReceiptsTable();
-    convertingFromReceiptId = null;
-  }
   renderInvoicesTable();
   renderDashboard();
   renderPaymentHistoryTable();
@@ -3005,33 +3020,6 @@ function renderInvoicesTable(){
 function editInvoice(id){
   const inv = invoices.find(i=>i.id===id);
   if(inv) openInvoiceModal(inv);
-}
-
-function convertReceiptToInvoice(id){
-  const r = receipts.find(x=>x.id===id);
-  if(!r) return;
-  if(!confirm(`تحويل وصل "${r.name}" إلى عرض سعر؟ الوصل الأصلي رح ينحذف نهائيًا بمجرد ما تحفظي عرض السعر.`)) return;
-  convertingFromReceiptId = id;
-  const pseudoInvoice = {
-    id: '',
-    docType: 'simple',
-    no: nextInvoiceNo('devis'),
-    date: new Date().toISOString().slice(0,10),
-    delay: '',
-    clientName: r.name || '',
-    clientAddress: r.address || '',
-    clientRC: '',
-    clientNIF: '',
-    clientNIS: '',
-    clientPhone: r.phone || '',
-    items: (r.items||[]).map(it=>({qty: it.qty, desc: it.desc, unit: '', price: it.price, amount: it.amount})),
-    payments: [],
-    note: `محوّل من وصل رقم ${r.no}`
-  };
-  openInvoiceModal(pseudoInvoice);
-  document.getElementById('invId').value = '';
-  document.getElementById('invoiceModalTitle').textContent = 'عرض سعر جديد (محوّل من وصل)';
-  toast('عدّل البيانات إذا احتجت، ثم احفظ عرض السعر');
 }
 
 function convertInvoiceToReceipt(id){
