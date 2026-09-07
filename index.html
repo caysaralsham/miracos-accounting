@@ -3949,26 +3949,31 @@ function nearlyEqual(a, b, eps){
 
 // فحص شامل يمر على كل الوصولات والفواتير وسجل الدفعات والمصاريف ويرجع لائحة تناقضات (بدون تعديل أي بيانات).
 // بيلقط دفعات "يتيمة" بسجل الدفعات (مالها معرّف حالي بوصل/فاتورة) بس هي فعليًا نسخة قديمة/مكررة
-// لنفس الدفعة الحقيقية اللي عم تتتبّع صح تحت معرّف جديد (نفس المبلغ + التاريخ + اسم الزبون).
+// لدفعة حالية موجودة فعلاً وناقصها سجل (نفس المبلغ + نفس التاريخ) — حتى لو اسم الزبون تغيّر/تعدّل بالوصل بعدين.
 // آمن نحذفها لأنو المبلغ نفسه محسوب أصلاً بمكان تاني بالسجل.
 function findDuplicateOrphanPaymentEntries(){
   const liveIds = new Set();
-  const liveSignatures = new Set();
+  const livePaymentsList = [];
   receipts.forEach(r=>(r.payments||[]).forEach(p=>{
     if(!p.id) return;
     liveIds.add(p.id);
-    liveSignatures.add(`${Number(p.amount)||0}|${p.date||''}|${r.name||''}`);
+    livePaymentsList.push({id:p.id, amount:Number(p.amount)||0, date:p.date||''});
   }));
   invoices.forEach(inv=>(inv.payments||[]).forEach(p=>{
     if(!p.id) return;
     liveIds.add(p.id);
-    liveSignatures.add(`${Number(p.amount)||0}|${p.date||''}|${inv.clientName||''}`);
+    livePaymentsList.push({id:p.id, amount:Number(p.amount)||0, date:p.date||''});
   }));
-  return paymentHistory.filter(h=>{
-    if(liveIds.has(h.paymentId)) return false;
-    const sig = `${Number(h.amount)||0}|${h.date||''}|${h.customerName||''}`;
-    return liveSignatures.has(sig);
+  const historyIds = new Set(paymentHistory.map(h=>h.paymentId));
+  const missingLive = livePaymentsList.filter(lp=>!historyIds.has(lp.id));
+  const usedMissing = new Set();
+  const dups = [];
+  paymentHistory.forEach(h=>{
+    if(liveIds.has(h.paymentId)) return; // مرتبطة صح أصلاً، مش يتيمة
+    const match = missingLive.find(lp=>!usedMissing.has(lp.id) && nearlyEqual(lp.amount, Number(h.amount)||0) && lp.date===(h.date||''));
+    if(match){ usedMissing.add(match.id); dups.push(h); }
   });
+  return dups;
 }
 
 function runDataIntegrityCheck(){
