@@ -2400,17 +2400,18 @@ async function buildAndSaveReceiptFromForm(){
 
   const id = document.getElementById('rcpId').value;
   const prevReceipt = id ? receipts.find(r=>r.id===id) : null;
+  const receiptDate = dmyToIso(document.getElementById('rcpDate').value);
   const isDelivered = document.getElementById('rcpDelivered').checked;
   let deliveredDate = '';
   if(isDelivered){
     deliveredDate = (prevReceipt && prevReceipt.delivered && prevReceipt.deliveredDate)
       ? prevReceipt.deliveredDate
-      : new Date().toISOString().slice(0,10);
+      : (receiptDate || new Date().toISOString().slice(0,10));
   }
   const data = {
     id: id || uid(),
     no: document.getElementById('rcpNo').value.trim(),
-    date: dmyToIso(document.getElementById('rcpDate').value),
+    date: receiptDate,
     duration: document.getElementById('rcpDuration').value.trim(),
     name,
     phone: document.getElementById('rcpPhone').value.trim(),
@@ -4257,7 +4258,11 @@ function renderCustomerReports(){
   const dDate = dmyToIso(document.getElementById('deliveredCustomerDate').value);
   let delivered = [...receipts]
     .filter(r => r.delivered)
-    .sort((a,b)=>((b.deliveredDate||b.date||'')).localeCompare(a.deliveredDate||a.date||''));
+    .sort((a,b)=>{
+      const byDelivered = (b.deliveredDate||b.date||'').localeCompare(a.deliveredDate||a.date||'');
+      if(byDelivered !== 0) return byDelivered;
+      return (b.date||'').localeCompare(a.date||'');
+    });
   if(dq) delivered = delivered.filter(r =>
     (r.name||'').includes(dq) ||
     (r.phone||'').includes(dq) ||
