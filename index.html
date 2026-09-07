@@ -605,8 +605,8 @@
             <input type="text" id="paymentHistorySearch" placeholder="بحث باسم الزبون أو رقم الوصل/الفاتورة...">
           </div>
           <div style="display:flex; gap:8px;">
-            <input type="text" id="paymentHistoryFrom" title="من تاريخ" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric">
-            <input type="text" id="paymentHistoryTo" title="إلى تاريخ" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric">
+            <input type="text" id="paymentHistoryFrom" title="من تاريخ" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric">
+            <input type="text" id="paymentHistoryTo" title="إلى تاريخ" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric">
           </div>
         </div>
         <div id="paymentHistoryTableWrap"></div>
@@ -626,7 +626,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
             <input type="text" id="deliveredCustomerSearch" placeholder="بحث بالاسم أو الهاتف أو النوع...">
           </div>
-          <input type="text" id="deliveredCustomerDate" title="بحث بتاريخ الوصل" style="max-width:170px;" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric">
+          <input type="text" id="deliveredCustomerDate" title="بحث بتاريخ الوصل" style="max-width:170px;" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric">
         </div>
         <div id="deliveredCustomersWrap"></div>
       </div>
@@ -802,7 +802,7 @@
       <input type="hidden" id="rcpId">
       <div class="grid3">
         <div class="field"><label>رقم الوصل</label><input type="text" id="rcpNo"></div>
-        <div class="field"><label>التاريخ</label><input type="text" id="rcpDate" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></div>
+        <div class="field"><label>التاريخ</label><input type="text" id="rcpDate" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric"></div>
         <div class="field"><label>مدة التسليم (بالأيام)</label><input type="number" id="rcpDuration" min="0" placeholder="مثال: 15"></div>
       </div>
       <div class="grid3">
@@ -917,7 +917,7 @@
           </select>
         </div>
         <div class="field"><label id="invNoLabel">N° de devis</label><input type="text" id="invNo"></div>
-        <div class="field"><label>Date</label><input type="text" id="invDate" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></div>
+        <div class="field"><label>Date</label><input type="text" id="invDate" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric"></div>
       </div>
       <div class="grid3">
         <div class="field"><label id="invDelayLabel">Délai de livraison</label><input type="text" id="invDelay" placeholder="مثال: 30 jours"></div>
@@ -1051,7 +1051,7 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="expId">
-      <div class="field"><label>التاريخ</label><input type="text" id="expDate" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></div>
+      <div class="field"><label>التاريخ</label><input type="text" id="expDate" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric"></div>
       <div class="field"><label>البيان</label><input type="text" id="expDesc" placeholder="مثال: شراء مواد، وقود، كهرباء..."></div>
       <div class="field">
         <label>الفئة</label>
@@ -1070,13 +1070,24 @@
 
 <script>
 (function(){
+  // خانات التاريخ (class="date-field") بتخلي الكتابة بترتيب يوم-شهر-سنة متل ما الناس معتادة تكتب
+  // (10-05-2026 يعني 10 ماي 2026)، بينما التخزين الداخلي وكل حسابات الترتيب بالتقارير تضل
+  // بصيغة ISO (سنة-شهر-يوم) متل ما كانت — التحويل بين الصيغتين بيصير عند القراءة والكتابة بس.
   function formatDateTyping(raw){
     const digits = raw.replace(/\D/g,'').slice(0,8);
     let out = digits;
-    if(digits.length > 4) out = digits.slice(0,4) + '-' + digits.slice(4);
-    if(digits.length > 6) out = digits.slice(0,4) + '-' + digits.slice(4,6) + '-' + digits.slice(6);
+    if(digits.length > 2) out = digits.slice(0,2) + '-' + digits.slice(2);
+    if(digits.length > 4) out = digits.slice(0,2) + '-' + digits.slice(2,4) + '-' + digits.slice(4);
     return out;
   }
+  window.dmyToIso = function(s){
+    const m = String(s||'').match(/^(\d{2})-(\d{2})-(\d{4})$/);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : (s||'');
+  };
+  window.isoToDmy = function(s){
+    const m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : (s||'');
+  };
   document.addEventListener('input', (e)=>{
     if(!e.target.matches || !e.target.matches('input.date-field')) return;
     const el = e.target;
@@ -2175,7 +2186,7 @@ function newPaymentRow(payment){
   const row = document.createElement('tr');
   row.dataset.pmId = payment.id;
   row.innerHTML = `
-    <td><input type="text" class="pm-date date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric" value="${payment.date||''}"></td>
+    <td><input type="text" class="pm-date date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric" value="${isoToDmy(payment.date||'')}"></td>
     <td><input type="number" class="pm-amount" value="${payment.amount||''}" min="0"></td>
     <td><select class="pm-method">${paymentMethodOptions(payment.method||'نقدي')}</select></td>
     <td><button class="btn btn-ghost btn-sm pm-remove">✕</button></td>
@@ -2279,7 +2290,7 @@ function openReceiptModal(receipt){
     document.getElementById('receiptModalTitle').textContent = 'تعديل الوصل';
     document.getElementById('rcpId').value = receipt.id;
     document.getElementById('rcpNo').value = receipt.no;
-    document.getElementById('rcpDate').value = receipt.date;
+    document.getElementById('rcpDate').value = isoToDmy(receipt.date);
     document.getElementById('rcpDuration').value = receipt.duration || '';
     document.getElementById('rcpName').value = receipt.name;
     document.getElementById('rcpPhone').value = receipt.phone || '';
@@ -2294,7 +2305,7 @@ function openReceiptModal(receipt){
     document.getElementById('receiptModalTitle').textContent = 'وصل دفع جديد';
     document.getElementById('rcpId').value = '';
     document.getElementById('rcpNo').value = getNextReceiptNo();
-    document.getElementById('rcpDate').value = new Date().toISOString().slice(0,10);
+    document.getElementById('rcpDate').value = isoToDmy(new Date().toISOString().slice(0,10));
     document.getElementById('rcpDuration').value = '';
     document.getElementById('rcpName').value = '';
     document.getElementById('rcpPhone').value = '';
@@ -2374,7 +2385,7 @@ async function buildAndSaveReceiptFromForm(){
   const total = Math.max(0, subtotal - discount);
   const payments = [];
   document.querySelectorAll('#paymentsBody tr').forEach(row=>{
-    const date = row.querySelector('.pm-date').value;
+    const date = dmyToIso(row.querySelector('.pm-date').value);
     const amount = Number(row.querySelector('.pm-amount').value)||0;
     const method = row.querySelector('.pm-method') ? row.querySelector('.pm-method').value : 'نقدي';
     const pid = row.dataset.pmId || uid();
@@ -2398,7 +2409,7 @@ async function buildAndSaveReceiptFromForm(){
   const data = {
     id: id || uid(),
     no: document.getElementById('rcpNo').value.trim(),
-    date: document.getElementById('rcpDate').value,
+    date: dmyToIso(document.getElementById('rcpDate').value),
     duration: document.getElementById('rcpDuration').value.trim(),
     name,
     phone: document.getElementById('rcpPhone').value.trim(),
@@ -2879,7 +2890,7 @@ function newInvoicePaymentRow(payment){
   const row = document.createElement('tr');
   row.dataset.pmId = payment.id;
   row.innerHTML = `
-    <td><input type="text" class="inv-pm-date date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric" value="${payment.date||''}"></td>
+    <td><input type="text" class="inv-pm-date date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric" value="${isoToDmy(payment.date||'')}"></td>
     <td><input type="number" class="inv-pm-amount" value="${payment.amount||''}" min="0"></td>
     <td><select class="inv-pm-method">${paymentMethodOptions(payment.method||'نقدي')}</select></td>
     <td><button class="btn btn-ghost btn-sm inv-pm-remove">✕</button></td>
@@ -2950,7 +2961,7 @@ function openInvoiceModal(invoice){
     document.getElementById('invId').value = invoice.id;
     document.getElementById('invDocType').value = invoice.docType || 'simple';
     document.getElementById('invNo').value = invoice.no||'';
-    document.getElementById('invDate').value = invoice.date||'';
+    document.getElementById('invDate').value = isoToDmy(invoice.date||'');
     document.getElementById('invDelay').value = invoice.delay||'';
     document.getElementById('invClientName').value = invoice.clientName||'';
     document.getElementById('invClientAddress').value = invoice.clientAddress||'';
@@ -2966,7 +2977,7 @@ function openInvoiceModal(invoice){
     document.getElementById('invId').value = '';
     document.getElementById('invDocType').value = 'simple';
     document.getElementById('invNo').value = nextInvoiceNo('devis');
-    document.getElementById('invDate').value = new Date().toISOString().slice(0,10);
+    document.getElementById('invDate').value = isoToDmy(new Date().toISOString().slice(0,10));
     document.getElementById('invDelay').value = '';
     document.getElementById('invClientName').value = '';
     document.getElementById('invClientAddress').value = '';
@@ -3002,7 +3013,7 @@ async function buildAndSaveInvoiceFromForm(){
   const ttc = ht+tva;
   const payments = [];
   document.querySelectorAll('#invPaymentsBody tr').forEach(row=>{
-    const date = row.querySelector('.inv-pm-date').value;
+    const date = dmyToIso(row.querySelector('.inv-pm-date').value);
     const amount = Number(row.querySelector('.inv-pm-amount').value)||0;
     const method = row.querySelector('.inv-pm-method') ? row.querySelector('.inv-pm-method').value : 'نقدي';
     const pid = row.dataset.pmId || uid();
@@ -3016,7 +3027,7 @@ async function buildAndSaveInvoiceFromForm(){
     id: id || uid(),
     docType: document.getElementById('invDocType').value,
     no: document.getElementById('invNo').value.trim(),
-    date: document.getElementById('invDate').value,
+    date: dmyToIso(document.getElementById('invDate').value),
     delay: document.getElementById('invDelay').value.trim(),
     clientName,
     clientAddress: document.getElementById('invClientAddress').value.trim(),
@@ -3333,14 +3344,14 @@ function openExpenseModal(exp){
   if(exp){
     document.getElementById('expenseModalTitle').textContent = 'تعديل مصروف';
     document.getElementById('expId').value = exp.id;
-    document.getElementById('expDate').value = exp.date;
+    document.getElementById('expDate').value = isoToDmy(exp.date);
     document.getElementById('expDesc').value = exp.desc;
     document.getElementById('expCategory').value = exp.category;
     document.getElementById('expAmount').value = exp.amount;
   } else {
     document.getElementById('expenseModalTitle').textContent = 'إضافة مصروف';
     document.getElementById('expId').value = '';
-    document.getElementById('expDate').value = new Date().toISOString().slice(0,10);
+    document.getElementById('expDate').value = isoToDmy(new Date().toISOString().slice(0,10));
     document.getElementById('expDesc').value = '';
     document.getElementById('expCategory').value = expenseCategories[0] || 'أخرى';
     document.getElementById('expAmount').value = '';
@@ -3355,7 +3366,7 @@ document.getElementById('btnSaveExpense').addEventListener('click', async ()=>{
   const id = document.getElementById('expId').value;
   const data = {
     id: id || uid(),
-    date: document.getElementById('expDate').value,
+    date: dmyToIso(document.getElementById('expDate').value),
     desc,
     category: document.getElementById('expCategory').value,
     amount: Number(document.getElementById('expAmount').value)||0
@@ -3949,31 +3960,27 @@ function nearlyEqual(a, b, eps){
 
 // فحص شامل يمر على كل الوصولات والفواتير وسجل الدفعات والمصاريف ويرجع لائحة تناقضات (بدون تعديل أي بيانات).
 // بيلقط دفعات "يتيمة" بسجل الدفعات (مالها معرّف حالي بوصل/فاتورة) بس هي فعليًا نسخة قديمة/مكررة
-// لدفعة حالية موجودة فعلاً وناقصها سجل (نفس المبلغ + نفس التاريخ) — حتى لو اسم الزبون تغيّر/تعدّل بالوصل بعدين.
-// آمن نحذفها لأنو المبلغ نفسه محسوب أصلاً بمكان تاني بالسجل.
+// لدفعة حالية موجودة فعلاً بنفس المبلغ ونفس التاريخ — حتى لو اسم الزبون تغيّر بالوصل بعدين،
+// وحتى لو الدفعة الحالية عندها أصلاً سجل خاص فيها (بعد المزامنة مثلاً). آمن نحذفها لأنو
+// المبلغ نفسه محسوب أصلاً بمكان تاني بالسجل، وما في داعي لنسختين لنفس الدفعة الحقيقية.
 function findDuplicateOrphanPaymentEntries(){
   const liveIds = new Set();
-  const livePaymentsList = [];
+  const liveSignatures = new Set();
   receipts.forEach(r=>(r.payments||[]).forEach(p=>{
     if(!p.id) return;
     liveIds.add(p.id);
-    livePaymentsList.push({id:p.id, amount:Number(p.amount)||0, date:p.date||''});
+    liveSignatures.add(`${Number(p.amount)||0}|${p.date||''}`);
   }));
   invoices.forEach(inv=>(inv.payments||[]).forEach(p=>{
     if(!p.id) return;
     liveIds.add(p.id);
-    livePaymentsList.push({id:p.id, amount:Number(p.amount)||0, date:p.date||''});
+    liveSignatures.add(`${Number(p.amount)||0}|${p.date||''}`);
   }));
-  const historyIds = new Set(paymentHistory.map(h=>h.paymentId));
-  const missingLive = livePaymentsList.filter(lp=>!historyIds.has(lp.id));
-  const usedMissing = new Set();
-  const dups = [];
-  paymentHistory.forEach(h=>{
-    if(liveIds.has(h.paymentId)) return; // مرتبطة صح أصلاً، مش يتيمة
-    const match = missingLive.find(lp=>!usedMissing.has(lp.id) && nearlyEqual(lp.amount, Number(h.amount)||0) && lp.date===(h.date||''));
-    if(match){ usedMissing.add(match.id); dups.push(h); }
+  return paymentHistory.filter(h=>{
+    if(liveIds.has(h.paymentId)) return false; // مرتبطة صح أصلاً بمعرّفها، مش يتيمة
+    const sig = `${Number(h.amount)||0}|${h.date||''}`;
+    return liveSignatures.has(sig);
   });
-  return dups;
 }
 
 function runDataIntegrityCheck(){
@@ -4208,7 +4215,7 @@ function renderCustomerReports(){
 
   const deliveredWrap = document.getElementById('deliveredCustomersWrap');
   const dq = (document.getElementById('deliveredCustomerSearch').value || '').trim();
-  const dDate = document.getElementById('deliveredCustomerDate').value;
+  const dDate = dmyToIso(document.getElementById('deliveredCustomerDate').value);
   let delivered = [...receipts]
     .filter(r => r.delivered)
     .sort((a,b)=>((b.deliveredDate||b.date||'')).localeCompare(a.deliveredDate||a.date||''));
@@ -4252,8 +4259,8 @@ document.getElementById('deliveredCustomerDate').addEventListener('input', rende
 
 function getFilteredPaymentHistory(){
   const q = (document.getElementById('paymentHistorySearch').value || '').trim();
-  const from = document.getElementById('paymentHistoryFrom').value;
-  const to = document.getElementById('paymentHistoryTo').value;
+  const from = dmyToIso(document.getElementById('paymentHistoryFrom').value);
+  const to = dmyToIso(document.getElementById('paymentHistoryTo').value);
   let list = [...paymentHistory];
   if(q) list = list.filter(h => (h.customerName||'').includes(q) || (h.docNo||'').includes(q));
   if(from) list = list.filter(h => (h.date||'') >= from);
