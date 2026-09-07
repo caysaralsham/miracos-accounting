@@ -1670,6 +1670,7 @@ document.querySelectorAll('[data-close]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.getElementById(btn.dataset.close).classList.remove('show');
     if(btn.dataset.close === 'receiptOverlay') convertingFromInvoiceId = null;
+    if(btn.dataset.close === 'invoiceOverlay') convertingFromReceiptId = null;
   });
 });
 
@@ -2533,6 +2534,7 @@ function renderReceiptsTable(){
         <div class="row-actions">
           <button class="btn btn-sm btn-ghost" onclick="viewReceipt('${r.id}')" title="عرض/طباعة">👁</button>
           <button class="btn btn-sm btn-ghost" onclick="editReceipt('${r.id}')" title="تعديل">✎</button>
+          <button class="btn btn-sm btn-ghost" onclick="convertReceiptToInvoice('${r.id}')" title="تحويل إلى عرض سعر">➜📄</button>
           <button class="btn btn-sm btn-ghost" onclick="deleteReceipt('${r.id}')" title="حذف">🗑</button>
         </div>
       </td>
@@ -2634,6 +2636,7 @@ function renderTrash(){
 }
 let currentViewedReceiptId = null;
 let convertingFromInvoiceId = null;
+let convertingFromReceiptId = null;
 function viewReceipt(id){
   const r = receipts.find(r=>r.id===id);
   if(!r) return;
@@ -2976,7 +2979,7 @@ function openInvoiceModal(invoice){
     document.getElementById('invoiceModalTitle').textContent = 'مستند جديد';
     document.getElementById('invId').value = '';
     document.getElementById('invDocType').value = 'simple';
-    document.getElementById('invNo').value = nextInvoiceNo('devis');
+    document.getElementById('invNo').value = nextInvoiceNo('simple');
     document.getElementById('invDate').value = isoToDmy(new Date().toISOString().slice(0,10));
     document.getElementById('invDelay').value = '';
     document.getElementById('invClientName').value = '';
@@ -3040,6 +3043,7 @@ async function buildAndSaveInvoiceFromForm(){
     note: document.getElementById('invNote').value.trim()
   };
 
+  const sourceReceipt = convertingFromReceiptId ? receipts.find(r=>r.id===convertingFromReceiptId) : null;
   if(id){
     const idx = invoices.findIndex(i=>i.id===id);
     if(idx>-1) invoices[idx] = data;
@@ -3049,10 +3053,18 @@ async function buildAndSaveInvoiceFromForm(){
   saveInvoices();
   noteInvoiceNoUsed(data.docType, data.no);
   const invDocTypeLabel = data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر');
-  syncPaymentHistoryForDoc(prevInvoice ? prevInvoice.payments : [], payments, {customerName: clientName, docType: invDocTypeLabel, docNo: data.no});
+  const priorInvPayments = (prevInvoice ? prevInvoice.payments : []).concat(sourceReceipt ? (sourceReceipt.payments||[]) : []);
+  syncPaymentHistoryForDoc(priorInvPayments, payments, {customerName: clientName, docType: invDocTypeLabel, docNo: data.no});
+  if(convertingFromReceiptId){
+    receipts = receipts.filter(r=>r.id!==convertingFromReceiptId);
+    saveReceipts();
+    renderReceiptsTable();
+    convertingFromReceiptId = null;
+  }
   renderInvoicesTable();
   renderDashboard();
   renderPaymentHistoryTable();
+  renderCustomerReports();
   return data.id;
 }
 
@@ -3137,6 +3149,33 @@ function convertInvoiceToReceipt(id){
   document.getElementById('rcpId').value = '';
   document.getElementById('receiptModalTitle').textContent = 'وصل جديد (محوّل من عرض سعر)';
   toast('عبّي الدفعة وانواع البضاعة إذا احتجت، ثم احفظ الوصل');
+}
+
+function convertReceiptToInvoice(id){
+  const r = receipts.find(x=>x.id===id);
+  if(!r) return;
+  if(!confirm(`تحويل وصل "${r.name}" رقم ${r.no} إلى عرض سعر جديد؟ الوصل الأصلي رح ينحذف نهائيًا بمجرد ما تحفظي عرض السعر.`)) return;
+  convertingFromReceiptId = id;
+  const pseudoInvoice = {
+    id: '',
+    docType: 'simple',
+    no: nextInvoiceNo('simple'),
+    date: new Date().toISOString().slice(0,10),
+    delay: '',
+    clientName: r.name || '',
+    clientAddress: r.address || '',
+    clientRC: '',
+    clientNIF: '',
+    clientNIS: '',
+    clientPhone: r.phone || '',
+    note: `محوّل من وصل رقم ${r.no}`,
+    items: (r.items||[]).map(it=>({qty: it.qty, desc: it.desc, unit:'', price: it.price, amount: it.amount})),
+    payments: []
+  };
+  openInvoiceModal(pseudoInvoice);
+  document.getElementById('invId').value = '';
+  document.getElementById('invoiceModalTitle').textContent = 'عرض سعر جديد (محوّل من وصل)';
+  toast('غيّري نوع المستند إذا بدك Devis أو Facture، وعبّي الدفعة إذا احتجت، ثم احفظي');
 }
 
 async function deleteInvoice(id){
