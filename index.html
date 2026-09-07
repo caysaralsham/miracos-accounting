@@ -770,6 +770,8 @@
         <div class="panel-head"><h2>🔍 فحص شامل للبيانات</h2></div>
         <p style="font-size:13px; color:var(--text-dim); margin-top:0;">يفحص كل الوصولات والفواتير وسجل الدفعات والمصاريف، ويطلعلك أي تناقض أو رقم مش متطابق (مجاميع، دفعات، أرقام مكررة...) بدون ما يغيّر أي شي بالبيانات.</p>
         <button class="btn btn-primary" id="btnRunDataAudit">تشغيل الفحص</button>
+        <button class="btn btn-sm" id="btnResyncPayments" style="margin-inline-start:8px;">إصلاح تلقائي: مزامنة سجل الدفعات</button>
+        <button class="btn btn-sm" id="btnFillDeliveryDates" style="margin-inline-start:8px;">إصلاح تلقائي: تعبئة تواريخ التسليم الناقصة</button>
         <div id="dataAuditResults" style="margin-top:14px;"></div>
       </div>
 
@@ -1117,6 +1119,7 @@ let priceCategories = [];
 let expenseCategories = [];
 const DEFAULT_EXPENSE_CATEGORIES = ['معرض','كميون','اجار عمال','ماصو','اجار باسل','اجار معرض','أخرى'];
 let lastReceiptNo = 0;
+let lastInvoiceNo = {};
 function computeMaxReceiptNo(){
   return receipts.reduce((max, r)=>{
     const n = parseInt(String(r.no||'').replace(/\D/g,''), 10);
@@ -1132,6 +1135,36 @@ function noteReceiptNoUsed(noStr){
   if(!isNaN(n) && n > lastReceiptNo){
     lastReceiptNo = n;
     saveLastReceiptNo();
+  }
+}
+
+// أرقام الفواتير/عروض الأسعار (D/F/S) محفوظة بعدّاد دائم لكل نوع وسنة على حدة،
+// بدل ما تتحسب من عدد العناصر الحالي بالمصفوفة (كان هذا يسبب تكرار الرقم لما ينحذف عرض سعر، متل التحويل لوصل).
+function invoiceNoPrefix(docType){ return docType === 'facture' ? 'F' : (docType === 'devis' ? 'D' : 'S'); }
+function invoiceNoKey(docType, year){ return `${invoiceNoPrefix(docType)}-${year}`; }
+function invoiceNoParts(noStr){
+  const m = String(noStr||'').match(/^[A-Za-z]*0*(\d+)\/(\d{4})$/);
+  if(!m) return null;
+  return {num: parseInt(m[1],10), year: m[2]};
+}
+function computeMaxInvoiceNo(){
+  const map = {};
+  invoices.forEach(inv=>{
+    const parts = invoiceNoParts(inv.no);
+    if(!parts) return;
+    const key = invoiceNoKey(inv.docType, parts.year);
+    if(!map[key] || parts.num > map[key]) map[key] = parts.num;
+  });
+  return map;
+}
+async function saveLastInvoiceNo(){ await cloudSet({lastInvoiceNo}); }
+function noteInvoiceNoUsed(docType, noStr){
+  const parts = invoiceNoParts(noStr);
+  if(!parts) return;
+  const key = invoiceNoKey(docType, parts.year);
+  if(!lastInvoiceNo[key] || parts.num > lastInvoiceNo[key]){
+    lastInvoiceNo[key] = parts.num;
+    saveLastInvoiceNo();
   }
 }
 
@@ -1241,10 +1274,17 @@ function startRealtimeSync(){
         lastReceiptNo = computeMaxReceiptNo();
         await saveLastReceiptNo();
       }
+      if(data.lastInvoiceNo && typeof data.lastInvoiceNo === 'object'){
+        lastInvoiceNo = data.lastInvoiceNo;
+      } else {
+        lastInvoiceNo = computeMaxInvoiceNo();
+        await saveLastInvoiceNo();
+      }
     } else {
       expenseCategories = DEFAULT_EXPENSE_CATEGORIES.slice();
       lastReceiptNo = computeMaxReceiptNo();
-      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts});
+      lastInvoiceNo = computeMaxInvoiceNo();
+      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, lastInvoiceNo, deletedReceipts});
     }
     applySettingsToUI();
     renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
@@ -1840,7 +1880,7 @@ function exportExcelReport(silent){
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
-  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts };
+  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, lastInvoiceNo, deletedReceipts };
   const blob = new Blob([JSON.stringify(restoreData)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1921,6 +1961,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       if(Array.isArray(data.deletedReceipts)) deletedReceipts = data.deletedReceipts;
       if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
       lastReceiptNo = (typeof data.lastReceiptNo === 'number') ? data.lastReceiptNo : computeMaxReceiptNo();
+      lastInvoiceNo = (data.lastInvoiceNo && typeof data.lastInvoiceNo === 'object') ? data.lastInvoiceNo : computeMaxInvoiceNo();
       await saveReceipts();
       await saveExpenses();
       await saveInvoices();
@@ -1929,6 +1970,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       await savePriceList();
       await saveExpenseCategories();
       await saveLastReceiptNo();
+      await saveLastInvoiceNo();
       await saveDeletedReceipts();
       await saveSettings();
       applySettingsToUI();
@@ -1950,10 +1992,12 @@ document.getElementById('btnResetAll').addEventListener('click', async ()=>{
   expenses = [];
   invoices = [];
   lastReceiptNo = 0;
+  lastInvoiceNo = {};
   await saveReceipts();
   await saveExpenses();
   await saveInvoices();
   await saveLastReceiptNo();
+  await saveLastInvoiceNo();
   renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports();
   toast('تم حذف جميع البيانات');
 });
@@ -2849,9 +2893,9 @@ document.getElementById('btnAddInvoicePaymentRow').addEventListener('click', ()=
 
 function nextInvoiceNo(docType){
   const year = new Date().getFullYear();
-  const prefix = docType === 'facture' ? 'F' : (docType === 'devis' ? 'D' : 'S');
-  const count = invoices.filter(i=>(i.docType||'simple')===(docType||'simple')).length + 1;
-  return `${prefix}${String(count).padStart(3,'0')}/${year}`;
+  const key = invoiceNoKey(docType, year);
+  const count = (lastInvoiceNo[key]||0) + 1;
+  return `${invoiceNoPrefix(docType)}${String(count).padStart(3,'0')}/${year}`;
 }
 
 function updateInvNoLabel(){
@@ -2991,6 +3035,7 @@ async function buildAndSaveInvoiceFromForm(){
     invoices.push(data);
   }
   saveInvoices();
+  noteInvoiceNoUsed(data.docType, data.no);
   const invDocTypeLabel = data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر');
   syncPaymentHistoryForDoc(prevInvoice ? prevInvoice.payments : [], payments, {customerName: clientName, docType: invDocTypeLabel, docNo: data.no});
   renderInvoicesTable();
@@ -4007,6 +4052,45 @@ function renderDataAuditResults(){
   }, 30);
 }
 document.getElementById('btnRunDataAudit').addEventListener('click', renderDataAuditResults);
+
+// إصلاح تلقائي: يعيد مزامنة سجل الدفعات مع كل وصل وفاتورة حالي (يحدّث القيم المتغيّرة ويضيف الناقص)،
+// بدون ما يلمس أي دفعة "يتيمة" مالها مستند حالي — هاي بتضل تحتاج قرار يدوي.
+async function resyncAllPaymentHistory(){
+  let anyChanged = false;
+  receipts.forEach(r=>{
+    if(syncPaymentHistoryForDoc(r.payments||[], r.payments||[], {customerName: r.name, docType: 'وصل', docNo: r.no})) anyChanged = true;
+  });
+  invoices.forEach(inv=>{
+    const label = inv.docType==='facture'?'فاتورة':(inv.docType==='devis'?'Devis':'عرض سعر');
+    if(syncPaymentHistoryForDoc(inv.payments||[], inv.payments||[], {customerName: inv.clientName, docType: label, docNo: inv.no})) anyChanged = true;
+  });
+  renderPaymentHistoryTable();
+  renderReports();
+  renderCustomerReports();
+  return anyChanged;
+}
+document.getElementById('btnResyncPayments').addEventListener('click', async ()=>{
+  if(!confirm('رح يراجع كل وصل وفاتورة حالي ويحدّث سجل الدفعات ليطابقهم بالضبط (المبلغ، التاريخ، اسم الزبون، رقم المستند). ما رح يمسح أي دفعة يتيمة مالها مستند — هاي لازم تتراجع يدويًا. متابعة؟')) return;
+  const changed = await resyncAllPaymentHistory();
+  toast(changed ? 'تم تحديث سجل الدفعات ليطابق الوصولات والفواتير الحالية' : 'سجل الدفعات كان مطابق أصلاً، ما احتاج أي تعديل');
+});
+
+// إصلاح تلقائي: يعبّي تاريخ التسليم للوصولات المحدّدة "تم التسليم" واللي ناقصها التاريخ،
+// باستعمال تاريخ الوصل نفسه كافتراض معقول — يفضّل مراجعتها يدويًا إذا التاريخ الحقيقي مختلف.
+async function fillMissingDeliveryDates(){
+  const targets = receipts.filter(r=>r.delivered && !r.deliveredDate);
+  targets.forEach(r=>{ r.deliveredDate = r.date || new Date().toISOString().slice(0,10); });
+  if(targets.length) await saveReceipts();
+  renderReceiptsTable();
+  renderCustomerReports();
+  renderDashboard();
+  return targets.length;
+}
+document.getElementById('btnFillDeliveryDates').addEventListener('click', async ()=>{
+  if(!confirm('رح يعبّي تاريخ التسليم لكل وصل محدّد "تم التسليم" وناقصه التاريخ، باستعمال تاريخ الوصل نفسه كافتراض. إذا تاريخ التسليم الحقيقي مختلف، لازم تعدّليه يدويًا بعدها من كل وصل. متابعة؟')) return;
+  const count = await fillMissingDeliveryDates();
+  toast(count ? `تم تعبئة تاريخ التسليم لـ${count} وصل` : 'ما في ولا وصل ناقصه تاريخ التسليم');
+});
 
 function renderReports(){
   const totalInvoiced = receipts.reduce((s,r)=>s+r.total,0);
