@@ -3109,7 +3109,7 @@ function renderInvoicesTable(){
     html += `<tr>
       <td><span class="tag ${typeClass}">${typeTag}</span></td>
       <td>${inv.no}</td>
-      <td>${inv.date||''}</td>
+      <td style="white-space:nowrap;">${inv.date||''}</td>
       <td>${inv.clientName}</td>
       <td>${fmt(inv.ttc)}</td>
       <td>${fmt(inv.remaining)}</td>
@@ -3936,7 +3936,7 @@ window.addEventListener('afterprint', ()=>{
 });
 
 function renderDashboard(){
-  const income = paymentHistory.reduce((s,h)=>s+(Number(h.amount)||0), 0);
+  const income = receipts.reduce((s,r)=>s+getReceiptPayments(r).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
   const expTotal = expenses.reduce((s,e)=>s+e.amount,0);
   const commissionPercent = Number(settings.commissionPercent)||0;
   const commission = income * (commissionPercent/100);
@@ -4249,7 +4249,7 @@ function renderCustomerReports(){
         return `<tr>
           <td>${r.name}</td>
           <td>${details}</td>
-          <td>${r.date||''}</td>
+          <td style="white-space:nowrap;">${r.date||''}</td>
           <td>${r.duration} يوم</td>
           <td>${deliveryDate}</td>
           <td>${daysUntilLabel(deliveryDate)}</td>
@@ -4290,8 +4290,8 @@ function renderCustomerReports(){
           <td>${r.name}</td>
           <td>${details}</td>
           <td>${r.phone||'—'}</td>
-          <td>${r.date||''}</td>
-          <td>${r.deliveredDate||'—'}</td>
+          <td style="white-space:nowrap;">${r.date||''}</td>
+          <td style="white-space:nowrap;">${r.deliveredDate||'—'}</td>
           <td>${fmt(r.total)}</td>
           <td>${paymentStatus}</td>
           <td>
@@ -4342,7 +4342,7 @@ function renderPaymentHistoryTable(){
   list.forEach(h=>{
     const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ-u-nu-latn', {hour:'2-digit', minute:'2-digit'}) : '—';
     html += `<tr>
-      <td>${h.date||'—'}</td>
+      <td style="white-space:nowrap;">${h.date||'—'}</td>
       <td>${loggedTime}</td>
       <td>${h.customerName||'—'}</td>
       <td>${fmt(h.amount)}</td>
@@ -4430,7 +4430,7 @@ function showLedger(title, rows){
         <tr><th style="width:60px;">#</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr>
       </thead>
       <tbody>
-        ${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.date||'—'}</td><td style="text-align:right;">${r.details}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
+        ${rows.map((r,i)=>`<tr><td>${i+1}</td><td style="white-space:nowrap;">${r.date||'—'}</td><td style="text-align:right;">${r.details}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
       </tbody>
     </table>
     <div class="totals-box" style="margin-top:14px;">
