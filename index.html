@@ -762,7 +762,7 @@
         <input type="file" id="restoreFileInput" accept="application/json" style="display:none;">
         <button class="btn btn-danger" id="btnImportRestore" style="margin-inline-start:8px;">استرجاع من ملف</button>
         <hr style="margin:16px 0; border:none; border-top:1px solid var(--line);">
-        <p style="font-size:13px; color:var(--text-dim); margin-top:0;"><b>النسخة اليومية التلقائية:</b> بتنزّل تلقائيًا (ملفين: Excel + استرجاع) لمجلد التنزيلات (Downloads) بجهازك، أول مرة تفتحي فيها البرنامج كل يوم. هاي مرتبطة بالجهاز والمتصفح يلي تفتحي فيه — مش بتصير من جهاز تاني ما فتحتي منه البرنامج.</p>
+        <p style="font-size:13px; color:var(--text-dim); margin-top:0;"><b>النسخة التلقائية:</b> بتنزّل تلقائيًا (ملفين: Excel + استرجاع) لمجلد التنزيلات (Downloads) بجهازك، أول مرة تفتح فيها البرنامج بعد الساعة 5 مساءً. على الكمبيوتر بتصير <b>كل يوم</b>، وعلى الموبايل بتصير <b>مرة كل أسبوع</b> بس. هاي مرتبطة بالجهاز والمتصفح يلي تفتحي فيه — مش بتصير من جهاز تاني ما فتحتي منه البرنامج.</p>
         <p style="font-size:13px; margin-top:0;">آخر نسخة تلقائية بهالجهاز: <b id="lastDailyBackupLabel" style="color:var(--brass-deep);">—</b></p>
       </div>
 
@@ -1117,7 +1117,8 @@ const DEFAULT_SETTINGS = {
   email: "miracus.2021@gmail.com",
   commissionPercent: 10,
   logo: LOGO_B64,
-  lastDailyBackupDate: ''
+  lastDailyBackupDate: '',
+  lastMobileBackupDate: ''
 };
 
 let receipts = [];
@@ -1909,13 +1910,18 @@ function exportRestoreJSON(silent){
 document.getElementById('btnExportRestore').addEventListener('click', ()=>exportRestoreJSON(false));
 
 const DAILY_BACKUP_HOUR = 17; // 5 مساءً
+const MOBILE_BACKUP_INTERVAL_DAYS = 7; // أسبوع
 function isMobileDevice(){
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 }
 function updateLastDailyBackupLabel(){
   const el = document.getElementById('lastDailyBackupLabel');
   if(!el) return;
-  el.textContent = settings.lastDailyBackupDate || 'لسا ما صارت';
+  if(isMobileDevice()){
+    el.textContent = settings.lastMobileBackupDate || 'لسا ما صارت';
+  }else{
+    el.textContent = settings.lastDailyBackupDate || 'لسا ما صارت';
+  }
 }
 
 let isRunningDailyBackup = false;
@@ -1925,7 +1931,18 @@ function runDailyBackupIfNeeded(){
     const now = new Date();
     if(now.getHours() < DAILY_BACKUP_HOUR) return;
     const today = now.toISOString().slice(0,10);
-    if(settings.lastDailyBackupDate === today) return;
+    const mobile = isMobileDevice();
+    if(mobile){
+      // على الموبايل: مرة كل أسبوع بس، مش كل يوم
+      if(settings.lastMobileBackupDate){
+        const last = new Date(settings.lastMobileBackupDate);
+        const daysSince = Math.floor((now - last) / (1000*60*60*24));
+        if(daysSince < MOBILE_BACKUP_INTERVAL_DAYS) return;
+      }
+    }else{
+      // على الكمبيوتر: مرة كل يوم متل ما كانت (بدون تغيير)
+      if(settings.lastDailyBackupDate === today) return;
+    }
     if(receipts.length === 0 && expenses.length === 0 && invoices.length === 0) return;
     isRunningDailyBackup = true;
     // نستنى شوية أول ما يفتح البرنامج حتى ما يتزاحمش الباكأب مع تحميل الصفحة نفسها
@@ -1935,10 +1952,14 @@ function runDailyBackupIfNeeded(){
         setTimeout(()=>{
           try{
             exportRestoreJSON(true);
-            settings.lastDailyBackupDate = today;
+            if(mobile){
+              settings.lastMobileBackupDate = today;
+            }else{
+              settings.lastDailyBackupDate = today;
+            }
             saveSettings();
             updateLastDailyBackupLabel();
-            toast('تم إنشاء نسخة احتياطية يومية تلقائيًا — تفقّدي مجلد التنزيلات');
+            toast(mobile ? 'تم إنشاء نسخة احتياطية أسبوعية تلقائيًا — تفقّدي مجلد التنزيلات' : 'تم إنشاء نسخة احتياطية يومية تلقائيًا — تفقّدي مجلد التنزيلات');
           }catch(err){ console.error('daily backup (restore file) failed', err); }
           finally{ isRunningDailyBackup = false; }
         }, 700);
