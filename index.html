@@ -605,8 +605,8 @@
             <input type="text" id="paymentHistorySearch" placeholder="بحث باسم الزبون أو رقم الوصل/الفاتورة...">
           </div>
           <div style="display:flex; gap:8px;">
-            <input type="text" id="paymentHistoryFrom" title="من تاريخ" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric">
-            <input type="text" id="paymentHistoryTo" title="إلى تاريخ" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric">
+            <input type="text" id="paymentHistoryFrom" title="من تاريخ" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric">
+            <input type="text" id="paymentHistoryTo" title="إلى تاريخ" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric">
           </div>
         </div>
         <div id="paymentHistoryTableWrap"></div>
@@ -626,7 +626,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
             <input type="text" id="deliveredCustomerSearch" placeholder="بحث بالاسم أو الهاتف أو النوع...">
           </div>
-          <input type="text" id="deliveredCustomerDate" title="بحث بتاريخ الوصل" style="max-width:170px;" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric">
+          <input type="text" id="deliveredCustomerDate" title="بحث بتاريخ الوصل" style="max-width:170px;" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric">
         </div>
         <div id="deliveredCustomersWrap"></div>
       </div>
@@ -766,16 +766,6 @@
         <p style="font-size:13px; margin-top:0;">آخر نسخة تلقائية بهالجهاز: <b id="lastDailyBackupLabel" style="color:var(--brass-deep);">—</b></p>
       </div>
 
-      <div class="panel" style="max-width:560px;">
-        <div class="panel-head"><h2>🔍 فحص شامل للبيانات</h2></div>
-        <p style="font-size:13px; color:var(--text-dim); margin-top:0;">يفحص كل الوصولات والفواتير وسجل الدفعات والمصاريف، ويطلعلك أي تناقض أو رقم مش متطابق (مجاميع، دفعات، أرقام مكررة...) بدون ما يغيّر أي شي بالبيانات.</p>
-        <button class="btn btn-primary" id="btnRunDataAudit">تشغيل الفحص</button>
-        <button class="btn btn-sm" id="btnResyncPayments" style="margin-inline-start:8px;">إصلاح تلقائي: مزامنة سجل الدفعات</button>
-        <button class="btn btn-sm" id="btnFillDeliveryDates" style="margin-inline-start:8px;">إصلاح تلقائي: تعبئة تواريخ التسليم الناقصة</button>
-        <button class="btn btn-sm" id="btnCleanDuplicateOrphans" style="margin-inline-start:8px;">تنظيف الدفعات المكررة (يتيمة+حالية لنفس الدفعة)</button>
-        <div id="dataAuditResults" style="margin-top:14px;"></div>
-      </div>
-
       <div class="panel" style="max-width:520px;">
         <div class="panel-head"><h2>🗑 سلة المهملات (الوصولات المحذوفة)</h2></div>
         <p style="font-size:13px; color:var(--text-dim); margin-top:0;">أي وصل تحذفه يبقى هنا 30 يوم قبل ما يمسح نهائيًا، ومبلغه ينشال من "إجمالي المقبوضات" فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.</p>
@@ -802,7 +792,7 @@
       <input type="hidden" id="rcpId">
       <div class="grid3">
         <div class="field"><label>رقم الوصل</label><input type="text" id="rcpNo"></div>
-        <div class="field"><label>التاريخ</label><input type="text" id="rcpDate" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric"></div>
+        <div class="field"><label>التاريخ</label><input type="text" id="rcpDate" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></div>
         <div class="field"><label>مدة التسليم (بالأيام)</label><input type="number" id="rcpDuration" min="0" placeholder="مثال: 15"></div>
       </div>
       <div class="grid3">
@@ -917,7 +907,7 @@
           </select>
         </div>
         <div class="field"><label id="invNoLabel">N° de devis</label><input type="text" id="invNo"></div>
-        <div class="field"><label>Date</label><input type="text" id="invDate" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric"></div>
+        <div class="field"><label>Date</label><input type="text" id="invDate" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></div>
       </div>
       <div class="grid3">
         <div class="field"><label id="invDelayLabel">Délai de livraison</label><input type="text" id="invDelay" placeholder="مثال: 30 jours"></div>
@@ -1051,7 +1041,7 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="expId">
-      <div class="field"><label>التاريخ</label><input type="text" id="expDate" class="date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric"></div>
+      <div class="field"><label>التاريخ</label><input type="text" id="expDate" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></div>
       <div class="field"><label>البيان</label><input type="text" id="expDesc" placeholder="مثال: شراء مواد، وقود، كهرباء..."></div>
       <div class="field">
         <label>الفئة</label>
@@ -1070,24 +1060,13 @@
 
 <script>
 (function(){
-  // خانات التاريخ (class="date-field") بتخلي الكتابة بترتيب يوم-شهر-سنة متل ما الناس معتادة تكتب
-  // (10-05-2026 يعني 10 ماي 2026)، بينما التخزين الداخلي وكل حسابات الترتيب بالتقارير تضل
-  // بصيغة ISO (سنة-شهر-يوم) متل ما كانت — التحويل بين الصيغتين بيصير عند القراءة والكتابة بس.
   function formatDateTyping(raw){
     const digits = raw.replace(/\D/g,'').slice(0,8);
     let out = digits;
-    if(digits.length > 2) out = digits.slice(0,2) + '-' + digits.slice(2);
-    if(digits.length > 4) out = digits.slice(0,2) + '-' + digits.slice(2,4) + '-' + digits.slice(4);
+    if(digits.length > 4) out = digits.slice(0,4) + '-' + digits.slice(4);
+    if(digits.length > 6) out = digits.slice(0,4) + '-' + digits.slice(4,6) + '-' + digits.slice(6);
     return out;
   }
-  window.dmyToIso = function(s){
-    const m = String(s||'').match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    return m ? `${m[3]}-${m[2]}-${m[1]}` : (s||'');
-  };
-  window.isoToDmy = function(s){
-    const m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return m ? `${m[3]}-${m[2]}-${m[1]}` : (s||'');
-  };
   document.addEventListener('input', (e)=>{
     if(!e.target.matches || !e.target.matches('input.date-field')) return;
     const el = e.target;
@@ -1132,7 +1111,6 @@ let priceCategories = [];
 let expenseCategories = [];
 const DEFAULT_EXPENSE_CATEGORIES = ['معرض','كميون','اجار عمال','ماصو','اجار باسل','اجار معرض','أخرى'];
 let lastReceiptNo = 0;
-let lastInvoiceNo = {};
 function computeMaxReceiptNo(){
   return receipts.reduce((max, r)=>{
     const n = parseInt(String(r.no||'').replace(/\D/g,''), 10);
@@ -1148,36 +1126,6 @@ function noteReceiptNoUsed(noStr){
   if(!isNaN(n) && n > lastReceiptNo){
     lastReceiptNo = n;
     saveLastReceiptNo();
-  }
-}
-
-// أرقام الفواتير/عروض الأسعار (D/F/S) محفوظة بعدّاد دائم لكل نوع وسنة على حدة،
-// بدل ما تتحسب من عدد العناصر الحالي بالمصفوفة (كان هذا يسبب تكرار الرقم لما ينحذف عرض سعر، متل التحويل لوصل).
-function invoiceNoPrefix(docType){ return docType === 'facture' ? 'F' : (docType === 'devis' ? 'D' : 'S'); }
-function invoiceNoKey(docType, year){ return `${invoiceNoPrefix(docType)}-${year}`; }
-function invoiceNoParts(noStr){
-  const m = String(noStr||'').match(/^[A-Za-z]*0*(\d+)\/(\d{4})$/);
-  if(!m) return null;
-  return {num: parseInt(m[1],10), year: m[2]};
-}
-function computeMaxInvoiceNo(){
-  const map = {};
-  invoices.forEach(inv=>{
-    const parts = invoiceNoParts(inv.no);
-    if(!parts) return;
-    const key = invoiceNoKey(inv.docType, parts.year);
-    if(!map[key] || parts.num > map[key]) map[key] = parts.num;
-  });
-  return map;
-}
-async function saveLastInvoiceNo(){ await cloudSet({lastInvoiceNo}); }
-function noteInvoiceNoUsed(docType, noStr){
-  const parts = invoiceNoParts(noStr);
-  if(!parts) return;
-  const key = invoiceNoKey(docType, parts.year);
-  if(!lastInvoiceNo[key] || parts.num > lastInvoiceNo[key]){
-    lastInvoiceNo[key] = parts.num;
-    saveLastInvoiceNo();
   }
 }
 
@@ -1287,17 +1235,10 @@ function startRealtimeSync(){
         lastReceiptNo = computeMaxReceiptNo();
         await saveLastReceiptNo();
       }
-      if(data.lastInvoiceNo && typeof data.lastInvoiceNo === 'object'){
-        lastInvoiceNo = data.lastInvoiceNo;
-      } else {
-        lastInvoiceNo = computeMaxInvoiceNo();
-        await saveLastInvoiceNo();
-      }
     } else {
       expenseCategories = DEFAULT_EXPENSE_CATEGORIES.slice();
       lastReceiptNo = computeMaxReceiptNo();
-      lastInvoiceNo = computeMaxInvoiceNo();
-      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, lastInvoiceNo, deletedReceipts});
+      await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts});
     }
     applySettingsToUI();
     renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
@@ -1671,7 +1612,6 @@ document.querySelectorAll('[data-close]').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.getElementById(btn.dataset.close).classList.remove('show');
     if(btn.dataset.close === 'receiptOverlay') convertingFromInvoiceId = null;
-    if(btn.dataset.close === 'invoiceOverlay') convertingFromReceiptId = null;
   });
 });
 
@@ -1894,7 +1834,7 @@ function exportExcelReport(silent){
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
-  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, lastInvoiceNo, deletedReceipts };
+  const restoreData = { savedAt: new Date().toISOString(), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts };
   const blob = new Blob([JSON.stringify(restoreData)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1995,7 +1935,6 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       if(Array.isArray(data.deletedReceipts)) deletedReceipts = data.deletedReceipts;
       if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
       lastReceiptNo = (typeof data.lastReceiptNo === 'number') ? data.lastReceiptNo : computeMaxReceiptNo();
-      lastInvoiceNo = (data.lastInvoiceNo && typeof data.lastInvoiceNo === 'object') ? data.lastInvoiceNo : computeMaxInvoiceNo();
       await saveReceipts();
       await saveExpenses();
       await saveInvoices();
@@ -2004,7 +1943,6 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       await savePriceList();
       await saveExpenseCategories();
       await saveLastReceiptNo();
-      await saveLastInvoiceNo();
       await saveDeletedReceipts();
       await saveSettings();
       applySettingsToUI();
@@ -2026,12 +1964,10 @@ document.getElementById('btnResetAll').addEventListener('click', async ()=>{
   expenses = [];
   invoices = [];
   lastReceiptNo = 0;
-  lastInvoiceNo = {};
   await saveReceipts();
   await saveExpenses();
   await saveInvoices();
   await saveLastReceiptNo();
-  await saveLastInvoiceNo();
   renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports();
   toast('تم حذف جميع البيانات');
 });
@@ -2083,28 +2019,6 @@ function measurementNoteText(t, l, w, h, count, total){
   return `(${dims}${countPart} = ${total.toFixed(3).replace(/\.?0+$/,'')} ${unit})`;
 }
 
-// تنقل بالأسهم بين خانات صف أداة القياس (طول/عرض/سماكة/عدد) داخل صف الوصل أو الفاتورة.
-// يمين/يسار = بين خانات نفس الصف (بالترتيب المرئي RTL). فوق/تحت = نفس الخانة بصف قياس آخر مفتوح (إذا موجود).
-function handleItemMeasureArrowNav(e){
-  const el = e.target;
-  const mRow = el.closest('tr');
-  if(!mRow) return;
-  const visible = [...mRow.querySelectorAll('.mt-field')].filter(f => f.style.display !== 'none');
-  if(e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
-    const idx = visible.indexOf(el);
-    const targetIdx = e.key === 'ArrowRight' ? idx - 1 : idx + 1;
-    if(visible[targetIdx]){ e.preventDefault(); visible[targetIdx].focus(); visible[targetIdx].select(); }
-  } else if(e.key === 'ArrowUp' || e.key === 'ArrowDown'){
-    const mf = el.dataset.mf;
-    const rowClass = mRow.classList.contains('it-measure-row') ? 'it-measure-row' : 'inv-it-measure-row';
-    const allRows = [...document.querySelectorAll('tr.' + rowClass)];
-    const rIdx = allRows.indexOf(mRow);
-    const targetRow = e.key === 'ArrowUp' ? allRows[rIdx-1] : allRows[rIdx+1];
-    const targetField = targetRow ? targetRow.querySelector(`.mt-field[data-mf="${mf}"]`) : null;
-    if(targetField && targetField.style.display !== 'none'){ e.preventDefault(); targetField.focus(); targetField.select(); }
-  }
-}
-
 function openItemMeasureTool(row, qtyInput){
   const existing = row.nextElementSibling;
   if(existing && existing.classList && existing.classList.contains('it-measure-row')){
@@ -2121,10 +2035,10 @@ function openItemMeasureTool(row, qtyInput){
           <option value="طول">متر طول</option>
           <option value="مكعب">متر مكعب</option>
         </select>
-        <input type="number" class="im-l mt-field" data-mf="l" dir="ltr" placeholder="طول (م)" step="0.01" style="width:100px; direction:ltr; text-align:right;">
-        <input type="number" class="im-w mt-field" data-mf="w" dir="ltr" placeholder="عرض (م)" step="0.01" style="width:100px; direction:ltr; text-align:right;">
-        <input type="number" class="im-h mt-field" data-mf="h" dir="ltr" placeholder="سماكة (م)" step="0.01" style="width:100px; display:none; direction:ltr; text-align:right;">
-        <input type="number" class="im-count mt-field" data-mf="count" dir="ltr" placeholder="عدد القطع" value="1" min="1" style="width:100px; direction:ltr; text-align:right;">
+        <input type="number" class="im-l" placeholder="طول (م)" step="0.01" style="width:100px;">
+        <input type="number" class="im-w" placeholder="عرض (م)" step="0.01" style="width:100px;">
+        <input type="number" class="im-h" placeholder="سماكة (م)" step="0.01" style="width:100px; display:none;">
+        <input type="number" class="im-count" placeholder="عدد القطع" value="1" min="1" style="width:100px;">
         <span class="im-result" style="font-size:13px; font-weight:700; color:var(--brass-deep); min-width:90px;">0.00 م²</span>
         <button type="button" class="btn btn-sm im-apply">تطبيق على العدد</button>
       </div>
@@ -2149,7 +2063,6 @@ function openItemMeasureTool(row, qtyInput){
     resultEl.textContent = (r.value*count).toFixed(3).replace(/\.?0+$/,'') + (t==='طول'?' م.ط':(t==='مكعب'?' م³':' م²'));
   }
   [typeSel,lIn,wIn,hIn,countIn].forEach(el=>el.addEventListener('input', ()=>{ updateVisibility(); recalcMeasure(); }));
-  [lIn,wIn,hIn,countIn].forEach(el=>el.addEventListener('keydown', handleItemMeasureArrowNav));
   updateVisibility(); recalcMeasure();
   mRow.querySelector('.im-apply').addEventListener('click', ()=>{
     const t = typeSel.value;
@@ -2208,7 +2121,7 @@ function newPaymentRow(payment){
   const row = document.createElement('tr');
   row.dataset.pmId = payment.id;
   row.innerHTML = `
-    <td><input type="text" class="pm-date date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric" value="${isoToDmy(payment.date||'')}"></td>
+    <td><input type="text" class="pm-date date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric" value="${payment.date||''}"></td>
     <td><input type="number" class="pm-amount" value="${payment.amount||''}" min="0"></td>
     <td><select class="pm-method">${paymentMethodOptions(payment.method||'نقدي')}</select></td>
     <td><button class="btn btn-ghost btn-sm pm-remove">✕</button></td>
@@ -2312,7 +2225,7 @@ function openReceiptModal(receipt){
     document.getElementById('receiptModalTitle').textContent = 'تعديل الوصل';
     document.getElementById('rcpId').value = receipt.id;
     document.getElementById('rcpNo').value = receipt.no;
-    document.getElementById('rcpDate').value = isoToDmy(receipt.date);
+    document.getElementById('rcpDate').value = receipt.date;
     document.getElementById('rcpDuration').value = receipt.duration || '';
     document.getElementById('rcpName').value = receipt.name;
     document.getElementById('rcpPhone').value = receipt.phone || '';
@@ -2327,7 +2240,7 @@ function openReceiptModal(receipt){
     document.getElementById('receiptModalTitle').textContent = 'وصل دفع جديد';
     document.getElementById('rcpId').value = '';
     document.getElementById('rcpNo').value = getNextReceiptNo();
-    document.getElementById('rcpDate').value = isoToDmy(new Date().toISOString().slice(0,10));
+    document.getElementById('rcpDate').value = new Date().toISOString().slice(0,10);
     document.getElementById('rcpDuration').value = '';
     document.getElementById('rcpName').value = '';
     document.getElementById('rcpPhone').value = '';
@@ -2345,47 +2258,27 @@ function openReceiptModal(receipt){
 
 document.getElementById('btnNewReceipt').addEventListener('click', ()=>openReceiptModal(null));
 
-// يزامن سجل الدفعات الدائم مع دفعات مستند معيّن (وصل أو فاتورة):
-// - أي دفعة كانت مسجّلة تحت هالمستند بالنسخة السابقة وما عادت موجودة (انحذفت من الصف) → تنشال من السجل.
-// - أي دفعة موجودة بالسجل وتغيّر مبلغها/تاريخها/طريقتها/اسم الزبون/رقم المستند → تنحدّث بالسجل لنفس القيم الحالية.
-// - أي دفعة جديدة (مالها سجل بعد) → تنضاف.
-// بهاد الشكل السجل بيطابق دايمًا الوصل/الفاتورة الفعليين، بدون ما تضل دفعة "شبح" أو رقم قديم بعد التعديل.
-function syncPaymentHistoryForDoc(prevPayments, newPayments, meta){
+// يسجّل كل دفعة جديدة (مش موجودة قبل بالسجل) بشكل مستقل بسجل تاريخي دائم،
+// بدون ما يمسح أو يعدّل أي سجل قديم — حتى لو الوصل/الفاتورة الأصلية اتعدّلت أو انحذفت لاحقًا.
+async function logPaymentHistoryEntries(payments, meta){
+  const existingIds = new Set(paymentHistory.map(h=>h.paymentId));
   let changed = false;
-  const newIds = new Set((newPayments||[]).map(p=>p.id).filter(Boolean));
-  const removedIds = (prevPayments||[]).map(p=>p.id).filter(pid=>pid && !newIds.has(pid));
-  if(removedIds.length){
-    const before = paymentHistory.length;
-    paymentHistory = paymentHistory.filter(h=>!removedIds.includes(h.paymentId));
-    if(paymentHistory.length !== before) changed = true;
-  }
-  (newPayments||[]).forEach(p=>{
-    if(!p.id) return;
-    const existing = paymentHistory.find(h=>h.paymentId===p.id);
-    if(existing){
-      const newDate = p.date || '', newMethod = p.method || 'نقدي';
-      if(existing.amount!==p.amount || existing.date!==newDate || existing.method!==newMethod || existing.customerName!==meta.customerName || existing.docNo!==meta.docNo || existing.docType!==meta.docType){
-        existing.amount = p.amount; existing.date = newDate; existing.method = newMethod;
-        existing.customerName = meta.customerName; existing.docNo = meta.docNo; existing.docType = meta.docType;
-        changed = true;
-      }
-    } else {
-      paymentHistory.push({
-        id: uid(),
-        paymentId: p.id,
-        loggedAt: new Date().toISOString(),
-        date: p.date || '',
-        customerName: meta.customerName,
-        amount: p.amount,
-        method: p.method || 'نقدي',
-        docType: meta.docType,
-        docNo: meta.docNo
-      });
-      changed = true;
-    }
+  payments.forEach(p=>{
+    if(!p.id || existingIds.has(p.id)) return;
+    paymentHistory.push({
+      id: uid(),
+      paymentId: p.id,
+      loggedAt: new Date().toISOString(),
+      date: p.date || '',
+      customerName: meta.customerName,
+      amount: p.amount,
+      method: p.method || 'نقدي',
+      docType: meta.docType,
+      docNo: meta.docNo
+    });
+    changed = true;
   });
   if(changed) savePaymentHistory();
-  return changed;
 }
 
 async function buildAndSaveReceiptFromForm(){
@@ -2407,7 +2300,7 @@ async function buildAndSaveReceiptFromForm(){
   const total = Math.max(0, subtotal - discount);
   const payments = [];
   document.querySelectorAll('#paymentsBody tr').forEach(row=>{
-    const date = dmyToIso(row.querySelector('.pm-date').value);
+    const date = row.querySelector('.pm-date').value;
     const amount = Number(row.querySelector('.pm-amount').value)||0;
     const method = row.querySelector('.pm-method') ? row.querySelector('.pm-method').value : 'نقدي';
     const pid = row.dataset.pmId || uid();
@@ -2421,18 +2314,17 @@ async function buildAndSaveReceiptFromForm(){
 
   const id = document.getElementById('rcpId').value;
   const prevReceipt = id ? receipts.find(r=>r.id===id) : null;
-  const receiptDate = dmyToIso(document.getElementById('rcpDate').value);
   const isDelivered = document.getElementById('rcpDelivered').checked;
   let deliveredDate = '';
   if(isDelivered){
     deliveredDate = (prevReceipt && prevReceipt.delivered && prevReceipt.deliveredDate)
       ? prevReceipt.deliveredDate
-      : (receiptDate || new Date().toISOString().slice(0,10));
+      : new Date().toISOString().slice(0,10);
   }
   const data = {
     id: id || uid(),
     no: document.getElementById('rcpNo').value.trim(),
-    date: receiptDate,
+    date: document.getElementById('rcpDate').value,
     duration: document.getElementById('rcpDuration').value.trim(),
     name,
     phone: document.getElementById('rcpPhone').value.trim(),
@@ -2446,7 +2338,6 @@ async function buildAndSaveReceiptFromForm(){
   };
 
   noteReceiptNoUsed(data.no);
-  const sourceInvoice = convertingFromInvoiceId ? invoices.find(i=>i.id===convertingFromInvoiceId) : null;
   if(id){
     const idx = receipts.findIndex(r=>r.id===id);
     if(idx>-1) receipts[idx] = data;
@@ -2454,8 +2345,7 @@ async function buildAndSaveReceiptFromForm(){
     receipts.push(data);
   }
   saveReceipts();
-  const priorPayments = (prevReceipt ? prevReceipt.payments : []).concat(sourceInvoice ? (sourceInvoice.payments||[]) : []);
-  syncPaymentHistoryForDoc(priorPayments, payments, {customerName: name, docType: 'وصل', docNo: data.no});
+  logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no});
   if(convertingFromInvoiceId){
     invoices = invoices.filter(i=>i.id!==convertingFromInvoiceId);
     saveInvoices();
@@ -2556,7 +2446,7 @@ function renderReceiptsTable(){
         <div class="row-actions">
           <button class="btn btn-sm btn-ghost" onclick="viewReceipt('${r.id}')" title="عرض/طباعة">👁</button>
           <button class="btn btn-sm btn-ghost" onclick="editReceipt('${r.id}')" title="تعديل">✎</button>
-          <button class="btn btn-sm btn-ghost" onclick="convertReceiptToInvoice('${r.id}')" title="تحويل إلى عرض سعر">➜📄</button>
+          <button class="btn btn-sm btn-ghost" onclick="duplicateReceipt('${r.id}')" title="نسخ (لعمل نسخة تانية بنفس الزبون)">⧉</button>
           <button class="btn btn-sm btn-ghost" onclick="deleteReceipt('${r.id}')" title="حذف">🗑</button>
         </div>
       </td>
@@ -2572,9 +2462,33 @@ function editReceipt(id){
   const r = receipts.find(r=>r.id===id);
   if(r) openReceiptModal(r);
 }
-async function deleteReceiptCore(id){
+
+function duplicateReceipt(id){
+  const r = receipts.find(r=>r.id===id);
+  if(!r) return;
+  const pseudoReceipt = {
+    id: '',
+    no: getNextReceiptNo(),
+    date: new Date().toISOString().slice(0,10),
+    duration: r.duration || '',
+    name: r.name || '',
+    phone: r.phone || '',
+    address: r.address || '',
+    note: r.note || '',
+    discount: r.discount || '',
+    items: (r.items||[]).map(it=>({qty: it.qty, desc: it.desc, price: it.price, amount: it.amount})),
+    payments: [],
+    measurementTables: r.measurementTables ? JSON.parse(JSON.stringify(r.measurementTables)) : []
+  };
+  openReceiptModal(pseudoReceipt);
+  document.getElementById('rcpId').value = '';
+  document.getElementById('receiptModalTitle').textContent = `نسخة جديدة (من وصل رقم ${r.no})`;
+  toast('نسخة جديدة جاهزة — عدّل نوع البضاعة/الأسعار زي ما بدك واحفظ');
+}
+async function deleteReceipt(id){
+  if(!confirm('هل تريد حذف هذا الوصل؟ رح ينحط في سلة المهملات 30 يوم وينشال مبلغه من الدخل فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.')) return;
   const target = receipts.find(r=>r.id===id);
-  if(!target) return false;
+  if(!target) return;
   receipts = receipts.filter(r=>r.id!==id);
   saveReceipts();
   const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
@@ -2582,21 +2496,14 @@ async function deleteReceiptCore(id){
   if(trashedPaymentEntries.length > 0){
     paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
     savePaymentHistory();
+    renderPaymentHistoryTable();
   }
   deletedReceipts.push({...target, deletedAt: new Date().toISOString(), trashedPaymentEntries});
   saveDeletedReceipts();
   renderReceiptsTable();
   renderDashboard();
   renderTrash();
-  renderReports();
-  renderCustomerReports();
-  renderPaymentHistoryTable();
-  return true;
-}
-async function deleteReceipt(id){
-  if(!confirm('هل تريد حذف هذا الوصل؟ رح ينحط في سلة المهملات 30 يوم وينشال مبلغه من الدخل فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.')) return;
-  const ok = await deleteReceiptCore(id);
-  if(ok) toast('تم نقل الوصل لسلة المهملات وتحديث الدخل');
+  toast('تم نقل الوصل لسلة المهملات وتحديث الدخل');
 }
 async function restoreReceiptFromTrash(id){
   const target = deletedReceipts.find(r=>r.id===id);
@@ -2614,9 +2521,6 @@ async function restoreReceiptFromTrash(id){
   renderReceiptsTable();
   renderDashboard();
   renderTrash();
-  renderReports();
-  renderCustomerReports();
-  renderPaymentHistoryTable();
   toast('تم استرجاع الوصل وإرجاع مبلغه للدخل بتاريخه الأصلي');
 }
 async function permanentlyDeleteFromTrash(id){
@@ -2661,7 +2565,6 @@ function renderTrash(){
 }
 let currentViewedReceiptId = null;
 let convertingFromInvoiceId = null;
-let convertingFromReceiptId = null;
 function viewReceipt(id){
   const r = receipts.find(r=>r.id===id);
   if(!r) return;
@@ -2842,10 +2745,10 @@ function openInvoiceItemMeasureTool(row, qtyInput){
           <option value="طول">متر طول</option>
           <option value="مكعب">متر مكعب</option>
         </select>
-        <input type="number" class="iim-l mt-field" data-mf="l" dir="ltr" placeholder="طول (م)" step="0.01" style="width:100px; direction:ltr; text-align:right;">
-        <input type="number" class="iim-w mt-field" data-mf="w" dir="ltr" placeholder="عرض (م)" step="0.01" style="width:100px; direction:ltr; text-align:right;">
-        <input type="number" class="iim-h mt-field" data-mf="h" dir="ltr" placeholder="سماكة (م)" step="0.01" style="width:100px; display:none; direction:ltr; text-align:right;">
-        <input type="number" class="iim-count mt-field" data-mf="count" dir="ltr" placeholder="عدد القطع" value="1" min="1" style="width:100px; direction:ltr; text-align:right;">
+        <input type="number" class="iim-l" placeholder="طول (م)" step="0.01" style="width:100px;">
+        <input type="number" class="iim-w" placeholder="عرض (م)" step="0.01" style="width:100px;">
+        <input type="number" class="iim-h" placeholder="سماكة (م)" step="0.01" style="width:100px; display:none;">
+        <input type="number" class="iim-count" placeholder="عدد القطع" value="1" min="1" style="width:100px;">
         <span class="iim-result" style="font-size:13px; font-weight:700; color:var(--brass-deep); min-width:90px;">0.00 م²</span>
         <button type="button" class="btn btn-sm iim-apply">تطبيق على العدد</button>
       </div>
@@ -2870,7 +2773,6 @@ function openInvoiceItemMeasureTool(row, qtyInput){
     resultEl.textContent = (r.value*count).toFixed(3).replace(/\.?0+$/,'') + (t==='طول'?' م.ط':(t==='مكعب'?' م³':' م²'));
   }
   [typeSel,lIn,wIn,hIn,countIn].forEach(el=>el.addEventListener('input', ()=>{ updateVisibility(); recalcMeasure(); }));
-  [lIn,wIn,hIn,countIn].forEach(el=>el.addEventListener('keydown', handleItemMeasureArrowNav));
   updateVisibility(); recalcMeasure();
   mRow.querySelector('.iim-apply').addEventListener('click', ()=>{
     const t = typeSel.value;
@@ -2918,7 +2820,7 @@ function newInvoicePaymentRow(payment){
   const row = document.createElement('tr');
   row.dataset.pmId = payment.id;
   row.innerHTML = `
-    <td><input type="text" class="inv-pm-date date-field" placeholder="DD-MM-YYYY" maxlength="10" inputmode="numeric" value="${isoToDmy(payment.date||'')}"></td>
+    <td><input type="text" class="inv-pm-date date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric" value="${payment.date||''}"></td>
     <td><input type="number" class="inv-pm-amount" value="${payment.amount||''}" min="0"></td>
     <td><select class="inv-pm-method">${paymentMethodOptions(payment.method||'نقدي')}</select></td>
     <td><button class="btn btn-ghost btn-sm inv-pm-remove">✕</button></td>
@@ -2933,9 +2835,9 @@ document.getElementById('btnAddInvoicePaymentRow').addEventListener('click', ()=
 
 function nextInvoiceNo(docType){
   const year = new Date().getFullYear();
-  const key = invoiceNoKey(docType, year);
-  const count = (lastInvoiceNo[key]||0) + 1;
-  return `${invoiceNoPrefix(docType)}${String(count).padStart(3,'0')}/${year}`;
+  const prefix = docType === 'facture' ? 'F' : (docType === 'devis' ? 'D' : 'S');
+  const count = invoices.filter(i=>(i.docType||'simple')===(docType||'simple')).length + 1;
+  return `${prefix}${String(count).padStart(3,'0')}/${year}`;
 }
 
 function updateInvNoLabel(){
@@ -2989,7 +2891,7 @@ function openInvoiceModal(invoice){
     document.getElementById('invId').value = invoice.id;
     document.getElementById('invDocType').value = invoice.docType || 'simple';
     document.getElementById('invNo').value = invoice.no||'';
-    document.getElementById('invDate').value = isoToDmy(invoice.date||'');
+    document.getElementById('invDate').value = invoice.date||'';
     document.getElementById('invDelay').value = invoice.delay||'';
     document.getElementById('invClientName').value = invoice.clientName||'';
     document.getElementById('invClientAddress').value = invoice.clientAddress||'';
@@ -3004,8 +2906,8 @@ function openInvoiceModal(invoice){
     document.getElementById('invoiceModalTitle').textContent = 'مستند جديد';
     document.getElementById('invId').value = '';
     document.getElementById('invDocType').value = 'simple';
-    document.getElementById('invNo').value = nextInvoiceNo('simple');
-    document.getElementById('invDate').value = isoToDmy(new Date().toISOString().slice(0,10));
+    document.getElementById('invNo').value = nextInvoiceNo('devis');
+    document.getElementById('invDate').value = new Date().toISOString().slice(0,10);
     document.getElementById('invDelay').value = '';
     document.getElementById('invClientName').value = '';
     document.getElementById('invClientAddress').value = '';
@@ -3041,7 +2943,7 @@ async function buildAndSaveInvoiceFromForm(){
   const ttc = ht+tva;
   const payments = [];
   document.querySelectorAll('#invPaymentsBody tr').forEach(row=>{
-    const date = dmyToIso(row.querySelector('.inv-pm-date').value);
+    const date = row.querySelector('.inv-pm-date').value;
     const amount = Number(row.querySelector('.inv-pm-amount').value)||0;
     const method = row.querySelector('.inv-pm-method') ? row.querySelector('.inv-pm-method').value : 'نقدي';
     const pid = row.dataset.pmId || uid();
@@ -3050,12 +2952,11 @@ async function buildAndSaveInvoiceFromForm(){
   const paid = payments.reduce((s,p)=>s+p.amount,0);
 
   const id = document.getElementById('invId').value;
-  const prevInvoice = id ? invoices.find(i=>i.id===id) : null;
   const data = {
     id: id || uid(),
     docType: document.getElementById('invDocType').value,
     no: document.getElementById('invNo').value.trim(),
-    date: dmyToIso(document.getElementById('invDate').value),
+    date: document.getElementById('invDate').value,
     delay: document.getElementById('invDelay').value.trim(),
     clientName,
     clientAddress: document.getElementById('invClientAddress').value.trim(),
@@ -3068,7 +2969,6 @@ async function buildAndSaveInvoiceFromForm(){
     note: document.getElementById('invNote').value.trim()
   };
 
-  const sourceReceipt = convertingFromReceiptId ? receipts.find(r=>r.id===convertingFromReceiptId) : null;
   if(id){
     const idx = invoices.findIndex(i=>i.id===id);
     if(idx>-1) invoices[idx] = data;
@@ -3076,20 +2976,10 @@ async function buildAndSaveInvoiceFromForm(){
     invoices.push(data);
   }
   saveInvoices();
-  noteInvoiceNoUsed(data.docType, data.no);
-  const invDocTypeLabel = data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر');
-  const priorInvPayments = (prevInvoice ? prevInvoice.payments : []).concat(sourceReceipt ? (sourceReceipt.payments||[]) : []);
-  syncPaymentHistoryForDoc(priorInvPayments, payments, {customerName: clientName, docType: invDocTypeLabel, docNo: data.no});
-  if(convertingFromReceiptId){
-    receipts = receipts.filter(r=>r.id!==convertingFromReceiptId);
-    saveReceipts();
-    renderReceiptsTable();
-    convertingFromReceiptId = null;
-  }
+  logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no});
   renderInvoicesTable();
   renderDashboard();
   renderPaymentHistoryTable();
-  renderCustomerReports();
   return data.id;
 }
 
@@ -3130,7 +3020,7 @@ function renderInvoicesTable(){
     html += `<tr>
       <td><span class="tag ${typeClass}">${typeTag}</span></td>
       <td>${inv.no}</td>
-      <td style="white-space:nowrap;">${inv.date||''}</td>
+      <td>${inv.date||''}</td>
       <td>${inv.clientName}</td>
       <td>${fmt(inv.ttc)}</td>
       <td>${fmt(inv.remaining)}</td>
@@ -3138,6 +3028,7 @@ function renderInvoicesTable(){
         <div class="row-actions">
           <button class="btn btn-sm btn-ghost" onclick="viewInvoice('${inv.id}')" title="عرض/طباعة">👁</button>
           <button class="btn btn-sm btn-ghost" onclick="editInvoice('${inv.id}')" title="تعديل">✎</button>
+          <button class="btn btn-sm btn-ghost" onclick="duplicateInvoice('${inv.id}')" title="نسخ (لعمل نسخة تانية بنفس الزبون)">⧉</button>
           <button class="btn btn-sm btn-ghost" onclick="convertInvoiceToReceipt('${inv.id}')" title="تحويل إلى وصل زبون">➜🧾</button>
           <button class="btn btn-sm btn-ghost" onclick="deleteInvoice('${inv.id}')" title="حذف">🗑</button>
         </div>
@@ -3151,6 +3042,31 @@ function renderInvoicesTable(){
 function editInvoice(id){
   const inv = invoices.find(i=>i.id===id);
   if(inv) openInvoiceModal(inv);
+}
+
+function duplicateInvoice(id){
+  const inv = invoices.find(i=>i.id===id);
+  if(!inv) return;
+  const pseudoInvoice = {
+    id: '',
+    docType: inv.docType,
+    no: nextInvoiceNo(inv.docType),
+    date: new Date().toISOString().slice(0,10),
+    delay: inv.delay || '',
+    clientName: inv.clientName || '',
+    clientAddress: inv.clientAddress || '',
+    clientRC: inv.clientRC || '',
+    clientNIF: inv.clientNIF || '',
+    clientNIS: inv.clientNIS || '',
+    clientPhone: inv.clientPhone || '',
+    note: inv.note || '',
+    items: (inv.items||[]).map(it=>({qty: it.qty, desc: it.desc, unit: it.unit, price: it.price, amount: it.amount})),
+    payments: []
+  };
+  openInvoiceModal(pseudoInvoice);
+  document.getElementById('invId').value = '';
+  document.getElementById('invoiceModalTitle').textContent = `نسخة جديدة (من مستند رقم ${inv.no})`;
+  toast('نسخة جديدة جاهزة — عدّل نوع البضاعة/الأسعار زي ما بدك واحفظ');
 }
 
 function convertInvoiceToReceipt(id){
@@ -3176,54 +3092,13 @@ function convertInvoiceToReceipt(id){
   toast('عبّي الدفعة وانواع البضاعة إذا احتجت، ثم احفظ الوصل');
 }
 
-function convertReceiptToInvoice(id){
-  const r = receipts.find(x=>x.id===id);
-  if(!r) return;
-  if(!confirm(`تحويل وصل "${r.name}" رقم ${r.no} إلى عرض سعر جديد؟ الوصل الأصلي رح ينحذف نهائيًا بمجرد ما تحفظي عرض السعر.`)) return;
-  convertingFromReceiptId = id;
-  const pseudoInvoice = {
-    id: '',
-    docType: 'simple',
-    no: nextInvoiceNo('simple'),
-    date: new Date().toISOString().slice(0,10),
-    delay: '',
-    clientName: r.name || '',
-    clientAddress: r.address || '',
-    clientRC: '',
-    clientNIF: '',
-    clientNIS: '',
-    clientPhone: r.phone || '',
-    note: `محوّل من وصل رقم ${r.no}`,
-    items: (r.items||[]).map(it=>({qty: it.qty, desc: it.desc, unit:'', price: it.price, amount: it.amount})),
-    payments: []
-  };
-  openInvoiceModal(pseudoInvoice);
-  document.getElementById('invId').value = '';
-  document.getElementById('invoiceModalTitle').textContent = 'عرض سعر جديد (محوّل من وصل)';
-  toast('غيّري نوع المستند إذا بدك Devis أو Facture، وعبّي الدفعة إذا احتجت، ثم احفظي');
-}
-
-async function deleteInvoiceCore(id){
-  const target = invoices.find(i=>i.id===id);
-  if(!target) return false;
-  invoices = invoices.filter(i=>i.id!==id);
-  saveInvoices();
-  const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
-  if(paymentIds.size > 0){
-    paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
-    savePaymentHistory();
-  }
-  renderInvoicesTable();
-  renderDashboard();
-  renderReports();
-  renderCustomerReports();
-  renderPaymentHistoryTable();
-  return true;
-}
 async function deleteInvoice(id){
   if(!confirm('هل تريد حذف هذه الفاتورة؟')) return;
-  const ok = await deleteInvoiceCore(id);
-  if(ok) toast('تم حذف الفاتورة');
+  invoices = invoices.filter(i=>i.id!==id);
+  saveInvoices();
+  renderInvoicesTable();
+  renderDashboard();
+  toast('تم حذف الفاتورة');
 }
 
 let currentViewedInvoiceId = null;
@@ -3411,14 +3286,14 @@ function openExpenseModal(exp){
   if(exp){
     document.getElementById('expenseModalTitle').textContent = 'تعديل مصروف';
     document.getElementById('expId').value = exp.id;
-    document.getElementById('expDate').value = isoToDmy(exp.date);
+    document.getElementById('expDate').value = exp.date;
     document.getElementById('expDesc').value = exp.desc;
     document.getElementById('expCategory').value = exp.category;
     document.getElementById('expAmount').value = exp.amount;
   } else {
     document.getElementById('expenseModalTitle').textContent = 'إضافة مصروف';
     document.getElementById('expId').value = '';
-    document.getElementById('expDate').value = isoToDmy(new Date().toISOString().slice(0,10));
+    document.getElementById('expDate').value = new Date().toISOString().slice(0,10);
     document.getElementById('expDesc').value = '';
     document.getElementById('expCategory').value = expenseCategories[0] || 'أخرى';
     document.getElementById('expAmount').value = '';
@@ -3433,7 +3308,7 @@ document.getElementById('btnSaveExpense').addEventListener('click', async ()=>{
   const id = document.getElementById('expId').value;
   const data = {
     id: id || uid(),
-    date: dmyToIso(document.getElementById('expDate').value),
+    date: document.getElementById('expDate').value,
     desc,
     category: document.getElementById('expCategory').value,
     amount: Number(document.getElementById('expAmount').value)||0
@@ -3957,7 +3832,7 @@ window.addEventListener('afterprint', ()=>{
 });
 
 function renderDashboard(){
-  const income = receipts.reduce((s,r)=>s+getReceiptPayments(r).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+  const income = paymentHistory.reduce((s,h)=>s+(Number(h.amount)||0), 0);
   const expTotal = expenses.reduce((s,e)=>s+e.amount,0);
   const commissionPercent = Number(settings.commissionPercent)||0;
   const commission = income * (commissionPercent/100);
@@ -4020,202 +3895,6 @@ function renderDashboard(){
   }
 }
 
-function nearlyEqual(a, b, eps){
-  eps = eps===undefined ? 0.01 : eps;
-  return Math.abs((Number(a)||0) - (Number(b)||0)) <= eps;
-}
-
-// فحص شامل يمر على كل الوصولات والفواتير وسجل الدفعات والمصاريف ويرجع لائحة تناقضات (بدون تعديل أي بيانات).
-// بيلقط دفعات "يتيمة" بسجل الدفعات (مالها معرّف حالي بوصل/فاتورة) بس هي فعليًا نسخة قديمة/مكررة
-// لدفعة حالية موجودة فعلاً بنفس المبلغ ونفس التاريخ — حتى لو اسم الزبون تغيّر بالوصل بعدين،
-// وحتى لو الدفعة الحالية عندها أصلاً سجل خاص فيها (بعد المزامنة مثلاً). آمن نحذفها لأنو
-// المبلغ نفسه محسوب أصلاً بمكان تاني بالسجل، وما في داعي لنسختين لنفس الدفعة الحقيقية.
-function findDuplicateOrphanPaymentEntries(){
-  const liveIds = new Set();
-  const liveSignatures = new Set();
-  receipts.forEach(r=>(r.payments||[]).forEach(p=>{
-    if(!p.id) return;
-    liveIds.add(p.id);
-    liveSignatures.add(`${Number(p.amount)||0}|${p.date||''}`);
-  }));
-  invoices.forEach(inv=>(inv.payments||[]).forEach(p=>{
-    if(!p.id) return;
-    liveIds.add(p.id);
-    liveSignatures.add(`${Number(p.amount)||0}|${p.date||''}`);
-  }));
-  return paymentHistory.filter(h=>{
-    if(liveIds.has(h.paymentId)) return false; // مرتبطة صح أصلاً بمعرّفها، مش يتيمة
-    const sig = `${Number(h.amount)||0}|${h.date||''}`;
-    return liveSignatures.has(sig);
-  });
-}
-
-function runDataIntegrityCheck(){
-  const issues = []; // {level:'error'|'warning', text}
-  const addErr = (text)=>issues.push({level:'error', text});
-  const addWarn = (text)=>issues.push({level:'warning', text});
-
-  // ---- الوصولات ----
-  const receiptNoCounts = {};
-  receipts.forEach(r=>{
-    const label = `وصل رقم ${r.no||'—'} (${r.name||'بدون اسم'})`;
-    if(r.no){ receiptNoCounts[r.no] = (receiptNoCounts[r.no]||0) + 1; }
-    const subtotal = (r.items||[]).reduce((s,it)=>s+(Number(it.qty)||0)*(Number(it.price)||0), 0);
-    (r.items||[]).forEach((it,i)=>{
-      const expectedAmt = (Number(it.qty)||0)*(Number(it.price)||0);
-      if(!nearlyEqual(it.amount, expectedAmt)) addErr(`${label}: مبلغ البند رقم ${i+1} (${it.desc||''}) ما يطابقش العدد×السعر`);
-    });
-    const expectedTotal = Math.max(0, subtotal - (Number(r.discount)||0));
-    if(!nearlyEqual(r.total, expectedTotal)) addErr(`${label}: المجموع الكلي المسجّل (${fmt(r.total)}) ما يطابقش مجموع البنود بعد الخصم (${fmt(expectedTotal)})`);
-    const paid = getReceiptPayments(r).reduce((s,p)=>s+(Number(p.amount)||0),0);
-    const expectedRemaining = (Number(r.total)||0) - paid;
-    if(!nearlyEqual(r.remaining, expectedRemaining)) addErr(`${label}: الباقي المسجّل (${fmt(r.remaining)}) ما يطابقش (المجموع − المدفوع = ${fmt(expectedRemaining)})`);
-    if(r.delivered && !r.deliveredDate) addWarn(`${label}: محدّد "تم التسليم" بدون تاريخ تسليم`);
-    const ids = (r.payments||[]).map(p=>p.id).filter(Boolean);
-    if(new Set(ids).size !== ids.length) addErr(`${label}: في دفعتين أو أكتر بنفس المعرّف الداخلي جوا نفس الوصل`);
-  });
-  Object.keys(receiptNoCounts).forEach(no=>{
-    if(receiptNoCounts[no] > 1) addErr(`رقم الوصل "${no}" مكرر على ${receiptNoCounts[no]} وصولات مختلفة`);
-  });
-
-  // ---- الفواتير / عروض السعر ----
-  const invoiceNoCounts = {};
-  invoices.forEach(inv=>{
-    const label = `${inv.docType==='facture'?'فاتورة':(inv.docType==='devis'?'Devis':'عرض سعر')} رقم ${inv.no||'—'} (${inv.clientName||'بدون اسم'})`;
-    if(inv.no){ invoiceNoCounts[inv.no] = (invoiceNoCounts[inv.no]||0) + 1; }
-    const expectedHt = (inv.items||[]).reduce((s,it)=>s+(Number(it.qty)||0)*(Number(it.price)||0), 0);
-    if(!nearlyEqual(inv.ht, expectedHt)) addErr(`${label}: مجموع البنود (HT) المسجّل (${fmt(inv.ht)}) ما يطابقش مجموع البنود الفعلي (${fmt(expectedHt)})`);
-    const isSimple = inv.docType === 'simple';
-    const expectedTva = isSimple ? 0 : expectedHt * 0.19;
-    if(!nearlyEqual(inv.tva, expectedTva)) addErr(`${label}: قيمة TVA المسجّلة (${fmt(inv.tva)}) ما تطابقش المتوقع (${fmt(expectedTva)})`);
-    const expectedTtc = expectedHt + (Number(inv.tva)||0);
-    if(!nearlyEqual(inv.ttc, expectedTtc)) addErr(`${label}: المجموع الكلي (TTC) المسجّل (${fmt(inv.ttc)}) ما يطابقش HT+TVA (${fmt(expectedTtc)})`);
-    const paid = (inv.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0);
-    if(!nearlyEqual(inv.paid, paid)) addErr(`${label}: مجموع المدفوع المسجّل (${fmt(inv.paid)}) ما يطابقش مجموع الدفعات الفعلي (${fmt(paid)})`);
-    const expectedRemaining = (Number(inv.ttc)||0) - paid;
-    if(!nearlyEqual(inv.remaining, expectedRemaining)) addErr(`${label}: الباقي المسجّل (${fmt(inv.remaining)}) ما يطابقش (${fmt(expectedRemaining)})`);
-  });
-  Object.keys(invoiceNoCounts).forEach(no=>{
-    if(invoiceNoCounts[no] > 1) addErr(`رقم المستند "${no}" مكرر على ${invoiceNoCounts[no]} فواتير/عروض أسعار مختلفة`);
-  });
-
-  // ---- سجل الدفعات مقابل الوصولات والفواتير الفعليّة ----
-  const livePayments = new Map(); // paymentId -> {doc}
-  receipts.forEach(r=>(r.payments||[]).forEach(p=>{ if(p.id) livePayments.set(p.id, {amount:p.amount, date:p.date||'', method:p.method||'نقدي', customerName:r.name, docType:'وصل', docNo:r.no}); }));
-  invoices.forEach(inv=>(inv.payments||[]).forEach(p=>{ if(p.id) livePayments.set(p.id, {amount:p.amount, date:p.date||'', method:p.method||'نقدي', customerName:inv.clientName, docType: inv.docType==='facture'?'فاتورة':(inv.docType==='devis'?'Devis':'عرض سعر'), docNo:inv.no}); }));
-
-  const historyIds = new Set(paymentHistory.map(h=>h.paymentId));
-  const duplicateOrphanIds = new Set(findDuplicateOrphanPaymentEntries().map(h=>h.id));
-  paymentHistory.forEach(h=>{
-    const live = livePayments.get(h.paymentId);
-    if(!live){
-      if(duplicateOrphanIds.has(h.id)){
-        addWarn(`دفعة (${fmt(h.amount)} بتاريخ ${h.date||'—'} للزبون ${h.customerName||'—'}) مسجّلة مرتين بسجل الدفعات (نسخة قديمة + نسخة حالية) — استعمل زر "تنظيف الدفعات المكررة" بالأسفل`);
-      } else {
-        addWarn(`سجل الدفعات فيه دفعة (${fmt(h.amount)} بتاريخ ${h.date||'—'} للزبون ${h.customerName||'—'}) مالها وصل أو فاتورة موجودة حاليًا — ممكن تكون من مستند انحذف`);
-      }
-    } else if(!nearlyEqual(live.amount, h.amount) || live.date!==h.date || live.docNo!==h.docNo || live.docType!==h.docType || live.customerName!==h.customerName){
-      addErr(`دفعة الزبون ${h.customerName||'—'} بسجل الدفعات (${fmt(h.amount)}) ما تطابقش القيمة الحالية بـ${live.docType} رقم ${live.docNo} (${fmt(live.amount)})`);
-    }
-  });
-  livePayments.forEach((live, pid)=>{
-    if(!historyIds.has(pid)) addWarn(`دفعة (${fmt(live.amount)} بتاريخ ${live.date||'—'} للزبون ${live.customerName||'—'}) بـ${live.docType} رقم ${live.docNo} مش مسجّلة بسجل الدفعات`);
-  });
-
-  // ---- سلة المهملات ----
-  const cutoff = Date.now() - 30*24*60*60*1000;
-  const overdueTrash = deletedReceipts.filter(r=>new Date(r.deletedAt).getTime() < cutoff);
-  if(overdueTrash.length > 0) addWarn(`في ${overdueTrash.length} وصل بسلة المهملات تجاوز الـ30 يوم ولسا ما انمسح نهائيًا`);
-
-  // ---- المصاريف ----
-  expenses.forEach(e=>{
-    if(!(Number(e.amount) > 0)) addWarn(`مصروف بتاريخ ${e.date||'—'} (${e.category||'بدون تصنيف'}) مبلغه صفر أو غير صحيح`);
-  });
-
-  return issues;
-}
-
-function renderDataAuditResults(){
-  const wrap = document.getElementById('dataAuditResults');
-  if(!wrap) return;
-  wrap.innerHTML = '<div style="font-size:13px; color:var(--text-dim);">جاري الفحص…</div>';
-  setTimeout(()=>{
-    const issues = runDataIntegrityCheck();
-    if(issues.length === 0){
-      wrap.innerHTML = `<div style="background:var(--marble-2); border-radius:8px; padding:14px; color:var(--verdigris-deep); font-weight:700;">✅ ما في أي تناقض — كل شي مسجّل ومطابق.</div>`;
-      return;
-    }
-    const errors = issues.filter(i=>i.level==='error');
-    const warnings = issues.filter(i=>i.level==='warning');
-    const row = (i)=>`<div style="padding:8px 10px; border-inline-start:3px solid ${i.level==='error'?'var(--danger)':'var(--brass)'}; background:var(--marble-2); border-radius:6px; margin-bottom:6px; font-size:12.5px;">${i.text}</div>`;
-    wrap.innerHTML = `
-      <div style="font-size:13px; font-weight:700; margin-bottom:8px;">
-        ${errors.length ? `<span style="color:var(--danger);">🔴 ${errors.length} خطأ بالأرقام</span>` : ''}
-        ${errors.length && warnings.length ? ' — ' : ''}
-        ${warnings.length ? `<span style="color:var(--brass-deep);">🟡 ${warnings.length} ملاحظة تستاهل مراجعة</span>` : ''}
-      </div>
-      ${errors.map(row).join('')}
-      ${warnings.map(row).join('')}
-    `;
-  }, 30);
-}
-document.getElementById('btnRunDataAudit').addEventListener('click', renderDataAuditResults);
-
-// إصلاح تلقائي: يعيد مزامنة سجل الدفعات مع كل وصل وفاتورة حالي (يحدّث القيم المتغيّرة ويضيف الناقص)،
-// بدون ما يلمس أي دفعة "يتيمة" مالها مستند حالي — هاي بتضل تحتاج قرار يدوي.
-async function resyncAllPaymentHistory(){
-  let anyChanged = false;
-  receipts.forEach(r=>{
-    if(syncPaymentHistoryForDoc(r.payments||[], r.payments||[], {customerName: r.name, docType: 'وصل', docNo: r.no})) anyChanged = true;
-  });
-  invoices.forEach(inv=>{
-    const label = inv.docType==='facture'?'فاتورة':(inv.docType==='devis'?'Devis':'عرض سعر');
-    if(syncPaymentHistoryForDoc(inv.payments||[], inv.payments||[], {customerName: inv.clientName, docType: label, docNo: inv.no})) anyChanged = true;
-  });
-  renderPaymentHistoryTable();
-  renderReports();
-  renderCustomerReports();
-  return anyChanged;
-}
-document.getElementById('btnResyncPayments').addEventListener('click', async ()=>{
-  if(!confirm('رح يراجع كل وصل وفاتورة حالي ويحدّث سجل الدفعات ليطابقهم بالضبط (المبلغ، التاريخ، اسم الزبون، رقم المستند). ما رح يمسح أي دفعة يتيمة مالها مستند — هاي لازم تتراجع يدويًا. متابعة؟')) return;
-  const changed = await resyncAllPaymentHistory();
-  toast(changed ? 'تم تحديث سجل الدفعات ليطابق الوصولات والفواتير الحالية' : 'سجل الدفعات كان مطابق أصلاً، ما احتاج أي تعديل');
-});
-
-// إصلاح تلقائي: يعبّي تاريخ التسليم للوصولات المحدّدة "تم التسليم" واللي ناقصها التاريخ،
-// باستعمال تاريخ الوصل نفسه كافتراض معقول — يفضّل مراجعتها يدويًا إذا التاريخ الحقيقي مختلف.
-async function fillMissingDeliveryDates(){
-  const targets = receipts.filter(r=>r.delivered && !r.deliveredDate);
-  targets.forEach(r=>{ r.deliveredDate = r.date || new Date().toISOString().slice(0,10); });
-  if(targets.length) await saveReceipts();
-  renderReceiptsTable();
-  renderCustomerReports();
-  renderDashboard();
-  return targets.length;
-}
-document.getElementById('btnFillDeliveryDates').addEventListener('click', async ()=>{
-  if(!confirm('رح يعبّي تاريخ التسليم لكل وصل محدّد "تم التسليم" وناقصه التاريخ، باستعمال تاريخ الوصل نفسه كافتراض. إذا تاريخ التسليم الحقيقي مختلف، لازم تعدّليه يدويًا بعدها من كل وصل. متابعة؟')) return;
-  const count = await fillMissingDeliveryDates();
-  toast(count ? `تم تعبئة تاريخ التسليم لـ${count} وصل` : 'ما في ولا وصل ناقصه تاريخ التسليم');
-});
-
-// يشيل من سجل الدفعات بس النسخ اليتيمة اللي هي فعليًا مكررة عن دفعة حالية متتبّعة صح تحت معرّف تاني —
-// ما بيلمس ولا دفعة يتيمة حقيقية (من مستند انحذف نهائيًا بلا بديل).
-document.getElementById('btnCleanDuplicateOrphans').addEventListener('click', async ()=>{
-  const dups = findDuplicateOrphanPaymentEntries();
-  if(dups.length === 0){ toast('ما في ولا دفعة مكررة يتيمة حاليًا'); return; }
-  const listText = dups.map(h=>`- ${fmt(h.amount)} بتاريخ ${h.date||'—'} للزبون ${h.customerName||'—'}`).join('\n');
-  if(!confirm(`في ${dups.length} دفعة بسجل الدفعات مكررة عن دفعة حالية متتبّعة صح (نفس المبلغ والتاريخ والزبون بس تحت معرّف قديم):\n${listText}\n\nرح تنشال النسخة القديمة بس — المبلغ يضل محسوب صح من النسخة الحالية. متابعة؟`)) return;
-  const dupIds = new Set(dups.map(h=>h.id));
-  paymentHistory = paymentHistory.filter(h=>!dupIds.has(h.id));
-  await savePaymentHistory();
-  renderPaymentHistoryTable();
-  renderReports();
-  renderCustomerReports();
-  toast(`تم حذف ${dups.length} نسخة مكررة من سجل الدفعات`);
-});
-
 function renderReports(){
   const totalInvoiced = receipts.reduce((s,r)=>s+r.total,0);
   const totalCollected = receipts.reduce((s,r)=>s+getReceiptPayments(r).reduce((a,p)=>a+p.amount,0),0);
@@ -4270,7 +3949,7 @@ function renderCustomerReports(){
         return `<tr>
           <td>${r.name}</td>
           <td>${details}</td>
-          <td style="white-space:nowrap;">${r.date||''}</td>
+          <td>${r.date||''}</td>
           <td>${r.duration} يوم</td>
           <td>${deliveryDate}</td>
           <td>${daysUntilLabel(deliveryDate)}</td>
@@ -4282,14 +3961,10 @@ function renderCustomerReports(){
 
   const deliveredWrap = document.getElementById('deliveredCustomersWrap');
   const dq = (document.getElementById('deliveredCustomerSearch').value || '').trim();
-  const dDate = dmyToIso(document.getElementById('deliveredCustomerDate').value);
+  const dDate = document.getElementById('deliveredCustomerDate').value;
   let delivered = [...receipts]
     .filter(r => r.delivered)
-    .sort((a,b)=>{
-      const byDelivered = (b.deliveredDate||b.date||'').localeCompare(a.deliveredDate||a.date||'');
-      if(byDelivered !== 0) return byDelivered;
-      return (b.date||'').localeCompare(a.date||'');
-    });
+    .sort((a,b)=>((b.deliveredDate||b.date||'')).localeCompare(a.deliveredDate||a.date||''));
   if(dq) delivered = delivered.filter(r =>
     (r.name||'').includes(dq) ||
     (r.phone||'').includes(dq) ||
@@ -4311,14 +3986,13 @@ function renderCustomerReports(){
           <td>${r.name}</td>
           <td>${details}</td>
           <td>${r.phone||'—'}</td>
-          <td style="white-space:nowrap;">${r.date||''}</td>
-          <td style="white-space:nowrap;">${r.deliveredDate||'—'}</td>
+          <td>${r.date||''}</td>
+          <td>${r.deliveredDate||'—'}</td>
           <td>${fmt(r.total)}</td>
           <td>${paymentStatus}</td>
           <td>
             <div class="row-actions">
               <button class="btn btn-sm btn-ghost" onclick="editReceipt('${r.id}')" title="تعديل">✎</button>
-              <button class="btn btn-sm btn-ghost" onclick="deleteReceipt('${r.id}')" title="حذف">🗑</button>
             </div>
           </td>
         </tr>`;
@@ -4331,8 +4005,8 @@ document.getElementById('deliveredCustomerDate').addEventListener('input', rende
 
 function getFilteredPaymentHistory(){
   const q = (document.getElementById('paymentHistorySearch').value || '').trim();
-  const from = dmyToIso(document.getElementById('paymentHistoryFrom').value);
-  const to = dmyToIso(document.getElementById('paymentHistoryTo').value);
+  const from = document.getElementById('paymentHistoryFrom').value;
+  const to = document.getElementById('paymentHistoryTo').value;
   let list = [...paymentHistory];
   if(q) list = list.filter(h => (h.customerName||'').includes(q) || (h.docNo||'').includes(q));
   if(from) list = list.filter(h => (h.date||'') >= from);
@@ -4363,7 +4037,7 @@ function renderPaymentHistoryTable(){
   list.forEach(h=>{
     const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ-u-nu-latn', {hour:'2-digit', minute:'2-digit'}) : '—';
     html += `<tr>
-      <td style="white-space:nowrap;">${h.date||'—'}</td>
+      <td>${h.date||'—'}</td>
       <td>${loggedTime}</td>
       <td>${h.customerName||'—'}</td>
       <td>${fmt(h.amount)}</td>
@@ -4379,30 +4053,10 @@ function renderPaymentHistoryTable(){
   wrap.innerHTML = html;
 }
 async function deletePaymentHistoryEntry(id){
-  const h = paymentHistory.find(x=>x.id===id);
-  if(!h) return;
-  const liveReceipt = receipts.find(r=>(r.payments||[]).some(p=>p.id===h.paymentId));
-  const liveInvoice = !liveReceipt ? invoices.find(inv=>(inv.payments||[]).some(p=>p.id===h.paymentId)) : null;
-
-  if(liveReceipt){
-    if(!confirm(`هاي الدفعة جزء من وصل رقم ${liveReceipt.no} (${liveReceipt.name}). حذفها من هون رح يحذف الوصل كامل (كل بنوده ودفعاته)، مش بس هاي الدفعة — وينحط بسلة المهملات 30 يوم متل أي حذف عادي. متابعة؟`)) return;
-    const ok = await deleteReceiptCore(liveReceipt.id);
-    if(ok) toast('تم حذف الوصل كامل مع كل دفعاته');
-    return;
-  }
-  if(liveInvoice){
-    const label = liveInvoice.docType==='facture'?'الفاتورة':(liveInvoice.docType==='devis'?'الـDevis':'عرض السعر');
-    if(!confirm(`هاي الدفعة جزء من ${label} رقم ${liveInvoice.no} (${liveInvoice.clientName}). حذفها من هون رح يحذف المستند كامل نهائيًا، مش بس هاي الدفعة. متابعة؟`)) return;
-    const ok = await deleteInvoiceCore(liveInvoice.id);
-    if(ok) toast('تم حذف المستند كامل مع كل دفعاته');
-    return;
-  }
-
-  if(!confirm('حذف هذه الدفعة من سجل الدفعات؟ ما إلها وصل أو فاتورة موجودة حاليًا مرتبطة فيها، فبتنشال هي بس.')) return;
-  paymentHistory = paymentHistory.filter(x=>x.id!==id);
+  if(!confirm('حذف هذه الدفعة من سجل الدفعات؟ هذا ما يأثرش على الوصل الأصلي إذا كان مازال موجود.')) return;
+  paymentHistory = paymentHistory.filter(h=>h.id!==id);
   await savePaymentHistory();
   renderPaymentHistoryTable();
-  renderDashboard();
   toast('تم حذف الدفعة من السجل');
 }
 document.getElementById('paymentHistorySearch').addEventListener('input', renderPaymentHistoryTable);
@@ -4451,7 +4105,7 @@ function showLedger(title, rows){
         <tr><th style="width:60px;">#</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr>
       </thead>
       <tbody>
-        ${rows.map((r,i)=>`<tr><td>${i+1}</td><td style="white-space:nowrap;">${r.date||'—'}</td><td style="text-align:right;">${r.details}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
+        ${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.date||'—'}</td><td style="text-align:right;">${r.details}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
       </tbody>
     </table>
     <div class="totals-box" style="margin-top:14px;">
