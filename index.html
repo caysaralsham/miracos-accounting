@@ -2274,7 +2274,8 @@ async function logPaymentHistoryEntries(payments, meta){
       amount: p.amount,
       method: p.method || 'نقدي',
       docType: meta.docType,
-      docNo: meta.docNo
+      docNo: meta.docNo,
+      details: meta.details || ''
     });
     changed = true;
   });
@@ -2345,7 +2346,7 @@ async function buildAndSaveReceiptFromForm(){
     receipts.push(data);
   }
   saveReceipts();
-  logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no});
+  logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no, details: items.map(it=>it.desc).filter(Boolean).join('، ')});
   if(convertingFromInvoiceId){
     invoices = invoices.filter(i=>i.id!==convertingFromInvoiceId);
     saveInvoices();
@@ -2976,7 +2977,7 @@ async function buildAndSaveInvoiceFromForm(){
     invoices.push(data);
   }
   saveInvoices();
-  logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no});
+  logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no, details: (items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
   renderInvoicesTable();
   renderDashboard();
   renderPaymentHistoryTable();
@@ -3992,6 +3993,7 @@ function renderCustomerReports(){
           <td>${paymentStatus}</td>
           <td>
             <div class="row-actions">
+              <button class="btn btn-sm btn-ghost" onclick="viewReceipt('${r.id}')" title="عرض/طباعة">👁</button>
               <button class="btn btn-sm btn-ghost" onclick="editReceipt('${r.id}')" title="تعديل">✎</button>
             </div>
           </td>
@@ -4032,14 +4034,17 @@ function renderPaymentHistoryTable(){
   }
   const totalAmount = list.reduce((s,h)=>s+(Number(h.amount)||0), 0);
   let html = `<table><thead><tr>
-    <th>التاريخ</th><th>الوقت</th><th>الزبون</th><th>المبلغ</th><th>المستند</th><th>طريقة الدفع</th><th style="width:50px"></th>
+    <th>التاريخ</th><th>الوقت</th><th>الزبون</th><th>تفاصيل</th><th>المبلغ</th><th>المستند</th><th>طريقة الدفع</th><th style="width:50px"></th>
   </tr></thead><tbody>`;
   list.forEach(h=>{
     const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ-u-nu-latn', {hour:'2-digit', minute:'2-digit'}) : '—';
+    const detailsFull = h.details || '—';
+    const detailsShort = detailsFull.length > 28 ? detailsFull.slice(0,28) + '…' : detailsFull;
     html += `<tr>
       <td>${h.date||'—'}</td>
       <td>${loggedTime}</td>
       <td>${h.customerName||'—'}</td>
+      <td title="${detailsFull.replace(/"/g,'&quot;')}">${detailsShort}</td>
       <td>${fmt(h.amount)}</td>
       <td>${h.docType||''} ${h.docNo?'#'+h.docNo:''}</td>
       <td>${h.method||'—'}</td>
