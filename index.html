@@ -148,6 +148,10 @@
   #receiptsTableWrap table, #invoicesTableWrap table, #expensesTableWrap table, #deliveryTrackWrap table, #measurementsTableWrap table, #paymentHistoryTableWrap table, #deliveredCustomersWrap table, #priceListGroupedWrap table{
     min-width:640px;
   }
+  #receiptsTableWrap table td, #invoicesTableWrap table td, #expensesTableWrap table td, #deliveryTrackWrap table td, #measurementsTableWrap table td, #paymentHistoryTableWrap table td, #deliveredCustomersWrap table td, #priceListGroupedWrap table td{
+    white-space:nowrap;
+  }
+  td.wrap-cell{ white-space:normal; }
   th,td{padding:10px 10px; text-align:right; border-bottom:1px solid var(--line);}
   th{color:var(--text-dim); font-weight:700; font-size:12.5px; background:var(--marble-2);}
   tbody tr:hover{background:var(--marble-2);}
@@ -2437,7 +2441,7 @@ function renderReceiptsTable(){
     html += `<tr>
       <td>${r.no}</td>
       <td>${r.name}</td>
-      <td>${details}</td>
+      <td class="wrap-cell">${details}</td>
       <td>${r.phone||'—'}</td>
       <td>${r.delivered ? '<span style="color:var(--verdigris-deep); font-weight:700;">✔ تم التسليم</span>' : daysUntilLabel(computeDeliveryDate(r))}</td>
       <td>${fmt(r.total)}</td>
@@ -3949,7 +3953,7 @@ function renderCustomerReports(){
         const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
         return `<tr>
           <td>${r.name}</td>
-          <td>${details}</td>
+          <td class="wrap-cell">${details}</td>
           <td>${r.date||''}</td>
           <td>${r.duration} يوم</td>
           <td>${deliveryDate}</td>
@@ -3985,7 +3989,7 @@ function renderCustomerReports(){
           : `<span style="color:var(--verdigris-deep); font-weight:700;">مدفوع</span>`;
         return `<tr>
           <td>${r.name}</td>
-          <td>${details}</td>
+          <td class="wrap-cell">${details}</td>
           <td>${r.phone||'—'}</td>
           <td>${r.date||''}</td>
           <td>${r.deliveredDate||'—'}</td>
