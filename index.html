@@ -788,7 +788,10 @@
   <div class="modal" style="max-width:760px;">
     <div class="modal-head">
       <h3 id="receiptModalTitle">وصل دفع جديد</h3>
-      <button class="close-x" data-close="receiptOverlay">×</button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button class="btn btn-sm" id="btnReceiptToQuote" style="display:none; font-size:12px; padding:4px 10px;" title="تحويل إلى عرض سعر">➜📄 عرض سعر</button>
+        <button class="close-x" data-close="receiptOverlay">×</button>
+      </div>
     </div>
     <div class="modal-body">
       <input type="hidden" id="rcpId">
@@ -854,7 +857,6 @@
     </div>
     <div class="modal-foot">
       <button class="btn" data-close="receiptOverlay">إلغاء</button>
-      <button class="btn" id="btnReceiptToQuote" style="display:none;">➜📄 تحويل إلى عرض سعر</button>
       <button class="btn btn-primary" id="btnSaveReceipt">حفظ الوصل</button>
       <button class="btn btn-primary" id="btnSaveAndPrint">حفظ وطباعة</button>
     </div>
