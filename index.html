@@ -149,11 +149,19 @@
     white-space:nowrap;
   }
   td.wrap-cell{ white-space:normal; }
-  /* البيان بالجداول: سطر واحد مرتب، والباقي "..." — كبسة عليه بتفتحه كامل وكبسة تانية بتسكره */
-  .details-wrap{ width:260px; max-width:260px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.5; cursor:pointer; }
-  .details-wrap.expanded{ white-space:normal; overflow-wrap:break-word; word-break:normal; }
-  @media (max-width: 700px){ .details-wrap{ width:190px; max-width:190px; } }
-  @media print{ .details-wrap{ width:auto; max-width:300px; white-space:normal; overflow:visible; } }
+  /* البيان بالجداول — كمبيوتر: سطرين بالأكتر والباقي "..." (التفاصيل الكاملة بفتح الوصل)، والجدول بيساع بدون تحريك يمين/يسار */
+  .details-wrap{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:normal; overflow-wrap:break-word; word-break:normal; min-width:140px; line-height:1.5; cursor:pointer; }
+  /* كبسة على البيان بتفتح كل التفاصيل، وكبسة تانية بترجعه سطرين */
+  .details-wrap.expanded{ display:block; -webkit-line-clamp:unset; overflow:visible; }
+  @media (min-width: 701px){
+    #receiptsTableWrap th, #receiptsTableWrap td{ padding:10px 7px; }
+  }
+  /* جوال: سطر واحد مرتب — كبسة عليه بتفتحه كامل وكبسة تانية بتسكره */
+  @media (max-width: 700px){
+    .details-wrap{ display:block; -webkit-line-clamp:unset; width:190px; max-width:190px; min-width:0; white-space:nowrap; text-overflow:ellipsis; cursor:pointer; }
+    .details-wrap.expanded{ white-space:normal; }
+  }
+  @media print{ .details-wrap{ display:block; -webkit-line-clamp:unset; width:auto; max-width:300px; white-space:normal; overflow:visible; } }
   th,td{padding:10px 10px; text-align:right; border-bottom:1px solid var(--line);}
   th{color:var(--text-dim); font-weight:700; font-size:12.5px; background:var(--marble-2);}
   tbody tr:hover{background:var(--marble-2);}
