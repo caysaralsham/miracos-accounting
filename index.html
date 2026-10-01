@@ -199,6 +199,24 @@
   .totals-row{display:flex; justify-content:space-between; padding:5px 0; font-size:13.5px;}
   .totals-row.grand{font-weight:800; font-size:15.5px; border-top:1px dashed var(--line); margin-top:6px; padding-top:10px;}
 
+  /* صورة المشاركة = نفس شكل صفحة الطباعة */
+  .receipt-view.share-page{ width:794px; border:none; border-radius:0; padding:38px 40px; margin:0; box-sizing:border-box; }
+  .share-page table{ font-size:14.5px; width:100%; }
+  .share-page th, .share-page td{ padding:8px 8px; }
+  textarea.desc-grow{ resize:none; overflow:hidden; line-height:1.45; min-height:38px; display:block; }
+  /* جوال: كل بند بطاقة — البيان كامل بسطر لحاله فوق، وتحته العدد والسعر والمبلغ */
+  @media (max-width: 700px){
+    table.items-editor:has(> #itemsBody) thead, table.items-editor:has(> #invItemsBody) thead{ display:none; }
+    #itemsBody tr, #invItemsBody tr{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:8px 0; border-bottom:1px solid var(--line); }
+    #itemsBody td, #invItemsBody td{ display:block; padding:0 !important; border:none !important; flex:1 1 0; min-width:0; }
+    #itemsBody td.desc-td, #invItemsBody td.desc-td{ flex:1 1 100%; order:-1; }
+    #itemsBody td:has(> .btn), #invItemsBody td:has(> .btn){ flex:0 0 auto; }
+    #itemsBody td.amount-cell, #invItemsBody td.amount-cell{ flex:1 1 auto; white-space:nowrap; text-align:center; }
+    #itemsBody td:has(> .it-qty), #invItemsBody td:has(> .inv-it-qty){ flex:0 0 72px; }
+    #itemsBody td:has(> .it-price), #invItemsBody td:has(> .inv-it-price){ flex:1 1 80px; }
+    #invItemsBody td:has(> .inv-it-unit){ flex:0 0 70px; }
+    #itemsBody td[colspan], #invItemsBody td[colspan]{ flex:1 1 100%; }
+  }
   .receipt-view{
     background:#fff; border:1px solid var(--line); border-radius:10px; padding:28px 30px; position:relative;
   }
@@ -1605,7 +1623,18 @@ document.getElementById('btnDisconnectFirebase').addEventListener('click', ()=>{
 });
 
 function uid(){ return 'id' + Date.now() + Math.floor(Math.random()*1000); }
-function fmt(n){ return (Number(n)||0).toLocaleString('ar-DZ-u-nu-latn') + ' دج'; }
+// تنسيق الأرقام يدوياً (أرقام لاتينية دايماً 0-9) — بعض الأجهزة كانت تطلع أرقام عربية ٠١٢ من إعدادات المتصفح
+function fmtNumLatn(n, maxFrac){
+  n = Number(n)||0; if(maxFrac===undefined) maxFrac = 3;
+  const neg = n < 0;
+  let [i, f] = Math.abs(n).toFixed(maxFrac).split('.');
+  f = (f||'').replace(/0+$/,'');
+  i = i.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return (neg?'-':'') + i + (f ? ','+f : '');
+}
+function fmtDateLatn(d){ d = d instanceof Date ? d : new Date(d); return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; }
+function fmtTimeLatn(d){ d = d instanceof Date ? d : new Date(d); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
+function fmt(n){ return fmtNumLatn(n) + ' دج'; }
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -2138,18 +2167,26 @@ function measResultFor(type, l, w, h){
   return {value: l*w, label: (l*w).toFixed(2)+' م²'};
 }
 
+function escHtmlText(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function autoGrow(el){ el.style.height = 'auto'; el.style.height = (el.scrollHeight + 2) + 'px'; }
+document.addEventListener('input', e=>{ if(e.target.classList && e.target.classList.contains('desc-grow')) autoGrow(e.target); });
+// Enter بالبيان ما بيعمل سطر جديد (البيان سطر واحد بيلتف لحاله)
+document.addEventListener('keydown', e=>{ if(e.key==='Enter' && e.target.classList && e.target.classList.contains('desc-grow')) e.preventDefault(); });
+function growAllDesc(root){ (root||document).querySelectorAll('.desc-grow').forEach(autoGrow); }
+
 function newItemRow(item){
   item = item || {qty:'', desc:'', price:''};
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td><input type="number" class="it-qty" value="${item.qty}" min="0" step="0.01"></td>
-    <td><input type="text" class="it-desc" value="${(item.desc||'').replace(/"/g,'&quot;')}"></td>
-    <td><input type="number" class="it-price" value="${item.price||''}" min="0"></td>
+    <td><input type="number" class="it-qty" value="${item.qty}" min="0" step="0.01" placeholder="العدد"></td>
+    <td class="desc-td"><textarea class="it-desc desc-grow" rows="1">${escHtmlText(item.desc||'')}</textarea></td>
+    <td><input type="number" class="it-price" value="${item.price||''}" min="0" placeholder="السعر"></td>
     <td class="amount-cell it-amount">0 دج</td>
     <td><button type="button" class="btn btn-ghost btn-sm it-measure" title="قياس">📐</button></td>
     <td><button class="btn btn-ghost btn-sm it-remove">✕</button></td>
   `;
   document.getElementById('itemsBody').appendChild(row);
+  requestAnimationFrame(()=>autoGrow(row.querySelector('.it-desc')));
   const qty = row.querySelector('.it-qty');
   const price = row.querySelector('.it-price');
   const amount = row.querySelector('.it-amount');
@@ -2272,7 +2309,7 @@ function openItemMeasureTool(row, qtyInput){
     const descIn = row.querySelector('.it-desc');
     if(descIn){
       const note = measurementNoteText(t, lIn.value, wIn.value, hIn.value, count, total);
-      descIn.value = descIn.value.trim() ? `${descIn.value.trim()} ${note}` : note;
+      descIn.value = descIn.value.trim() ? `${descIn.value.trim()} ${note}` : note; autoGrow(descIn);
     }
     mRow.remove();
   });
@@ -2454,6 +2491,7 @@ function openReceiptModal(receipt){
   // زر "تحويل إلى عرض سعر" بيظهر بس بتعديل وصل محفوظ (مش بالوصل الجديد ولا النسخة ولا المحوّل)
   document.getElementById('btnReceiptToQuote').style.display = (receipt && receipt.id) ? '' : 'none';
   document.getElementById('receiptOverlay').classList.add('show');
+  requestAnimationFrame(()=>growAllDesc(document.getElementById('receiptOverlay')));
 }
 
 // تحويل الوصل المفتوح للتعديل إلى عرض سعر مبسط جديد — الوصل الأصلي بيضل متل ما هو
@@ -2918,8 +2956,7 @@ document.getElementById('btnShareReceipt').addEventListener('click', async ()=>{
   const area = document.getElementById('receiptPrintArea');
   let blob;
   try{
-    const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:1200});
-    blob = await new Promise(res=>canvas.toBlob(res, 'image/jpeg', 0.92));
+    blob = await captureAsPage(area);
   }catch(e){
     console.error(e);
     toast('تعذر إنشاء الصورة');
@@ -2931,6 +2968,26 @@ document.getElementById('btnShareReceipt').addEventListener('click', async ()=>{
   shareImageChoice(blob, fileName, shareTitle, r.phone);
 });
 
+
+// صورة المشاركة بشكل صفحة الطباعة: نسخة من الوصل بعرض ورقة A4 (794px) بدل عرض النافذة الضيقة
+async function captureAsPage(area){
+  const holder = document.createElement('div');
+  holder.style.cssText = 'position:fixed; top:0; left:0; width:794px; background:#fff; z-index:-1; pointer-events:none;';
+  const clone = area.cloneNode(true);
+  clone.removeAttribute('id');
+  clone.classList.add('share-page');
+  // المبالغ والأسعار ما تنكسر على سطرين
+  clone.querySelectorAll('td, th').forEach(c=>{ const t = c.textContent.trim(); if(/دج|^[\d.,\s×x*]+$/.test(t) && t.length < 25) c.style.whiteSpace = 'nowrap'; });
+  holder.appendChild(clone);
+  document.body.appendChild(holder);
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  try{
+    const canvas = await html2canvas(clone, {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:1200, width:794});
+    return await new Promise(res=>canvas.toBlob(res, 'image/jpeg', 0.92));
+  } finally {
+    holder.remove();
+  }
+}
 
 // ---------- مشاركة: خيار حفظ الصورة أو إرسالها على واتساب ----------
 function waPhone(phone){
@@ -2987,15 +3044,16 @@ function newInvoiceItemRow(item){
   item = item || {qty:'', desc:'', unit:'', price:''};
   const row = document.createElement('tr');
   row.innerHTML = `
-    <td><input type="number" class="inv-it-qty" value="${item.qty}" min="0" step="0.01"></td>
-    <td><input type="text" class="inv-it-desc" value="${(item.desc||'').replace(/"/g,'&quot;')}"></td>
+    <td><input type="number" class="inv-it-qty" value="${item.qty}" min="0" step="0.01" placeholder="العدد"></td>
+    <td class="desc-td"><textarea class="inv-it-desc desc-grow" rows="1">${escHtmlText(item.desc||'')}</textarea></td>
     <td><input type="text" class="inv-it-unit" list="unitOptions" value="${(item.unit||'').replace(/"/g,'&quot;')}" placeholder="الوحدة"></td>
-    <td><input type="number" class="inv-it-price" value="${item.price||''}" min="0"></td>
+    <td><input type="number" class="inv-it-price" value="${item.price||''}" min="0" placeholder="السعر"></td>
     <td class="amount-cell inv-it-amount">0 دج</td>
     <td><button type="button" class="btn btn-ghost btn-sm inv-it-measure" title="قياس">📐</button></td>
     <td><button class="btn btn-ghost btn-sm inv-it-remove">✕</button></td>
   `;
   document.getElementById('invItemsBody').appendChild(row);
+  requestAnimationFrame(()=>autoGrow(row.querySelector('.inv-it-desc')));
   const qty = row.querySelector('.inv-it-qty');
   const price = row.querySelector('.inv-it-price');
   const amount = row.querySelector('.inv-it-amount');
@@ -3067,7 +3125,7 @@ function openInvoiceItemMeasureTool(row, qtyInput){
     const descIn = row.querySelector('.inv-it-desc');
     if(descIn){
       const note = measurementNoteText(t, lIn.value, wIn.value, hIn.value, count, total);
-      descIn.value = descIn.value.trim() ? `${descIn.value.trim()} ${note}` : note;
+      descIn.value = descIn.value.trim() ? `${descIn.value.trim()} ${note}` : note; autoGrow(descIn);
     }
     mRow.remove();
   });
@@ -3204,6 +3262,7 @@ function openInvoiceModal(invoice){
   updateInvNoLabel();
   recalcInvoiceTotals();
   document.getElementById('invoiceOverlay').classList.add('show');
+  requestAnimationFrame(()=>growAllDesc(document.getElementById('invoiceOverlay')));
 }
 document.getElementById('btnNewInvoice').addEventListener('click', ()=>openInvoiceModal(null));
 
@@ -3524,8 +3583,7 @@ async function shareInvoiceById(id){
   const area = document.getElementById('invoicePrintArea');
   let blob;
   try{
-    const canvas = await html2canvas(area, {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:1200});
-    blob = await new Promise(res=>canvas.toBlob(res, 'image/jpeg', 0.92));
+    blob = await captureAsPage(area);
   }catch(e){
     console.error(e);
     toast('تعذر إنشاء الصورة');
@@ -4397,7 +4455,7 @@ function renderPaymentHistoryTable(){
     <th>التاريخ</th><th>الوقت</th><th>الزبون</th><th>تفاصيل</th><th>المبلغ</th><th>المستند</th><th>طريقة الدفع</th><th style="width:50px"></th>
   </tr></thead><tbody>`;
   list.forEach(h=>{
-    const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ-u-nu-latn', {hour:'2-digit', minute:'2-digit'}) : '—';
+    const loggedTime = h.loggedAt ? fmtTimeLatn(h.loggedAt) : '—';
     const detailsFull = h.details || '—';
     html += `<tr>
       <td>${h.date||'—'}</td>
@@ -4431,7 +4489,7 @@ document.getElementById('btnPrintPaymentHistory').addEventListener('click', ()=>
   const list = getFilteredPaymentHistory();
   if(list.length === 0){ toast('لا توجد دفعات لطباعتها'); return; }
   const rows = list.map(h=>{
-    const loggedTime = h.loggedAt ? new Date(h.loggedAt).toLocaleTimeString('ar-DZ-u-nu-latn', {hour:'2-digit', minute:'2-digit'}) : '';
+    const loggedTime = h.loggedAt ? fmtTimeLatn(h.loggedAt) : '';
     const docPart = h.docType ? `${h.docType}${h.docNo?' #'+h.docNo:''}` : '';
     return {
       date: h.date || '',
@@ -4461,7 +4519,7 @@ function showLedger(title, rows){
               <img src="${settings.logo}" style="width:60px; height:60px;">
               <div>
                 <div class="name" style="font-size:16px;">${settings.companyName}</div>
-                <div class="meta" style="font-size:12px;">${title} — ${new Date().toLocaleDateString('ar-DZ-u-nu-latn')}</div>
+                <div class="meta" style="font-size:12px;">${title} — ${fmtDateLatn(new Date())}</div>
               </div>
             </div>
           </div>
@@ -4511,7 +4569,7 @@ document.getElementById('btnPrintExpenseLedger').addEventListener('click', ()=>{
 
 document.getElementById('btnPrintLedger').addEventListener('click', ()=>window.print());
 
-document.getElementById('todayDate').textContent = new Date().toLocaleDateString('ar-DZ-u-nu-latn', {year:'numeric', month:'2-digit', day:'2-digit'});
+document.getElementById('todayDate').textContent = fmtDateLatn(new Date());
 
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=>{
