@@ -1793,75 +1793,202 @@ if(btnLogoutApp){
   });
 }
 
+// ---------- كاتب ملف Excel حقيقي (.xlsx) بدون مكتبات — بدل ملف HTML يلي كان يطلع تحذير بالإكسل ----------
+const XLSX_CRC_TABLE = (()=>{ const t = new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c = (c&1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1); t[n]=c>>>0; } return t; })();
+function xlsxCrc32(bytes){ let c = 0xFFFFFFFF; for(let i=0;i<bytes.length;i++) c = XLSX_CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c>>>8); return (c ^ 0xFFFFFFFF)>>>0; }
+function xlsxZip(files){ // files: [{name, text}] — ضغط "store" بدون تصغير
+  const enc = new TextEncoder(); const parts = []; const central = []; let offset = 0;
+  files.forEach(f=>{
+    const name = enc.encode(f.name), data = enc.encode(f.text), crc = xlsxCrc32(data);
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0x0800,true); lh.setUint16(8,0,true);
+    lh.setUint16(10,0,true); lh.setUint16(12,0x21,true); lh.setUint32(14,crc,true); lh.setUint32(18,data.length,true);
+    lh.setUint32(22,data.length,true); lh.setUint16(26,name.length,true); lh.setUint16(28,0,true);
+    parts.push(new Uint8Array(lh.buffer), name, data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint16(8,0x0800,true); ch.setUint16(10,0,true);
+    ch.setUint16(12,0,true); ch.setUint16(14,0x21,true); ch.setUint32(16,crc,true); ch.setUint32(20,data.length,true); ch.setUint32(24,data.length,true);
+    ch.setUint16(28,name.length,true); ch.setUint16(30,0,true); ch.setUint16(32,0,true); ch.setUint16(34,0,true); ch.setUint16(36,0,true);
+    ch.setUint32(38,0,true); ch.setUint32(42,offset,true);
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30 + name.length + data.length;
+  });
+  const cdSize = central.reduce((s,a)=>s+a.length,0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0,0x06054b50,true); end.setUint16(8,files.length,true); end.setUint16(10,files.length,true);
+  end.setUint32(12,cdSize,true); end.setUint32(16,offset,true);
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function xlsxEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function xlsxCol(i){ return String.fromCharCode(65+i); }
+// rows: [{height?, cells:[{v, s, span, f}]}] — كل صف 6 أعمدة (A..F)
+function buildXlsx(rows, colWidths){
+  const merges = []; let sheetRows = '';
+  rows.forEach((row, ri)=>{
+    const r = ri+1; let col = 0; let cellsXml = '';
+    (row.cells||[]).forEach(c=>{
+      const span = c.span||1, ref = xlsxCol(col)+r, s = c.s||0;
+      if(c.f){ cellsXml += `<c r="${ref}" s="${s}"><f>${xlsxEsc(c.f)}</f><v>${Number(c.v)||0}</v></c>`; }
+      else if(typeof c.v === 'number'){ cellsXml += `<c r="${ref}" s="${s}"><v>${c.v}</v></c>`; }
+      else if(c.v!==undefined && c.v!==''){ cellsXml += `<c r="${ref}" s="${s}" t="inlineStr"><is><t xml:space="preserve">${xlsxEsc(c.v)}</t></is></c>`; }
+      else { cellsXml += `<c r="${ref}" s="${s}"/>`; }
+      for(let k=1;k<span;k++) cellsXml += `<c r="${xlsxCol(col+k)}${r}" s="${s}"/>`;
+      if(span>1) merges.push(`${ref}:${xlsxCol(col+span-1)}${r}`);
+      col += span;
+    });
+    sheetRows += `<row r="${r}"${row.height?` ht="${row.height}" customHeight="1"`:''}>${cellsXml}</row>`;
+  });
+  const cols = colWidths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('');
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
+<sheetViews><sheetView rightToLeft="1" workbookViewId="0"/></sheetViews>
+<sheetFormatPr defaultRowHeight="20"/>
+<cols>${cols}</cols>
+<sheetData>${sheetRows}</sheetData>
+${merges.length?`<mergeCells count="${merges.length}">${merges.map(m=>`<mergeCell ref="${m}"/>`).join('')}</mergeCells>`:''}
+<printOptions horizontalCentered="1"/>
+<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.6" header="0.3" footer="0.3"/>
+<pageSetup paperSize="9" orientation="portrait" fitToWidth="1" fitToHeight="0"/>
+<headerFooter><oddFooter>&amp;C&amp;P / &amp;N</oddFooter></headerFooter>
+</worksheet>`;
+  const B = '<border><left style="thin"><color rgb="FF999999"/></left><right style="thin"><color rgb="FF999999"/></right><top style="thin"><color rgb="FF999999"/></top><bottom style="thin"><color rgb="FF999999"/></bottom><diagonal/></border>';
+  const fill = rgb => `<fill><patternFill patternType="solid"><fgColor rgb="FF${rgb}"/><bgColor indexed="64"/></patternFill></fill>`;
+  const xf = (font, fillId, border, h, num) => `<xf numFmtId="${num||0}" fontId="${font}" fillId="${fillId}" borderId="${border}" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"${num?' applyNumberFormat="1"':''}><alignment horizontal="${h}" vertical="center" wrapText="1" readingOrder="2"/></xf>`;
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts>
+<fonts count="7">
+<font><sz val="11"/><name val="Arial"/></font>
+<font><b/><sz val="16"/><name val="Arial"/></font>
+<font><sz val="10"/><color rgb="FF666666"/><name val="Arial"/></font>
+<font><b/><sz val="11"/><name val="Arial"/></font>
+<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font>
+<font><b/><sz val="11"/><color rgb="FFB3261E"/><name val="Arial"/></font>
+<font><b/><sz val="13"/><name val="Arial"/></font>
+</fonts>
+<fills count="7"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fill('ECE7DC')}${fill('B08D3E')}${fill('F2EEE4')}${fill('E3EEE9')}${fill('F3E2E0')}</fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>${B}</borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="15">
+<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+${xf(1,0,0,'center')}
+${xf(2,0,0,'center')}
+${xf(3,2,1,'right')}
+${xf(4,3,1,'center')}
+${xf(0,0,1,'right')}
+${xf(0,0,1,'center')}
+${xf(0,0,1,'center',164)}
+${xf(3,4,1,'right')}
+${xf(3,4,1,'center',164)}
+${xf(6,5,1,'right')}
+${xf(6,5,1,'center',164)}
+${xf(6,6,1,'right')}
+${xf(6,6,1,'center',164)}
+${xf(5,0,1,'center',164)}
+</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+  const files = [
+    {name:'[Content_Types].xml', text:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`},
+    {name:'_rels/.rels', text:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`},
+    {name:'xl/workbook.xml', text:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets><sheet name="التقرير" sheetId="1" r:id="rId1"/></sheets><calcPr calcId="124519" fullCalcOnLoad="1"/></workbook>`},
+    {name:'xl/_rels/workbook.xml.rels', text:`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`},
+    {name:'xl/styles.xml', text:styles},
+    {name:'xl/worksheets/sheet1.xml', text:sheet}
+  ];
+  return xlsxZip(files);
+}
+
 function exportExcelReport(silent){
   try{
-    const fmt2 = (n)=> (Number(n)||0).toLocaleString('ar-DZ-u-nu-latn');
-    const th = (text, colspan)=>`<th colspan="${colspan||1}" style="border:1px solid #444; background:#B08D3E; color:#fff; padding:6px 10px; font-weight:bold; text-align:center;">${text}</th>`;
-    const td = (text, opts)=>{
-      opts = opts || {};
-      const align = opts.align || 'center';
-      const bold = opts.bold ? 'font-weight:bold;' : '';
-      const bg = opts.bg || '#fff';
-      return `<td colspan="${opts.colspan||1}" style="border:1px solid #999; background:${bg}; padding:5px 10px; text-align:${align}; ${bold}">${text}</td>`;
-    };
-    const sectionTitle = (text)=>`<tr>${td(text,{colspan:6, bold:true, bg:'#ECE7DC', align:'right'})}</tr>`;
-    const blankRow = ()=>`<tr>${td('',{colspan:6, bg:'#fff'})}</tr>`;
+    // أرقام الستايلات (راجع cellXfs بـ buildXlsx)
+    const S = {title:1, sub:2, section:3, head:4, txtR:5, txtC:6, num:7, totLbl:8, totNum:9, netPosLbl:10, netPosNum:11, netNegLbl:12, netNegNum:13, numRed:14};
+    const rows = [];
+    const add = (cells, height)=>{ rows.push({cells, height}); return rows.length; };
+    const blank = ()=>add([{v:'', span:6}]);
 
-    let rows = '';
-    rows += `<tr><td colspan="6" style="text-align:center; font-size:18px; font-weight:bold; padding:10px; border:1px solid #444;">${settings.companyName||'ميراكوس كنستريكسون'}</td></tr>`;
-    rows += `<tr><td colspan="6" style="text-align:center; font-size:13px; padding:6px; border:1px solid #999; color:#555;">تقرير مالي — ${new Date().toLocaleDateString('ar-DZ-u-nu-latn')}</td></tr>`;
-    rows += blankRow();
+    // الحسابات بنفس طريقة صفحة التقارير بالبرنامج
+    const commissionPercent = Number(settings.commissionPercent)||0;
+    let totalIncomeInvoiced = 0, totalIncomePaid = 0, totalExpenses = 0;
+    receipts.forEach(r=>{ totalIncomeInvoiced += Number(r.total)||0; totalIncomePaid += getReceiptPayments(r).reduce((s,p)=>s+(Number(p.amount)||0),0); });
+    expenses.forEach(e=>{ totalExpenses += Number(e.amount)||0; });
+    const commission = totalIncomePaid * commissionPercent/100;
+    const net = totalIncomePaid - commission - totalExpenses;
 
-    rows += sectionTitle('قسم الدخل — الزبائن');
-    rows += `<tr>${th('رقم الوصل')}${th('التاريخ')}${th('الاسم')}${th('المجموع')}${th('المدفوع')}${th('الباقي')}</tr>`;
-    let totalIncomeInvoiced = 0, totalIncomePaid = 0;
+    add([{v: settings.companyName||'ميراكوس كنستريكسون', s:S.title, span:6}], 30);
+    add([{v:`تقرير مالي — ${new Date().toISOString().slice(0,10).split('-').reverse().join('/')}`, s:S.sub, span:6}]);
+    blank();
+
+    // ===== جدول الملخص: الدخل، المصروف، العمولة، الصافي =====
+    add([{v:'الملخص', s:S.section, span:6}], 24);
+    add([{v:'البيان', s:S.head, span:4},{v:'المبلغ (دج)', s:S.head, span:2}], 22);
+    const sumIncomeRow = rows.length+1;
+    // الخلايا رح تتعبّى بالمعادلات بعد ما نعرف أرقام صفوف الجداول التحت
+    const summaryIdx = rows.length;
+    add([]); add([]); add([]); add([]);
+    blank();
+
+    // ===== قسم الدخل =====
+    add([{v:'قسم الدخل — الزبائن', s:S.section, span:6}], 24);
+    add([{v:'رقم الوصل',s:S.head},{v:'التاريخ',s:S.head},{v:'الاسم',s:S.head},{v:'المجموع',s:S.head},{v:'المدفوع',s:S.head},{v:'الباقي',s:S.head}], 22);
+    const incFirst = rows.length+1;
     receipts.forEach(r=>{
       const paid = getReceiptPayments(r).reduce((s,p)=>s+(Number(p.amount)||0),0);
       const total = Number(r.total)||0;
-      totalIncomeInvoiced += total;
-      totalIncomePaid += paid;
-      rows += `<tr>${td(r.no||'')}${td(r.date||'')}${td(r.name||'', {align:'right'})}${td(fmt2(total))}${td(fmt2(paid))}${td(fmt2(total-paid))}</tr>`;
+      const rn = rows.length+1;
+      add([{v:String(r.no||''),s:S.txtC},{v:r.date||'',s:S.txtC},{v:r.name||'',s:S.txtR},{v:total,s:S.num},{v:paid,s:S.num},{v:total-paid,s:S.num,f:`D${rn}-E${rn}`}]);
     });
-    rows += `<tr>${td('',{colspan:2})}${td('إجمالي الدخل',{bold:true, bg:'#F2EEE4', align:'right'})}${td(fmt2(totalIncomeInvoiced),{bold:true, bg:'#F2EEE4'})}${td(fmt2(totalIncomePaid),{bold:true, bg:'#F2EEE4'})}${td(fmt2(totalIncomeInvoiced-totalIncomePaid),{bold:true, bg:'#F2EEE4'})}</tr>`;
-    rows += blankRow();
+    const incLast = Math.max(rows.length, incFirst);
+    const incTotRow = rows.length+1;
+    const sumF = (col, a, b) => b>=a && receipts.length ? `SUM(${col}${a}:${col}${b})` : '0';
+    add([{v:'',s:S.totLbl,span:2},{v:'إجمالي الدخل',s:S.totLbl},
+      {v:totalIncomeInvoiced,s:S.totNum,f:sumF('D',incFirst,incLast)},
+      {v:totalIncomePaid,s:S.totNum,f:sumF('E',incFirst,incLast)},
+      {v:totalIncomeInvoiced-totalIncomePaid,s:S.totNum,f:sumF('F',incFirst,incLast)}], 22);
+    blank();
 
-    rows += sectionTitle('قسم المصاريف');
-    rows += `<tr>${th('التاريخ',1)}${th('البيان',2)}${th('الفئة',2)}${th('المبلغ',1)}</tr>`;
-    let totalExpenses = 0;
+    // ===== قسم المصاريف =====
+    add([{v:'قسم المصاريف', s:S.section, span:6}], 24);
+    add([{v:'التاريخ',s:S.head},{v:'البيان',s:S.head,span:2},{v:'الفئة',s:S.head,span:2},{v:'المبلغ',s:S.head}], 22);
+    const expFirst = rows.length+1;
     expenses.forEach(e=>{
-      const amount = Number(e.amount)||0;
-      totalExpenses += amount;
-      rows += `<tr>${td(e.date||'')}${td(e.desc||'', {colspan:2, align:'right'})}${td(e.category||'', {colspan:2})}${td(fmt2(amount))}</tr>`;
+      add([{v:e.date||'',s:S.txtC},{v:e.desc||'',s:S.txtR,span:2},{v:e.category||'',s:S.txtC,span:2},{v:Number(e.amount)||0,s:S.num}]);
     });
-    rows += `<tr>${td('',{colspan:2})}${td('إجمالي المصاريف',{colspan:2, bold:true, bg:'#F2EEE4', align:'right'})}${td(fmt2(totalExpenses),{bold:true, bg:'#F2EEE4'})}</tr>`;
-    rows += blankRow();
+    const expLast = rows.length;
+    const expTotRow = rows.length+1;
+    add([{v:'',s:S.totLbl,span:2},{v:'إجمالي المصاريف',s:S.totLbl,span:3},
+      {v:totalExpenses,s:S.totNum,f: expenses.length ? `SUM(F${expFirst}:F${expLast})` : '0'}], 22);
 
-    const net = totalIncomePaid - totalExpenses;
-    const netColor = net>=0 ? '#E3EEE9' : '#F3E2E0';
-    rows += `<tr>${td('الرصيد الصافي (المقبوضات − المصاريف)',{colspan:5, bold:true, bg:netColor, align:'right'})}${td(fmt2(net),{bold:true, bg:netColor})}</tr>`;
+    // تعبئة جدول الملخص بمعادلات مربوطة بالجداول
+    const r1 = summaryIdx+1, r2 = r1+1, r3 = r1+2, r4 = r1+3;
+    const netPos = net >= 0;
+    rows[summaryIdx]   = {height:22, cells:[{v:'الدخل (المقبوضات فعلياً)',s:S.txtR,span:4},{v:totalIncomePaid,s:S.num,span:2,f:`E${incTotRow}`}]};
+    rows[summaryIdx+1] = {height:22, cells:[{v:'المصروف',s:S.txtR,span:4},{v:totalExpenses,s:S.num,span:2,f:`F${expTotRow}`}]};
+    rows[summaryIdx+2] = {height:22, cells:[{v:`العمولة (${commissionPercent}% من الدخل)`,s:S.txtR,span:4},{v:commission,s:S.numRed,span:2,f:`E${r1}*${commissionPercent}/100`}]};
+    rows[summaryIdx+3] = {height:26, cells:[{v:'الصافي (الدخل − العمولة − المصروف)',s:netPos?S.netPosLbl:S.netNegLbl,span:4},{v:net,s:netPos?S.netPosNum:S.netNegNum,span:2,f:`E${r1}-E${r3}-E${r2}`}]};
 
-    const html = `
-      <html dir="rtl"><head><meta charset="UTF-8"></head>
-      <body style="font-family:Arial;">
-      <table style="border-collapse:collapse; width:100%; direction:rtl;">${rows}</table>
-      </body></html>`;
-
-    const blob = new Blob(['\ufeff' + html], {type:'application/vnd.ms-excel'});
+    const blob = buildXlsx(rows, [12, 13, 28, 15, 15, 15]);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     const dateStr = new Date().toISOString().slice(0,10);
     a.href = url;
-    a.download = `تقرير-ميراكوس-${dateStr}.xls`;
+    a.download = `تقرير-ميراكوس-${dateStr}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    if(!silent) toast('تم تحميل النسخة الاحتياطية');
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    if(!silent) toast('تم تحميل تقرير Excel');
   }catch(e){
     console.error(e);
-    if(!silent) toast('تعذر إنشاء النسخة الاحتياطية');
+    if(!silent) toast('تعذر إنشاء ملف Excel');
   }
 }
+
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
