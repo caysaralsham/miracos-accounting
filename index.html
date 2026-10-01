@@ -567,12 +567,14 @@
           <button class="btn" id="btnMeasAddSq">+ جدول متر مربع</button>
           <button class="btn" id="btnMeasAddLen">+ جدول متر طول</button>
           <button class="btn" id="btnMeasAddCube">+ جدول متر مكعب</button>
+          <button class="btn" id="btnMeasAddCol">+ جدول عامود</button>
         </div>
 
         <div style="display:flex; gap:8px; margin-top:16px; border-top:1px solid var(--line); padding-top:14px; flex-wrap:wrap;">
           <button class="btn btn-primary" id="btnMeasSaveOnly">حفظ فقط</button>
           <button class="btn btn-primary" id="btnMeasSavePrint">حفظ وطباعة</button>
           <button class="btn btn-primary" id="btnMeasConvertReceipt">تحويل لوصل دفع</button>
+          <button class="btn btn-primary" id="btnMeasConvertQuote">تحويل لعرض سعر</button>
         </div>
       </div>
 
@@ -865,6 +867,7 @@
         <button type="button" class="btn btn-sm" id="btnRcpMeasAddSq">+ جدول متر مربع</button>
         <button type="button" class="btn btn-sm" id="btnRcpMeasAddLen">+ جدول متر طول</button>
         <button type="button" class="btn btn-sm" id="btnRcpMeasAddCube">+ جدول متر مكعب</button>
+        <button type="button" class="btn btn-sm" id="btnRcpMeasAddCol">+ جدول عامود</button>
       </div>
     </div>
     <div class="modal-foot">
@@ -1992,6 +1995,8 @@ function measResultFor(type, l, w, h){
   l = parseFloat(l)||0; w = parseFloat(w)||0; h = parseFloat(h)||0;
   if(type==='طول') return {value: l, label: l.toFixed(2)+' م.ط'};
   if(type==='مكعب') return {value: l*w*h, label: (l*w*h).toFixed(3)+' م³'};
+  // عامود: القطر بالسنتي (l) × 3.14 × الارتفاع بالمتر (w) = مساحة الدوران م²
+  if(type==='عامود'){ const a = (l/100)*3.14*w; return {value: a, label: a.toFixed(2)+' م²'}; }
   return {value: l*w, label: (l*w).toFixed(2)+' م²'};
 }
 
@@ -2709,6 +2714,7 @@ function viewReceipt(id){
         ${t['مربع']>0 ? `<div><b>إجمالي متر مربع:</b> ${t['مربع'].toFixed(2)} م²</div>` : ''}
         ${t['طول']>0 ? `<div><b>إجمالي متر طول:</b> ${t['طول'].toFixed(2)} م.ط</div>` : ''}
         ${t['مكعب']>0 ? `<div><b>إجمالي متر مكعب:</b> ${t['مكعب'].toFixed(3)} م³</div>` : ''}
+        ${t['عامود']>0 ? `<div><b>إجمالي العواميد:</b> ${t['عامود'].toFixed(2)} م²</div>` : ''}
       </div>`;
     measTablesHtml = `
       <hr style="margin:18px 0; border:none; border-top:1px dashed var(--line);">
@@ -2784,23 +2790,60 @@ document.getElementById('btnShareReceipt').addEventListener('click', async ()=>{
   if(!blob){ toast('تعذر إنشاء الصورة'); return; }
 
   const fileName = `وصل-${r.no}.jpg`.replace(/\s+/g,'-');
-  const file = new File([blob], fileName, {type:'image/jpeg'});
+  shareImageChoice(blob, fileName, shareTitle, r.phone);
+});
 
-  if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{
-      await navigator.share({ files:[file], title: shareTitle });
-      return;
-    }catch(e){
-      if(e && e.name === 'AbortError') return;
-    }
-  }
+
+// ---------- مشاركة: خيار حفظ الصورة أو إرسالها على واتساب ----------
+function waPhone(phone){
+  let d = String(phone||'').replace(/[^0-9]/g,'');
+  if(d.startsWith('00')) d = d.slice(2);
+  if(d.startsWith('0')) d = '213' + d.slice(1);
+  return d;
+}
+function downloadBlob(blob, fileName){
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = fileName;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast('تم تحميل صورة الوصل — ارفعها يدوياً بواتساب');
-});
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+function shareImageChoice(blob, fileName, title, phone){
+  const old = document.getElementById('shareChoiceOverlay');
+  if(old) old.remove();
+  const ov = document.createElement('div');
+  ov.id = 'shareChoiceOverlay';
+  ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:99999; padding:16px;';
+  ov.innerHTML = `<div style="background:var(--marble,#faf8f4); border-radius:14px; padding:20px; width:100%; max-width:320px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,.25);">
+    <div style="font-weight:800; margin-bottom:14px;">${title}</div>
+    <button type="button" class="btn btn-primary" data-act="save" style="width:100%; margin-bottom:8px;">💾 حفظ الصورة</button>
+    <button type="button" class="btn" data-act="wa" style="width:100%; margin-bottom:8px; background:#25D366; color:#fff; border-color:#25D366;">إرسال على واتساب</button>
+    <button type="button" class="btn btn-ghost" data-act="cancel" style="width:100%;">إلغاء</button>
+  </div>`;
+  document.body.appendChild(ov);
+  const close = ()=>ov.remove();
+  ov.addEventListener('click', e=>{ if(e.target===ov) close(); });
+  ov.querySelector('[data-act="cancel"]').addEventListener('click', close);
+  ov.querySelector('[data-act="save"]').addEventListener('click', ()=>{
+    close();
+    downloadBlob(blob, fileName);
+    toast('تم حفظ الصورة');
+  });
+  ov.querySelector('[data-act="wa"]').addEventListener('click', async ()=>{
+    close();
+    const file = new File([blob], fileName, {type:'image/jpeg'});
+    // الجوال: بتفتح قائمة المشاركة وبتختار واتساب، والصورة مرفقة
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({ files:[file], title }); return; }
+      catch(e){ if(e && e.name === 'AbortError') return; }
+    }
+    // الكمبيوتر: المتصفح ما بيقدر يرفق صورة لواتساب لحاله — بننزّل الصورة وبنفتح محادثة الزبون
+    downloadBlob(blob, fileName);
+    const p = waPhone(phone);
+    window.open(p ? `https://wa.me/${p}` : 'https://web.whatsapp.com/', '_blank');
+    toast('نزلت الصورة — اسحبها على محادثة واتساب');
+  });
+}
 
 function newInvoiceItemRow(item){
   item = item || {qty:'', desc:'', unit:'', price:''};
@@ -3354,22 +3397,7 @@ async function shareInvoiceById(id){
   if(!blob){ toast('تعذر إنشاء الصورة'); return; }
 
   const fileName = `${docLabel}-${inv.no}.jpg`.replace(/\s+/g,'-');
-  const file = new File([blob], fileName, {type:'image/jpeg'});
-
-  if(navigator.canShare && navigator.canShare({files:[file]})){
-    try{
-      await navigator.share({ files:[file], title: shareTitle });
-      return;
-    }catch(e){
-      if(e && e.name === 'AbortError') return;
-    }
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = fileName;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast('تم تحميل صورة المستند — ارفعها يدوياً بواتساب');
+  shareImageChoice(blob, fileName, shareTitle, inv.clientPhone);
 }
 
 document.getElementById('btnShareInvoice').addEventListener('click', ()=>{
@@ -3483,16 +3511,17 @@ async function deleteExpense(id){
 const MEAS_SPECS = {
   'مربع': {label:'متر مربع', cols:['طول (م)','عرض (م)']},
   'طول': {label:'متر طول', cols:['طول (م)','العرض (مرجعي، م)']},
-  'مكعب': {label:'متر مكعب', cols:['طول (م)','عرض (م)','سماكة (م)']}
+  'مكعب': {label:'متر مكعب', cols:['طول (م)','عرض (م)','سماكة (م)']},
+  'عامود': {label:'عامود (القطر × 3.14 × الارتفاع = م²)', cols:['القطر (سم)','الارتفاع (م)']}
 };
 
 function computeMeasTotalsFrom(tables){
-  const totals = {'مربع':0, 'طول':0, 'مكعب':0};
+  const totals = {'مربع':0, 'طول':0, 'مكعب':0, 'عامود':0};
   tables.forEach(tbl=>{
     tbl.rows.forEach(r=>{
       const count = r.count===undefined || r.count===null || r.count==='' ? 1 : (Number(r.count)||1);
       const base = measResultFor(tbl.type, r.l, r.w, r.h);
-      totals[tbl.type] += base.value * count;
+      totals[tbl.type] = (totals[tbl.type]||0) + base.value * count;
     });
   });
   return totals;
@@ -3508,7 +3537,8 @@ function renderMeasTotals(tables, targetEl){
   </div>`;
   el.innerHTML = card('إجمالي متر مربع', totals['مربع'], 'م²')
     + card('إجمالي متر طول', totals['طول'], 'م.ط')
-    + card('إجمالي متر مكعب', totals['مكعب'], 'م³');
+    + card('إجمالي متر مكعب', totals['مكعب'], 'م³')
+    + (tables.some(t=>t.type==='عامود') ? card('إجمالي العواميد', totals['عامود'], 'م²') : '');
 }
 
 function emptyMeasRow(){ return {l:'', w:'', h:'', count:1}; }
@@ -3636,6 +3666,7 @@ function addMeasTable(type){
 document.getElementById('btnMeasAddSq').addEventListener('click', ()=>addMeasTable('مربع'));
 document.getElementById('btnMeasAddLen').addEventListener('click', ()=>addMeasTable('طول'));
 document.getElementById('btnMeasAddCube').addEventListener('click', ()=>addMeasTable('مكعب'));
+document.getElementById('btnMeasAddCol').addEventListener('click', ()=>addMeasTable('عامود'));
 
 // ---------- جداول القياسات المرفقة بنافذة الوصل (قابلة للتعديل والإضافة حتى بعد الحفظ) ----------
 let receiptMeasTables = [];
@@ -3741,6 +3772,7 @@ function addReceiptMeasTable(type){
 document.getElementById('btnRcpMeasAddSq').addEventListener('click', ()=>addReceiptMeasTable('مربع'));
 document.getElementById('btnRcpMeasAddLen').addEventListener('click', ()=>addReceiptMeasTable('طول'));
 document.getElementById('btnRcpMeasAddCube').addEventListener('click', ()=>addReceiptMeasTable('مكعب'));
+document.getElementById('btnRcpMeasAddCol').addEventListener('click', ()=>addReceiptMeasTable('عامود'));
 
 function buildMeasurementRecord(){
   const name = document.getElementById('measCustomerName').value.trim();
@@ -3790,14 +3822,40 @@ document.getElementById('btnMeasSavePrint').addEventListener('click', async ()=>
   resetMeasForm();
 });
 
-document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
-  const rec = buildMeasurementRecord();
-  if(!rec) return;
-  const totals = computeMeasTotalsFrom(rec.tables);
+function measItemsFromTotals(totals){
   const items = [];
   if(totals['مربع'] > 0) items.push({qty: Number(totals['مربع'].toFixed(2)), desc: 'متر مربع', price:''});
   if(totals['طول'] > 0) items.push({qty: Number(totals['طول'].toFixed(2)), desc: 'متر طول', price:''});
   if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: 'متر مكعب', price:''});
+  if(totals['عامود'] > 0) items.push({qty: Number(totals['عامود'].toFixed(2)), desc: 'عامود (متر مربع)', price:''});
+  return items;
+}
+
+document.getElementById('btnMeasConvertQuote').addEventListener('click', ()=>{
+  const rec = buildMeasurementRecord();
+  if(!rec) return;
+  const items = measItemsFromTotals(computeMeasTotalsFrom(rec.tables))
+    .map(it=>({qty: it.qty, desc: it.desc, unit:'', price:'', amount:0}));
+  const pseudoInvoice = {
+    id: '', docType: 'simple', no: nextInvoiceNo('simple'),
+    date: new Date().toISOString().slice(0,10), delay: '',
+    clientName: rec.customerName, clientAddress: '', clientRC: '', clientNIF: '', clientNIS: '',
+    clientPhone: rec.customerPhone || '',
+    note: 'محوّل من حاسبة القياسات',
+    items, payments: []
+  };
+  openInvoiceModal(pseudoInvoice);
+  document.getElementById('invId').value = '';
+  document.getElementById('invoiceModalTitle').textContent = 'عرض سعر جديد (محوّل من قياسات)';
+  toast('عبّي السعر لكل بند ثم احفظ عرض السعر');
+  resetMeasForm();
+});
+
+document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
+  const rec = buildMeasurementRecord();
+  if(!rec) return;
+  const totals = computeMeasTotalsFrom(rec.tables);
+  const items = measItemsFromTotals(totals);
   const pseudoReceipt = {
     id: '',
     no: getNextReceiptNo(),
@@ -3910,6 +3968,7 @@ function viewMeasurementRecord(id){
       ${t['مربع']>0 ? `<div><b>إجمالي متر مربع:</b> ${t['مربع'].toFixed(2)} م²</div>` : ''}
       ${t['طول']>0 ? `<div><b>إجمالي متر طول:</b> ${t['طول'].toFixed(2)} م.ط</div>` : ''}
       ${t['مكعب']>0 ? `<div><b>إجمالي متر مكعب:</b> ${t['مكعب'].toFixed(3)} م³</div>` : ''}
+      ${t['عامود']>0 ? `<div><b>إجمالي العواميد:</b> ${t['عامود'].toFixed(2)} م²</div>` : ''}
     </div>`;
 
   document.getElementById('measurementsPrintArea').innerHTML = `
