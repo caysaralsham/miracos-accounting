@@ -555,11 +555,11 @@
         <div class="grid2">
           <div class="field">
             <label>اسم الزبون</label>
-            <input type="text" id="measCustomerName" placeholder="مثلا: احمد بلحاج" autocomplete="off">
+            <input type="text" id="measCustomerName" autocomplete="off">
           </div>
           <div class="field">
             <label>الهاتف</label>
-            <input type="text" id="measCustomerPhone" placeholder="0555 00 00 00">
+            <input type="text" id="measCustomerPhone" autocomplete="off">
           </div>
         </div>
 
@@ -4043,13 +4043,26 @@ renderMeasTables();
 
 // يقرر تلقائيًا قبل الطباعة إذا المحتوى كبير (يحتاج خط مضغوط) أو صغير (يبقى بالحجم المريح)،
 // بالاعتماد على عدد صفوف الجدول الفعلي بالنافذة الظاهرة وقت الطباعة فقط.
+// الطباعة: الحجم العادي (خط ولوغو كبار) دايماً، وإذا التفاصيل كتيرة وما بتساع بورقة وحدة
+// بيصغّر الصفحة كلها بالنسبة المطلوبة بالضبط لحتى تبقى بصفحة وحدة.
+const PRINT_PAGE_W = 718;   // عرض A4 بعد هوامش 10mm (px)
+const PRINT_PAGE_H = 1000;  // ارتفاع A4 بعد الهوامش مع شوية أمان (px)
+let printZoomEls = [];
 window.addEventListener('beforeprint', ()=>{
-  const activeOverlay = document.querySelector('.overlay.show');
-  const rowCount = activeOverlay ? activeOverlay.querySelectorAll('tbody tr').length : 0;
-  document.body.classList.toggle('print-compact', rowCount > 14);
+  document.body.classList.remove('print-compact');
+  printZoomEls = [];
+  document.querySelectorAll('.overlay.show .modal-body').forEach(body=>{
+    const oldW = body.style.width, oldMax = body.style.maxHeight, oldOv = body.style.overflow;
+    body.style.width = PRINT_PAGE_W + 'px'; body.style.maxHeight = 'none'; body.style.overflow = 'visible';
+    const h = body.scrollHeight * 1.0;  // الخط بالطباعة أكبر شوي من الشاشة
+    body.style.width = oldW; body.style.maxHeight = oldMax; body.style.overflow = oldOv;
+    const scale = Math.min(1, PRINT_PAGE_H / h);
+    if(scale < 1){ body.style.zoom = scale.toFixed(3); printZoomEls.push(body); }
+  });
 });
 window.addEventListener('afterprint', ()=>{
-  document.body.classList.remove('print-compact');
+  printZoomEls.forEach(el=>{ el.style.zoom = ''; });
+  printZoomEls = [];
 });
 
 function renderDashboard(){
