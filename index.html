@@ -223,6 +223,9 @@
   .meas-table-box{border:1px solid var(--line); border-radius:9px; padding:12px 14px; margin-top:14px; background:var(--marble-2);}
   .meas-table-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
   .meas-table-head .meas-title{font-size:14px; font-weight:700; color:var(--brass-deep);}
+  .meas-toggle{cursor:pointer; user-select:none;}
+  .meas-toggle .meas-sum{font-size:12px; font-weight:600; color:var(--text-dim);}
+  .meas-toggle .meas-arrow{display:inline-block; width:14px;}
   .meas-row-grid{display:grid; grid-template-columns:26px minmax(0,1fr) 1fr 1fr 70px 110px 30px; gap:6px; align-items:center; margin-bottom:5px;}
   .meas-row-grid input[disabled]{background:var(--stone); color:var(--text-dim);}
   .meas-result{font-size:13px; font-weight:700; color:var(--brass-deep); text-align:center;}
@@ -552,7 +555,7 @@
         <div class="grid2">
           <div class="field">
             <label>اسم الزبون</label>
-            <input type="text" id="measCustomerName" placeholder="مثلا: احمد بلحاج">
+            <input type="text" id="measCustomerName" placeholder="مثلا: احمد بلحاج" autocomplete="off">
           </div>
           <div class="field">
             <label>الهاتف</label>
@@ -1753,6 +1756,14 @@ function doLogin(){
   });
 }
 document.getElementById('btnLogin').addEventListener('click', doLogin);
+// منع اقتراحات عناوين Google/المتصفح بخانات البرنامج (ما عدا تسجيل الدخول)
+function disableBrowserAutofill(el){
+  if(!el || el.tagName!=='INPUT' || el.id==='loginUsername' || el.type==='password') return;
+  if(['text','tel','email','search',''].includes(el.type)) el.setAttribute('autocomplete','nofill');
+}
+document.querySelectorAll('input').forEach(disableBrowserAutofill);
+document.addEventListener('focusin', e=>disableBrowserAutofill(e.target), true);
+
 document.getElementById('loginPassword').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
 document.getElementById('loginUsername').addEventListener('keydown', (e)=>{ if(e.key==='Enter') doLogin(); });
 
@@ -1995,8 +2006,8 @@ function measResultFor(type, l, w, h){
   l = parseFloat(l)||0; w = parseFloat(w)||0; h = parseFloat(h)||0;
   if(type==='طول') return {value: l, label: l.toFixed(2)+' م.ط'};
   if(type==='مكعب') return {value: l*w*h, label: (l*w*h).toFixed(3)+' م³'};
-  // عامود: القطر بالسنتي (l) × 3.14 × الارتفاع بالمتر (w) = مساحة الدوران م²
-  if(type==='عامود'){ const a = (l/100)*3.14*w; return {value: a, label: a.toFixed(2)+' م²'}; }
+  // عامود: القطر بالمتر (l) × 3.14 × الارتفاع بالمتر (w) = م²
+  if(type==='عامود'){ const a = l*3.14*w; return {value: a, label: a.toFixed(2)+' م²'}; }
   return {value: l*w, label: (l*w).toFixed(2)+' م²'};
 }
 
@@ -2411,7 +2422,7 @@ async function buildAndSaveReceiptFromForm(){
   const paid = payments.reduce((s,p)=>s+p.amount,0);
 
   const measTablesToSave = receiptMeasTables
-    .map(tbl => ({...tbl, rows: tbl.rows.filter(r => r.l || r.w || r.h)}))
+    .map(tbl => ({type: tbl.type, rows: tbl.rows.filter(r => r.l || r.w || r.h)}))
     .filter(tbl => tbl.rows.length > 0);
 
   const id = document.getElementById('rcpId').value;
@@ -3512,7 +3523,7 @@ const MEAS_SPECS = {
   'مربع': {label:'متر مربع', cols:['طول (م)','عرض (م)']},
   'طول': {label:'متر طول', cols:['طول (م)','العرض (مرجعي، م)']},
   'مكعب': {label:'متر مكعب', cols:['طول (م)','عرض (م)','سماكة (م)']},
-  'عامود': {label:'عامود (القطر × 3.14 × الارتفاع = م²)', cols:['القطر (سم)','الارتفاع (م)']}
+  'عامود': {label:'عامود (القطر × 3.14 × الارتفاع = م²)', cols:['القطر (م)','الارتفاع (م)']}
 };
 
 function computeMeasTotalsFrom(tables){
@@ -3539,6 +3550,32 @@ function renderMeasTotals(tables, targetEl){
     + card('إجمالي متر طول', totals['طول'], 'م.ط')
     + card('إجمالي متر مكعب', totals['مكعب'], 'م³')
     + (tables.some(t=>t.type==='عامود') ? card('إجمالي العواميد', totals['عامود'], 'م²') : '');
+}
+
+// جداول القياسات بتنطوى: بتطلع بس عنوانها وملخصها، وكبسة على العنوان بتفتحها
+function measTableSummary(tbl){
+  const filled = tbl.rows.filter(r=>parseFloat(r.l)||parseFloat(r.w)||parseFloat(r.h));
+  if(!filled.length) return '';
+  const total = computeMeasTotalsFrom([{type: tbl.type, rows: filled}])[tbl.type] || 0;
+  const unit = tbl.type==='طول' ? 'م.ط' : (tbl.type==='مكعب' ? 'م³' : 'م²');
+  return `— ${filled.length} قياس · ${total.toFixed(tbl.type==='مكعب'?3:2)} ${unit}`;
+}
+function wireMeasToggles(wrap, tables){
+  wrap.addEventListener('input', ()=>{
+    wrap.querySelectorAll('.meas-toggle').forEach(h=>{ const t = tables[h.dataset.toggleT]; if(t) h.querySelector('.meas-sum').textContent = measTableSummary(t); });
+  });
+  wrap.querySelectorAll('.meas-toggle').forEach(head=>{
+    head.addEventListener('click', e=>{
+      if(e.target.closest('button')) return;
+      const t = head.dataset.toggleT;
+      tables[t].open = !tables[t].open;
+      const body = head.nextElementSibling;
+      body.style.display = tables[t].open ? '' : 'none';
+      head.querySelector('.meas-arrow').textContent = tables[t].open ? '▾' : '◂';
+      head.querySelector('.meas-sum').textContent = measTableSummary(tables[t]);
+      if(tables[t].open){ const f = body.querySelector('input'); if(f) f.focus(); }
+    });
+  });
 }
 
 function emptyMeasRow(){ return {l:'', w:'', h:'', count:1}; }
@@ -3592,18 +3629,21 @@ function renderMeasTables(){
       </div>`;
     }).join('');
     box.innerHTML = `
-      <div class="meas-table-head">
-        <span class="meas-title">${spec.label}</span>
+      <div class="meas-table-head meas-toggle" data-toggle-t="${ti}">
+        <span class="meas-title"><span class="meas-arrow">${tbl.open?'▾':'◂'}</span> ${spec.label} <span class="meas-sum">${measTableSummary(tbl)}</span></span>
         <button type="button" class="btn btn-sm btn-danger" data-deltable="${ti}">حذف الجدول</button>
       </div>
+      <div class="meas-body" style="${tbl.open?'':'display:none;'}">
       <div class="meas-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
         <span></span>${headCols}${spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):''}<span>العدد</span><span>النتيجة</span><span></span>
       </div>
       ${rowsHtml}
       <button type="button" class="btn btn-sm" data-addrow="${ti}" style="margin-top:6px;">+ إضافة قياس</button>
+      </div>
     `;
     wrap.appendChild(box);
   });
+  wireMeasToggles(wrap, measTables);
   renderMeasTotals(measTables);
 
   wrap.querySelectorAll('input').forEach(el=>{
@@ -3660,7 +3700,7 @@ function renderMeasTables(){
 }
 
 function addMeasTable(type){
-  measTables.push({type, rows: Array.from({length:10}, emptyMeasRow)});
+  measTables.push({type, open:true, rows: Array.from({length:10}, emptyMeasRow)});
   renderMeasTables();
 }
 document.getElementById('btnMeasAddSq').addEventListener('click', ()=>addMeasTable('مربع'));
@@ -3700,18 +3740,21 @@ function renderReceiptMeasTables(){
       </div>`;
     }).join('');
     box.innerHTML = `
-      <div class="meas-table-head">
-        <span class="meas-title">${spec.label}</span>
+      <div class="meas-table-head meas-toggle" data-toggle-t="${ti}">
+        <span class="meas-title"><span class="meas-arrow">${tbl.open?'▾':'◂'}</span> ${spec.label} <span class="meas-sum">${measTableSummary(tbl)}</span></span>
         <button type="button" class="btn btn-sm btn-danger" data-rcp-deltable="${ti}">حذف الجدول</button>
       </div>
+      <div class="meas-body" style="${tbl.open?'':'display:none;'}">
       <div class="meas-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
         <span></span>${headCols}${spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):''}<span>العدد</span><span>النتيجة</span><span></span>
       </div>
       ${rowsHtml}
       <button type="button" class="btn btn-sm" data-rcp-addrow="${ti}" style="margin-top:6px;">+ إضافة قياس</button>
+      </div>
     `;
     wrap.appendChild(box);
   });
+  wireMeasToggles(wrap, receiptMeasTables);
 
   wrap.querySelectorAll('input').forEach(el=>{
     el.addEventListener('keydown', e=>handleMeasArrowNav(e, wrap));
@@ -3766,7 +3809,7 @@ function renderReceiptMeasTables(){
 }
 
 function addReceiptMeasTable(type){
-  receiptMeasTables.push({type, rows: Array.from({length:5}, emptyMeasRow)});
+  receiptMeasTables.push({type, open:true, rows: Array.from({length:5}, emptyMeasRow)});
   renderReceiptMeasTables();
 }
 document.getElementById('btnRcpMeasAddSq').addEventListener('click', ()=>addReceiptMeasTable('مربع'));
@@ -3822,19 +3865,36 @@ document.getElementById('btnMeasSavePrint').addEventListener('click', async ()=>
   resetMeasForm();
 });
 
-function measItemsFromTotals(totals){
+// نص القياسات يلي بينكتب بالبيان: مثلاً "عامود (م²): قطر 0.50 × ارتفاع 3 (×2)، ..."
+function measDetailsForType(tables, type){
+  const n = v => { const x = parseFloat(v)||0; return String(Number(x.toFixed(3))); };
+  const parts = [];
+  (tables||[]).filter(t=>t.type===type).forEach(t=>t.rows.forEach(r=>{
+    if(!(parseFloat(r.l)||parseFloat(r.w)||parseFloat(r.h))) return;
+    const c = Number(r.count)||1;
+    let d;
+    if(type==='عامود') d = `قطر ${n(r.l)} × ارتفاع ${n(r.w)}`;
+    else if(type==='طول') d = `${n(r.l)}`;
+    else if(type==='مكعب') d = `${n(r.l)}×${n(r.w)}×${n(r.h)}`;
+    else d = `${n(r.l)}×${n(r.w)}`;
+    parts.push(c > 1 ? `${d} (×${c})` : d);
+  }));
+  return parts.join('، ');
+}
+function measItemsFromTotals(totals, tables){
   const items = [];
-  if(totals['مربع'] > 0) items.push({qty: Number(totals['مربع'].toFixed(2)), desc: 'متر مربع', price:''});
-  if(totals['طول'] > 0) items.push({qty: Number(totals['طول'].toFixed(2)), desc: 'متر طول', price:''});
-  if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: 'متر مكعب', price:''});
-  if(totals['عامود'] > 0) items.push({qty: Number(totals['عامود'].toFixed(2)), desc: 'عامود (متر مربع)', price:''});
+  const desc = (label, type) => { const d = measDetailsForType(tables, type); return d ? `${label}: ${d}` : label; };
+  if(totals['مربع'] > 0) items.push({qty: Number(totals['مربع'].toFixed(2)), desc: desc('متر مربع','مربع'), price:''});
+  if(totals['طول'] > 0) items.push({qty: Number(totals['طول'].toFixed(2)), desc: desc('متر طول','طول'), price:''});
+  if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: desc('متر مكعب','مكعب'), price:''});
+  if(totals['عامود'] > 0) items.push({qty: Number(totals['عامود'].toFixed(2)), desc: desc('عامود (م²)','عامود'), price:''});
   return items;
 }
 
 document.getElementById('btnMeasConvertQuote').addEventListener('click', ()=>{
   const rec = buildMeasurementRecord();
   if(!rec) return;
-  const items = measItemsFromTotals(computeMeasTotalsFrom(rec.tables))
+  const items = measItemsFromTotals(computeMeasTotalsFrom(rec.tables), rec.tables)
     .map(it=>({qty: it.qty, desc: it.desc, unit:'', price:'', amount:0}));
   const pseudoInvoice = {
     id: '', docType: 'simple', no: nextInvoiceNo('simple'),
@@ -3855,7 +3915,7 @@ document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
   const rec = buildMeasurementRecord();
   if(!rec) return;
   const totals = computeMeasTotalsFrom(rec.tables);
-  const items = measItemsFromTotals(totals);
+  const items = measItemsFromTotals(totals, rec.tables);
   const pseudoReceipt = {
     id: '',
     no: getNextReceiptNo(),
