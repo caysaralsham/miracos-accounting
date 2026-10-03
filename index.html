@@ -4943,10 +4943,22 @@ window.addEventListener('beforeprint', ()=>{
   document.querySelectorAll('.overlay.show .modal-body').forEach(body=>{
     const oldW = body.style.width, oldMax = body.style.maxHeight, oldOv = body.style.overflow;
     body.style.width = PRINT_PAGE_W + 'px'; body.style.maxHeight = 'none'; body.style.overflow = 'visible';
-    const h = body.scrollHeight * 1.0;  // الخط بالطباعة أكبر شوي من الشاشة
+    const h = body.scrollHeight * 1.0;
+    // اللوغو واسم الشركة (رأس الورقة) ما بيصغروا أكتر من 80%، والتصغير الباقي بيتوزّع على التفاصيل
+    const head = body.querySelector('.receipt-top');
+    const headH = head ? head.offsetHeight : 0;
     body.style.width = oldW; body.style.maxHeight = oldMax; body.style.overflow = oldOv;
-    const scale = Math.min(1, PRINT_PAGE_H / h);
-    if(scale < 1){ body.style.zoom = scale.toFixed(3); printZoomEls.push(body); }
+    let scale = Math.min(1, PRINT_PAGE_H / h);
+    const MIN_HEAD = 0.8;
+    if(scale < 1){
+      let headScale = scale;
+      if(head && scale < MIN_HEAD && h > headH){
+        headScale = MIN_HEAD;
+        scale = Math.max(0.2, (PRINT_PAGE_H - headH*MIN_HEAD) / (h - headH));
+      }
+      body.style.zoom = scale.toFixed(3); printZoomEls.push(body);
+      if(head && headScale > scale){ head.style.zoom = (headScale/scale).toFixed(3); printZoomEls.push(head); }
+    }
   });
 });
 window.addEventListener('afterprint', ()=>{
