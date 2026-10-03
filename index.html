@@ -308,6 +308,7 @@
       margin:0 !important; padding:0 !important; background:none !important; backdrop-filter:none !important;
     }
     .overlay.show *{ visibility:visible; }
+    body.print-factory-only .overlay.show:not(#factoryViewOverlay){ display:none !important; }
 
     .modal{ max-width:none !important; width:auto !important; height:auto !important; min-height:0 !important; box-shadow:none !important; margin:0 !important; }
     .modal-head, .modal-foot{ display:none !important; }
@@ -869,6 +870,7 @@
     <div class="modal-head">
       <h3 id="receiptModalTitle">وصل دفع جديد</h3>
       <div style="display:flex; align-items:center; gap:8px;">
+        <button class="btn btn-sm" id="btnReceiptEditToFactory" style="display:none; font-size:12px; padding:4px 10px;" title="ورقة القياسات للمعمل بدون أسعار">للمعمل</button>
         <button class="btn btn-sm" id="btnReceiptToQuote" style="display:none; font-size:12px; padding:4px 10px;" title="تحويل إلى عرض سعر">➜📄 عرض سعر</button>
         <button class="close-x" data-close="receiptOverlay">×</button>
       </div>
@@ -2566,7 +2568,17 @@ function openReceiptModal(receipt){
   document.getElementById('btnReceiptToQuote').style.display = (receipt && receipt.id) ? '' : 'none';
   document.getElementById('receiptOverlay').classList.add('show');
   requestAnimationFrame(()=>growAllDesc(document.getElementById('receiptOverlay')));
+  // زر "للمعمل" بيظهر إذا بنود الوصل فيها قياسات مرسومة (حتى قبل الحفظ)
+  document.getElementById('btnReceiptEditToFactory').style.display = document.querySelector('#itemsBody tr[data-draws]') ? '' : 'none';
 }
+document.getElementById('btnReceiptEditToFactory').addEventListener('click', ()=>{
+  const items = [...document.querySelectorAll('#itemsBody tr')].map(row=>{
+    const q = row.querySelector('.it-qty'), d = row.querySelector('.it-desc');
+    if(!q || !d) return null;
+    return {qty: Number(q.value)||0, desc: d.value.trim(), draws: row.dataset.draws ? JSON.parse(row.dataset.draws) : []};
+  }).filter(Boolean);
+  openFactoryPreview(factoryOrderFromItems(items, document.getElementById('rcpName').value.trim()));
+});
 
 // تحويل الوصل المفتوح للتعديل إلى عرض سعر مبسط جديد — الوصل الأصلي بيضل متل ما هو
 function convertReceiptToQuote(){
@@ -4105,7 +4117,12 @@ document.getElementById('facViewWorkshop').addEventListener('input', e=>{
   const mw = document.getElementById('measWorkshop'); if(mw) mw.value = e.target.value;
   document.getElementById('factoryPrintArea').innerHTML = renderFactorySheetHtml(lastFactoryOrder);
 });
-document.getElementById('btnFacViewPrint').addEventListener('click', ()=>window.print());
+document.getElementById('btnFacViewPrint').addEventListener('click', ()=>{
+  // إذا نافذة الوصل مفتوحة تحتها، ما تنطبع معها
+  document.body.classList.add('print-factory-only');
+  window.print();
+});
+window.addEventListener('afterprint', ()=>document.body.classList.remove('print-factory-only'));
 document.getElementById('btnFacViewShare').addEventListener('click', ()=>{ if(lastFactoryOrder) shareFactoryOrder(lastFactoryOrder); });
 // ورقة المعمل من بنود وصل / عرض سعر: الرسمات والتفاصيل بس، بدون أسعار
 function factoryOrderFromItems(items, customer){
