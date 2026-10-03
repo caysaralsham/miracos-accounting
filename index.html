@@ -286,6 +286,11 @@
   .corner-dirs{ display:flex; gap:6px; justify-content:center; align-items:center; flex-wrap:wrap; margin-top:6px; font-size:12px; color:var(--text-dim); }
   .corner-dirs .btn{ padding:4px 9px; font-size:12px; }
   .corner-dirs .btn.active{ background:var(--brass); color:#fff; border-color:var(--brass); }
+  .intro-row > td{ padding:0 !important; border:none !important; background:none !important; }
+  .receipt-view .print-head-row > td{ border:none !important; }
+  tbody.doc-intro tr.intro-row, tbody.doc-intro tr.intro-row td{ border:none !important; box-shadow:none !important; }
+  td.row-no, th.row-no{ width:34px; text-align:center; color:#777; font-size:12px; }
+  .items-count{ display:inline-block; margin-inline-start:10px; font-size:12.5px; color:var(--text-dim); font-weight:700; }
   .item-draws{ display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px; }
   .item-draw{ display:inline-block; text-align:center; font-size:11px; color:#555; line-height:1.2; }
   .item-draw-cap{ font-size:11.5px; color:#333; max-width:200px; margin:0 auto; }
@@ -294,7 +299,14 @@
   .fac-card svg{ display:inline-block; margin:0; vertical-align:top; } /* html2canvas بيقص الرسمة إذا margin:auto */
   .fac-extra{ border:1px dashed #bbb; border-radius:8px; padding:8px 12px; margin-top:10px; font-size:14px; font-weight:600; }
   .fac-legend{ margin-top:14px; font-size:13px; color:#444; display:flex; align-items:center; gap:8px; }
-  .fac-legend i{ display:inline-block; width:34px; height:6px; background:#D32F2F; border-radius:3px; }
+  .fac-legend i{ display:inline-block; width:34px; height:6px; background:#D32F2F; border-radius:3px; vertical-align:middle; }
+  .fac-legend.item-legend{ margin-top:2px; font-size:11px; }
+  .fac-legend.item-legend i{ width:20px; height:4px; }
+  .fac-legend .lg{ display:inline-flex; align-items:center; gap:6px; margin-inline-end:18px; }
+  .edge-brush{ display:flex; gap:8px; align-items:center; margin:0 0 12px; font-size:13px; color:var(--text-dim); flex-wrap:wrap; }
+  .edge-brush button{ border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 12px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .edge-brush button i{ display:inline-block; width:22px; height:5px; border-radius:3px; }
+  .edge-brush button.active{ border-color:var(--ink); box-shadow:0 0 0 2px rgba(0,0,0,.08); background:#FFFDF6; }
   .meas-row-grid input[disabled]{background:var(--stone); color:var(--text-dim);}
   .meas-result{font-size:13px; font-weight:700; color:var(--brass-deep); text-align:center;}
   .meas-print-table{width:100%; border-collapse:collapse; font-size:13px; margin-top:6px;}
@@ -333,6 +345,9 @@
     tfoot{ display:table-footer-group; }
     tr{ page-break-inside:avoid; page-break-after:auto; }
     .print-head-row td{ padding:0 !important; border:none !important; }
+    /* أكتر من 20 بند: بيكمّل على صفحة تانية، والرأس (اللوغو ورقم الوصل) بيتكرر بكل صفحة، وتحت: صفحة 1 من 2 */
+    tbody tr{ break-inside:avoid; page-break-inside:avoid; }
+    body.print-multipage .overlay.show .modal{ page: multi; }
 
     .receipt-view .receipt-top{ padding-bottom:12px !important; margin-bottom:12px !important; }
     .receipt-brand img{ width:80px !important; height:80px !important; }
@@ -358,6 +373,7 @@
       color-adjust:exact !important;
     }
     @page{ margin:10mm; size:auto; }
+    @page multi{ margin:10mm 10mm 14mm; @bottom-center{ content: "صفحة " counter(page) " من " counter(pages); font-family: Arial, sans-serif; font-size:11px; color:#555; } }
   }
 
   @media (max-width: 900px){
@@ -635,6 +651,12 @@
           <input type="text" id="measCustomerPhone" autocomplete="off" placeholder="الهاتف" class="who-phone">
         </div>
 
+        <div class="edge-brush">
+          <span>علامة الحافة:</span>
+          <button type="button" class="active" data-brush="a"><i style="background:#D32F2F"></i> اروندي</button>
+          <button type="button" data-brush="s"><i style="background:#2E9E4F"></i> شطفة</button>
+          <span style="font-size:12px;">— اختار، بعدين اكبس على الأضلاع بالرسمة</span>
+        </div>
         <div id="measTablesWrap"></div>
         <div id="measTotalsSummary" style="display:flex; gap:14px; flex-wrap:wrap; margin-top:14px;"></div>
 
@@ -906,7 +928,7 @@
         <thead><tr><th style="width:90px">العدد</th><th>النوع والتفاصيل *</th><th style="width:100px">السعر</th><th style="width:100px">المبلغ</th><th style="width:30px"></th><th style="width:36px"></th></tr></thead>
         <tbody id="itemsBody"></tbody>
       </table>
-      <button class="btn btn-sm" id="btnAddItemRow" style="margin-top:8px;">+ إضافة سطر</button>
+      <button class="btn btn-sm" id="btnAddItemRow" style="margin-top:8px;">+ إضافة سطر</button><span class="items-count" id="rcpItemsCount"></span>
 
       <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
         <label style="margin:0; white-space:nowrap;">خصم (اختياري)</label>
@@ -1047,7 +1069,7 @@
         </tr></thead>
         <tbody id="invItemsBody"></tbody>
       </table>
-      <button class="btn btn-sm" id="btnAddInvoiceItemRow" style="margin-top:8px;">+ <span id="invAddLineLabel">Ajouter une ligne</span></button>
+      <button class="btn btn-sm" id="btnAddInvoiceItemRow" style="margin-top:8px;">+ <span id="invAddLineLabel">Ajouter une ligne</span></button><span class="items-count" id="invItemsCount"></span>
 
       <div class="totals-box">
         <div class="totals-row" id="invHTRow"><span id="invHTLabel">Montant HT</span><span id="invHTDisplay">0 دج</span></div>
@@ -2412,6 +2434,8 @@ function openItemMeasureTool(row, qtyInput){
 }
 
 function recalcTotals(){
+  const rc = document.getElementById('rcpItemsCount');
+  if(rc) rc.textContent = `عدد البنود: ${document.querySelectorAll('#itemsBody .it-qty').length}`;
   let subtotal = 0;
   document.querySelectorAll('#itemsBody tr').forEach(row=>{
     const qtyEl = row.querySelector('.it-qty');
@@ -2957,8 +2981,8 @@ function viewReceipt(id){
   const r = receipts.find(r=>r.id===id);
   if(!r) return;
   currentViewedReceiptId = id;
-  const itemsRows = r.items.map(it=>`
-    <tr><td>${it.qty}</td><td>${it.desc}${itemMeasDrawingsHtml(it, r.measurementTables)}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+  const itemsRows = r.items.map((it,i)=>`
+    <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td>${it.desc}${itemMeasDrawingsHtml(it, r.measurementTables)}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
   `).join('');
   const payList = getReceiptPayments(r);
   const paymentsRows = payList.map(p=>`
@@ -3014,7 +3038,7 @@ function viewReceipt(id){
   document.getElementById('receiptPrintArea').innerHTML = `
     <table>
       <thead>
-        <tr class="print-head-row"><td colspan="4">
+        <tr class="print-head-row"><td colspan="5">
           <div class="receipt-top">
             <div class="receipt-brand">
               <img src="${settings.logo}">
@@ -3029,6 +3053,10 @@ function viewReceipt(id){
               <div class="lbl">وصل دفع</div>
             </div>
           </div>
+        </td></tr>
+      </thead>
+      <tbody class="doc-intro">
+        <tr class="intro-row"><td colspan="5">
           <div class="receipt-info-grid">
             <div><span>الاسم: </span>${r.name}</div>
             <div><span>التاريخ: </span>${r.date||''}</div>
@@ -3037,8 +3065,8 @@ function viewReceipt(id){
             <div><span>العنوان: </span>${r.address||'—'}</div>
           </div>
         </td></tr>
-        <tr><th>العدد</th><th>النوع والتفاصيل</th><th>السعر</th><th>المبلغ</th></tr>
-      </thead>
+        <tr><th class="row-no">#</th><th>العدد</th><th>النوع والتفاصيل</th><th>السعر</th><th>المبلغ</th></tr>
+      </tbody>
       <tbody>${itemsRows}</tbody>
     </table>
     <div class="totals-box">
@@ -3245,6 +3273,8 @@ function openInvoiceItemMeasureTool(row, qtyInput){
 }
 
 function recalcInvoiceTotals(){
+  const ic = document.getElementById('invItemsCount');
+  if(ic) ic.textContent = `عدد البنود: ${document.querySelectorAll('#invItemsBody .inv-it-qty').length}`;
   let ht = 0;
   document.querySelectorAll('#invItemsBody tr').forEach(row=>{
     const qtyEl = row.querySelector('.inv-it-qty');
@@ -3564,8 +3594,8 @@ function viewInvoice(id){
   const isSimple = inv.docType === 'simple';
 
   if(isSimple){
-    const itemsRowsAr = (inv.items||[]).map(it=>`
-      <tr><td>${it.qty}</td><td style="text-align:right;">${it.desc}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+    const itemsRowsAr = (inv.items||[]).map((it,i)=>`
+      <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td style="text-align:right;">${it.desc}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
     `).join('');
     const paymentsRowsAr = (inv.payments||[]).map(p=>`
       <div class="totals-row"><span>دفعة بتاريخ ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
@@ -3574,7 +3604,7 @@ function viewInvoice(id){
     document.getElementById('invoicePrintArea').innerHTML = `
       <table>
         <thead>
-          <tr class="print-head-row"><td colspan="5">
+          <tr class="print-head-row"><td colspan="6">
             <div class="receipt-top">
               <div class="receipt-brand">
                 <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
@@ -3590,6 +3620,10 @@ function viewInvoice(id){
                 </div>
               </div>
             </div>
+          </td></tr>
+        </thead>
+        <tbody class="doc-intro">
+          <tr class="intro-row"><td colspan="6">
             <div class="receipt-info-grid">
               <div><span>الاسم: </span>${inv.clientName}</div>
               <div><span>التاريخ: </span>${inv.date||''}</div>
@@ -3597,8 +3631,8 @@ function viewInvoice(id){
               <div><span>العنوان: </span>${inv.clientAddress||'—'}</div>
             </div>
           </td></tr>
-          <tr><th>العدد</th><th>البيان</th><th>الوحدة</th><th>السعر</th><th>المجموع</th></tr>
-        </thead>
+          <tr><th class="row-no">#</th><th>العدد</th><th>البيان</th><th>الوحدة</th><th>السعر</th><th>المجموع</th></tr>
+        </tbody>
         <tbody>${itemsRowsAr}</tbody>
       </table>
       <div class="totals-box">
@@ -3615,8 +3649,8 @@ function viewInvoice(id){
   }
 
   const docLabel = (inv.docType === 'facture') ? 'FACTURE' : 'DEVIS';
-  const itemsRows = (inv.items||[]).map(it=>`
-    <tr><td>${it.qty}</td><td style="text-align:left;">${it.desc}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+  const itemsRows = (inv.items||[]).map((it,i)=>`
+    <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td style="text-align:left;">${it.desc}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
   `).join('');
   const paymentsRows = (inv.payments||[]).map(p=>`
     <div class="totals-row"><span>Paiement du ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
@@ -3627,7 +3661,7 @@ function viewInvoice(id){
   document.getElementById('invoicePrintArea').innerHTML = `
     <table style="direction:ltr;">
       <thead>
-        <tr class="print-head-row"><td colspan="5">
+        <tr class="print-head-row"><td colspan="6">
           <div class="receipt-top" style="direction:ltr; text-align:left;">
             <div class="receipt-brand">
               <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
@@ -3645,13 +3679,17 @@ function viewInvoice(id){
               <div style="font-size:13px; font-weight:700; color:var(--text-dim);">Date: ${inv.date||''}</div>
             </div>
           </div>
+        </td></tr>
+      </thead>
+      <tbody class="doc-intro">
+        <tr class="intro-row"><td colspan="6">
           <div style="direction:ltr; text-align:left; margin-bottom:14px; font-size:13.5px; line-height:1.6;">
             <div><b>Client:</b> ${inv.clientName} ${inv.clientAddress ? '— '+inv.clientAddress : ''}</div>
             ${clientLegalLine}
           </div>
         </td></tr>
-        <tr><th>Qté</th><th>Désignation</th><th>Unité</th><th>Prix Unit.</th><th>Total</th></tr>
-      </thead>
+        <tr><th class="row-no">N°</th><th>Qté</th><th>Désignation</th><th>Unité</th><th>Prix Unit.</th><th>Total</th></tr>
+      </tbody>
       <tbody>${itemsRows}</tbody>
     </table>
     <div class="totals-box" style="direction:ltr; text-align:left;">
@@ -3906,8 +3944,7 @@ function pieceSvg(lCm, wCm, edges, opts){
   const x0 = padSide, y0 = padTop, x1 = x0 + rw, y1 = y0 + rh;
   const RED = '#D32F2F', INK = '#333';
   const edge = (k, xa, ya, xb, yb)=>{
-    const on = !!edges[k];
-    const vis = `<line x1="${xa}" y1="${ya}" x2="${xb}" y2="${yb}" stroke="${on?RED:INK}" stroke-width="${on?7:2}" stroke-linecap="round"/>`;
+    const vis = `<line x1="${xa}" y1="${ya}" x2="${xb}" y2="${yb}" stroke="${edgeColor(edges[k])}" stroke-width="${edgeType(edges[k])?7:2}" stroke-linecap="round"/>`;
     const hit = opts.hit ? `<line class="piece-edge" data-edge="${k}" x1="${xa}" y1="${ya}" x2="${xb}" y2="${yb}" stroke="rgba(0,0,0,0)" stroke-width="18"/>` : '';
     return vis + hit;
   };
@@ -3923,8 +3960,21 @@ function pieceSvg(lCm, wCm, edges, opts){
 // ---- أشكال تانية: دائرة، زاوية، عامود (من برا ومن جوا + اللف) ----
 function svgLbl(x, y, text, size, bold){ return `<text x="${x}" y="${y}" text-anchor="middle" font-size="${size||12}" ${bold?'font-weight="700"':''} fill="#111">${text}</text>`; }
 function svgWrap(W, H, inner){ return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="font-family:Arial,sans-serif; direction:ltr;" direction="ltr">${inner}</svg>`; }
-const EDGE_RED = '#D32F2F', EDGE_INK = '#333';
-function edgeStroke(on){ return `stroke="${on?EDGE_RED:EDGE_INK}" stroke-width="${on?7:2}"`; }
+const EDGE_RED = '#D32F2F', EDGE_GREEN = '#2E9E4F', EDGE_INK = '#333';
+// نوع الحافة: 'a' اروندي (أحمر) — 's' شطفة (أخضر) — true من النسخ القديمة = اروندي
+function edgeType(v){ return v === 's' ? 's' : (v ? 'a' : ''); }
+function edgeColor(v){ const t = edgeType(v); return t==='s' ? EDGE_GREEN : t==='a' ? EDGE_RED : EDGE_INK; }
+function edgeStroke(on){ return `stroke="${edgeColor(on)}" stroke-width="${edgeType(on)?7:2}"`; }
+// الفرشاة المختارة بالحاسبة
+let edgeBrush = 'a';
+function toggleEdge(edges, k){ const e = Object.assign({}, edges||{}); e[k] = edgeType(e[k]) === edgeBrush ? false : edgeBrush; return e; }
+function edgeLegendHtml(types){
+  const parts = [];
+  if(types.a) parts.push('<span class="lg"><i style="background:#D32F2F"></i> أحمر = اروندي</span>');
+  if(types.s) parts.push('<span class="lg"><i style="background:#2E9E4F"></i> أخضر = شطفة</span>');
+  return parts.length ? `<div class="fac-legend">${parts.join('')}</div>` : '';
+}
+function edgeTypesOf(pieces){ const t = {}; (pieces||[]).forEach(p=>Object.values(p.edges||{}).forEach(v=>{ const x = edgeType(v); if(x) t[x] = true; })); return t; }
 function edgeHit(opts, k, el){ return opts.hit ? el.replace('/>', ` class="piece-edge" data-edge="${k}" stroke="rgba(0,0,0,0)" stroke-width="18" fill="none" pointer-events="stroke"/>`) : ''; }
 
 function circleSvg(D, d, edges, opts){
@@ -4026,8 +4076,12 @@ function calcRowDrawHtml(type, r){
   if(!shapeHasDims(p)) return '';
   const cur = cornerDir(r.dir);
   const dirBtn = p.shape==='corner' ? `<div class="corner-dirs"><span>رأس الزاوية:</span>${['tl','tr','bl','br'].map(k=>`<button type="button" class="btn btn-sm corner-dir ${k===cur?'active':''}" data-dir="${k}" title="${CORNER_DIR_TXT[k]}">${CORNER_DIR_ARROW[k]} ${CORNER_DIR_TXT[k]}</button>`).join('')}</div>` : '';
-  return shapeSvg(p.shape, p.l, p.w, p.h, r.edges, {hit:true, dir:r.dir, c2:p.h2}) + dirBtn + '<div class="piece-hint">اكبس على الضلع لتعلّم اللف</div>';
+  return shapeSvg(p.shape, p.l, p.w, p.h, r.edges, {hit:true, dir:r.dir, c2:p.h2}) + dirBtn + '<div class="piece-hint">اكبس على الضلع لتعلّمه (حسب الاختيار فوق: اروندي أو شطفة)</div>';
 }
+document.querySelectorAll('.edge-brush button[data-brush]').forEach(b=>b.addEventListener('click', ()=>{
+  edgeBrush = b.dataset.brush;
+  document.querySelectorAll('.edge-brush button[data-brush]').forEach(x=>x.classList.toggle('active', x===b));
+}));
 // زر قلب اتجاه الزاوية (يمين / يسار)
 document.addEventListener('click', e=>{
   const btn = e.target.closest && e.target.closest('#measTablesWrap .corner-dir');
@@ -4044,7 +4098,7 @@ document.addEventListener('click', e=>{
   const box = hit.closest('.piece-draw');
   const t = box.dataset.drawT, r = box.dataset.drawR, k = hit.dataset.edge;
   const row = measTables[t].rows[r];
-  row.edges = Object.assign({}, row.edges||{}); row.edges[k] = !row.edges[k];
+  row.edges = toggleEdge(row.edges, k);
   box.innerHTML = calcRowDrawHtml(measTables[t].type, row);
 });
 
@@ -4053,7 +4107,7 @@ document.addEventListener('click', e=>{
 function renderFactorySheetHtml(order){
   const esc = escHtmlText;
   const d = order.date ? order.date.split('-').reverse().join('/') : fmtDateLatn(new Date());
-  const {cards, hasEdges} = factoryCardsHtml(order.pieces);
+  const {cards} = factoryCardsHtml(order.pieces);
   const extras = (order.extras||[]).map(t=>`<div class="fac-extra">${esc(t)}</div>`).join('');
   return `
     <div class="fac-sheet-head">
@@ -4065,7 +4119,7 @@ function renderFactorySheetHtml(order){
     </div>
     ${cards ? `<div class="fac-cards">${cards}</div>` : ''}
     ${extras}
-    ${hasEdges ? '<div class="fac-legend"><i></i> الخط الأحمر = مكان اللف</div>' : ''}
+    ${edgeLegendHtml(edgeTypesOf(order.pieces))}
   `;
 }
 // رسومات صغيرة تحت بيان البند بالوصل (من جداول القياسات المرفقة بنفس النوع)
@@ -4082,7 +4136,7 @@ function drawsHtml(pieces){
     const c = Number(p.count)||1;
     const cap = [c>1 ? `<b>العدد: ${c}</b>` : '', p.note ? escHtmlText(p.note) : ''].filter(Boolean).join(' · ');
     return `<div class="item-draw">${shapeSvg(p.shape, p.l, p.w, p.h, p.edges, {maxW:90, maxH:42, compact:true, dir:p.dir, c2:p.h2})}${cap?`<div class="item-draw-cap">${cap}</div>`:''}</div>`;
-  }).join('')}</div>`;
+  }).join('')}</div>${edgeLegendHtml(edgeTypesOf(pieces)).replace('fac-legend','fac-legend item-legend')}`;
 }
 function itemMeasDrawingsHtml(it, tables){
   if(!it) return '';
@@ -4894,7 +4948,7 @@ function renderMeasurementRecordInto(rec){
     <div style="margin-top:16px;">
       <div style="font-weight:700; color:var(--brass-deep); margin-bottom:8px;">الرسومات</div>
       <div class="fac-cards">${draw.cards}</div>
-      ${draw.hasEdges ? '<div class="fac-legend"><i></i> الخط الأحمر = مكان اللف</div>' : ''}
+      ${edgeLegendHtml(edgeTypesOf(calcToFactoryOrder(rec.tables, rec.customerName||'', rec.date).pieces))}
     </div>` : '';
   document.getElementById('measurementsPrintArea').innerHTML = `
     ${tablesHtml}
@@ -4950,6 +5004,9 @@ window.addEventListener('beforeprint', ()=>{
     body.style.width = oldW; body.style.maxHeight = oldMax; body.style.overflow = oldOv;
     let scale = Math.min(1, PRINT_PAGE_H / h);
     const MIN_HEAD = 0.8;
+    // أكتر من 20 بند (أو بدها تصغير كتير): ما منصغّر — بيكمّل على صفحات، بنفس الرأس ورقم الوصل بكل صفحة
+    const rowsCount = body.querySelectorAll('td.row-no').length;
+    if(rowsCount > 20 || (scale < 0.6 && rowsCount > 0)){ document.body.classList.add('print-multipage'); return; }
     if(scale < 1){
       let headScale = scale;
       if(head && scale < MIN_HEAD && h > headH){
@@ -4962,6 +5019,7 @@ window.addEventListener('beforeprint', ()=>{
   });
 });
 window.addEventListener('afterprint', ()=>{
+  document.body.classList.remove('print-multipage');
   printZoomEls.forEach(el=>{ el.style.zoom = ''; });
   printZoomEls = [];
 });
