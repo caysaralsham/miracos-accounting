@@ -247,6 +247,12 @@
   .meas-row-grid{display:grid; grid-template-columns:26px minmax(0,1fr) 1fr 1fr 70px 110px 30px; gap:6px; align-items:center; margin-bottom:5px;}
   .meas-table-box.with-note .meas-row-grid{grid-template-columns:26px minmax(0,1fr) 1fr 2.2fr 70px 110px 30px;}
   .meas-note{ text-align:right; }
+  .meas-who{ display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+  .meas-who input{ flex:1 1 180px; padding:7px 10px; font-size:13.5px; }
+  .meas-who input.who-phone{ flex:0 1 170px; }
+  .who-toggle{ display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden; flex:none; }
+  .who-toggle button{ border:none; background:#fff; padding:7px 14px; font-family:inherit; font-size:13px; font-weight:700; color:var(--text-dim); cursor:pointer; }
+  .who-toggle button.active{ background:var(--brass); color:#fff; }
   /* رسمة القطعة + علامة اللف */
   .piece-draw{ grid-column:1 / -1; padding:4px 0 8px; }
   .piece-draw:empty{ display:none; }
@@ -269,6 +275,7 @@
   .fac-card-head{ display:flex; justify-content:space-between; gap:8px; font-weight:800; font-size:15px; }
   .fac-card-head .dims{ direction:ltr; }
   .fac-card-note{ font-size:14px; font-weight:600; color:#222; margin-top:4px; }
+  td.desc-td .item-draws{ margin-top:4px; }
   .item-draws{ display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px; }
   .item-draw{ display:inline-block; text-align:center; font-size:11px; color:#555; line-height:1.2; }
   .item-draw svg{ display:inline-block; margin:0; transform-origin:top center; width:auto; height:auto; max-height:80px; }
@@ -608,19 +615,15 @@
       </div>
 
       <div class="panel">
-        <div class="grid2">
-          <div class="field">
-            <label>اسم الزبون</label>
-            <input type="text" id="measCustomerName" autocomplete="off">
+        <!-- سطر واحد صغير: زبون/معمل (الافتراضي زبون) + الاسم + الهاتف -->
+        <div class="meas-who">
+          <div class="who-toggle">
+            <button type="button" class="active" data-who="customer">زبون</button>
+            <button type="button" data-who="workshop">معمل</button>
           </div>
-          <div class="field">
-            <label>الهاتف</label>
-            <input type="text" id="measCustomerPhone" autocomplete="off">
-          </div>
-          <div class="field">
-            <label>اسم المعمل</label>
-            <input type="text" id="measWorkshop" autocomplete="off">
-          </div>
+          <input type="text" id="measCustomerName" autocomplete="off" placeholder="اسم الزبون">
+          <input type="text" id="measWorkshop" autocomplete="off" placeholder="اسم المعمل" style="display:none;">
+          <input type="text" id="measCustomerPhone" autocomplete="off" placeholder="الهاتف" class="who-phone">
         </div>
 
         <div id="measTablesWrap"></div>
@@ -2255,8 +2258,8 @@ function measResultFor(type, l, w, h){
   if(type==='مكعب') return {value: l*w*h, label: (l*w*h).toFixed(3)+' م³'};
   // عامود: القطر بالمتر (l) × 3.14 × الارتفاع بالمتر (w) = م²
   if(type==='عامود'){ const a = l*3.14*w; return {value: a, label: a.toFixed(2)+' م²'}; }
-  // دائرة: القطر برا (l) والقطر جوا (w، اختياري) → مساحة الحلقة م²
-  if(type==='دائرة'){ const a = 3.14/4*(l*l - w*w); return {value: Math.max(a,0), label: Math.max(a,0).toFixed(2)+' م²'}; }
+  // دائرة: بتنحسب بالقطر البراني متل ما هو (1.20 = 1.20 م²) — القطر الجواني للرسمة والمعمل فقط
+  if(type==='دائرة'){ return {value: l, label: l.toFixed(2)+' م²'}; }
   // زاوية: ضلع برا 1 (l) + ضلع برا 2 (w) والعرض (h) → مساحة الزاوية م²
   if(type==='زاوية'){ const a = h*(l + w - h); return {value: Math.max(a,0), label: Math.max(a,0).toFixed(2)+' م²'}; }
   return {value: l*w, label: (l*w).toFixed(2)+' م²'};
@@ -2274,13 +2277,14 @@ function newItemRow(item){
   const row = document.createElement('tr');
   row.innerHTML = `
     <td><input type="number" class="it-qty" value="${item.qty}" min="0" step="0.01" placeholder="العدد"></td>
-    <td class="desc-td"><textarea class="it-desc desc-grow" rows="1">${escHtmlText(item.desc||'')}</textarea></td>
+    <td class="desc-td"><textarea class="it-desc desc-grow" rows="1">${escHtmlText(item.desc||'')}</textarea>${drawsHtml(item.draws)}</td>
     <td><input type="number" class="it-price" value="${item.price||''}" min="0" placeholder="السعر"></td>
     <td class="amount-cell it-amount">0 دج</td>
     <td><button type="button" class="btn btn-ghost btn-sm it-measure" title="قياس">📐</button></td>
     <td><button class="btn btn-ghost btn-sm it-remove">✕</button></td>
   `;
   if(item.measType) row.dataset.measType = item.measType;
+  if(item.draws && item.draws.length) row.dataset.draws = JSON.stringify(item.draws);
   document.getElementById('itemsBody').appendChild(row);
   requestAnimationFrame(()=>autoGrow(row.querySelector('.it-desc')));
   const qty = row.querySelector('.it-qty');
@@ -2602,7 +2606,7 @@ function convertReceiptToQuote(){
     const qty = Number(qtyEl.value)||0;
     const desc = row.querySelector('.it-desc').value.trim();
     const price = Number(row.querySelector('.it-price').value)||0;
-    if(desc || qty || price) items.push({qty, desc, unit:'', price, amount: qty*price});
+    if(desc || qty || price) items.push({qty, desc, unit:'', price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {})});
   });
   const discount = Number(document.getElementById('rcpDiscount').value)||0;
   if(discount > 0) items.push({qty:1, desc:'خصم', unit:'', price:-discount, amount:-discount});
@@ -2665,7 +2669,7 @@ async function buildAndSaveReceiptFromForm(){
     const qty = Number(qtyEl.value)||0;
     const desc = row.querySelector('.it-desc').value.trim();
     const price = Number(row.querySelector('.it-price').value)||0;
-    if(desc || qty || price) items.push({qty, desc, price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {})});
+    if(desc || qty || price) items.push({qty, desc, price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {})});
   });
   const hasDetails = items.some(it=>it.desc);
   if(!hasDetails){ toast('يرجى كتابة تفاصيل البند (النوع) — خانة إجبارية'); return null; }
@@ -3144,13 +3148,15 @@ function newInvoiceItemRow(item){
   const row = document.createElement('tr');
   row.innerHTML = `
     <td><input type="number" class="inv-it-qty" value="${item.qty}" min="0" step="0.01" placeholder="العدد"></td>
-    <td class="desc-td"><textarea class="inv-it-desc desc-grow" rows="1">${escHtmlText(item.desc||'')}</textarea></td>
+    <td class="desc-td"><textarea class="inv-it-desc desc-grow" rows="1">${escHtmlText(item.desc||'')}</textarea>${drawsHtml(item.draws)}</td>
     <td><input type="text" class="inv-it-unit" list="unitOptions" value="${(item.unit||'').replace(/"/g,'&quot;')}" placeholder="الوحدة"></td>
     <td><input type="number" class="inv-it-price" value="${item.price||''}" min="0" placeholder="السعر"></td>
     <td class="amount-cell inv-it-amount">0 دج</td>
     <td><button type="button" class="btn btn-ghost btn-sm inv-it-measure" title="قياس">📐</button></td>
     <td><button class="btn btn-ghost btn-sm inv-it-remove">✕</button></td>
   `;
+  if(item.measType) row.dataset.measType = item.measType;
+  if(item.draws && item.draws.length) row.dataset.draws = JSON.stringify(item.draws);
   document.getElementById('invItemsBody').appendChild(row);
   requestAnimationFrame(()=>autoGrow(row.querySelector('.inv-it-desc')));
   const qty = row.querySelector('.inv-it-qty');
@@ -3376,7 +3382,7 @@ async function buildAndSaveInvoiceFromForm(){
     const desc = row.querySelector('.inv-it-desc').value.trim();
     const unit = row.querySelector('.inv-it-unit').value.trim();
     const price = Number(row.querySelector('.inv-it-price').value)||0;
-    if(desc || qty || price) items.push({qty, desc, unit, price, amount: qty*price});
+    if(desc || qty || price) items.push({qty, desc, unit, price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {})});
   });
   const ht = items.reduce((s,it)=>s+it.amount,0);
   const isSimpleDoc = document.getElementById('invDocType').value === 'simple';
@@ -3551,7 +3557,7 @@ function viewInvoice(id){
 
   if(isSimple){
     const itemsRowsAr = (inv.items||[]).map(it=>`
-      <tr><td>${it.qty}</td><td style="text-align:right;">${it.desc}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+      <tr><td>${it.qty}</td><td style="text-align:right;">${it.desc}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
     `).join('');
     const paymentsRowsAr = (inv.payments||[]).map(p=>`
       <div class="totals-row"><span>دفعة بتاريخ ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
@@ -3602,7 +3608,7 @@ function viewInvoice(id){
 
   const docLabel = (inv.docType === 'facture') ? 'FACTURE' : 'DEVIS';
   const itemsRows = (inv.items||[]).map(it=>`
-    <tr><td>${it.qty}</td><td style="text-align:left;">${it.desc}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+    <tr><td>${it.qty}</td><td style="text-align:left;">${it.desc}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
   `).join('');
   const paymentsRows = (inv.payments||[]).map(p=>`
     <div class="totals-row"><span>Paiement du ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
@@ -3808,7 +3814,7 @@ const MEAS_SPECS = {
   'طول': {label:'متر طول', cols:['طول (م)','العرض (مرجعي، م)']},
   'مكعب': {label:'متر مكعب', cols:['طول (م)','عرض (م)','سماكة (م)']},
   'عامود': {label:'عامود (القطر × 3.14 × الارتفاع = م²)', cols:['القطر (م)','الارتفاع (م)']},
-  'دائرة': {label:'دائرة (قطر برا وقطر جوا)', cols:['القطر برا (م)','القطر جوا (م)']},
+  'دائرة': {label:'دائرة (بتنحسب بالقطر البراني)', cols:['القطر برا (م)','القطر جوا (م)']},
   'زاوية': {label:'زاوية (ضلعين من برا والعرض)', cols:['ضلع برا 1 (م)','ضلع برا 2 (م)','العرض (م)']}
 };
 
@@ -4027,11 +4033,25 @@ function renderFactorySheetHtml(order){
   `;
 }
 // رسومات صغيرة تحت بيان البند بالوصل (من جداول القياسات المرفقة بنفس النوع)
+// القطع المرسومة لنوع معيّن من جداول القياسات (بالسنتي) — بتنحفظ مع البند
+function measDrawsForType(tables, type){
+  const tbls = (tables||[]).filter(t=>t.type===type);
+  if(!tbls.length) return [];
+  return calcToFactoryOrder(tbls, '', '').pieces.filter(p=>shapeHasDims(p))
+    .map(p=>({shape:p.shape, l:p.l, w:p.w, h:p.h||0, count:Number(p.count)||1, edges:p.edges||{}}));
+}
+function drawsHtml(pieces){
+  if(!pieces || !pieces.length) return '';
+  return `<div class="item-draws">${pieces.map(p=>{
+    const c = Number(p.count)||1;
+    return `<div class="item-draw">${shapeSvg(p.shape, p.l, p.w, p.h, p.edges, {maxW:90, maxH:42, compact:true})}${c>1?`<div>×${c}</div>`:''}</div>`;
+  }).join('')}</div>`;
+}
 function itemMeasDrawingsHtml(it, tables){
-  if(!it || !it.measType || !tables || !tables.length) return '';
-  const tbls = tables.filter(t=>t.type===it.measType);
-  if(!tbls.length) return '';
-  const pieces = calcToFactoryOrder(tbls, '', '').pieces.filter(p=>shapeHasDims(p));
+  if(!it) return '';
+  if(it.draws && it.draws.length) return drawsHtml(it.draws);
+  if(!it.measType || !tables || !tables.length) return '';
+  const pieces = measDrawsForType(tables, it.measType);
   if(!pieces.length) return '';
   return `<div class="item-draws">${pieces.map(p=>{
     const c = Number(p.count)||1;
@@ -4445,7 +4465,7 @@ document.getElementById('btnRcpMeasAddCol').addEventListener('click', ()=>addRec
 
 function buildMeasurementRecord(allowNoName){
   const name = document.getElementById('measCustomerName').value.trim();
-  if(!name && !allowNoName){ toast('يرجى إدخال اسم الزبون'); return null; }
+  if(!name && !allowNoName){ setMeasWho('customer'); toast('يرجى إدخال اسم الزبون'); return null; }
   const tables = measTables.map(tbl=>({
     type: tbl.type,
     rows: tbl.rows.filter(measRowFilled)
@@ -4473,8 +4493,19 @@ async function saveMeasurementRecord(rec){
   renderMeasurementsTable();
 }
 
+// زبون / معمل بخانة الاسم فوق الحاسبة
+function setMeasWho(who){
+  document.querySelectorAll('.who-toggle button').forEach(b=>b.classList.toggle('active', b.dataset.who===who));
+  document.getElementById('measCustomerName').style.display = who==='customer' ? '' : 'none';
+  document.getElementById('measCustomerPhone').style.display = who==='customer' ? '' : 'none';
+  document.getElementById('measWorkshop').style.display = who==='workshop' ? '' : 'none';
+  (who==='customer' ? document.getElementById('measCustomerName') : document.getElementById('measWorkshop')).focus();
+}
+document.querySelectorAll('.who-toggle button').forEach(b=>b.addEventListener('click', ()=>setMeasWho(b.dataset.who)));
+
 function resetMeasForm(){
   editingMeasurementId = null;
+  if(document.querySelector('.who-toggle')){ document.querySelectorAll('.who-toggle button').forEach(b=>b.classList.toggle('active', b.dataset.who==='customer')); document.getElementById('measCustomerName').style.display=''; document.getElementById('measCustomerPhone').style.display=''; document.getElementById('measWorkshop').style.display='none'; }
   if(typeof updateMeasEditBanner === 'function') updateMeasEditBanner();
   document.getElementById('measCustomerName').value = '';
   document.getElementById('measCustomerPhone').value = '';
@@ -4530,7 +4561,7 @@ function measItemsFromTotals(totals, tables){
   if(totals['عامود'] > 0) items.push({qty: Number(totals['عامود'].toFixed(2)), desc: desc('عامود (م²)','عامود'), price:'', measType:'عامود'});
   if(totals['دائرة'] > 0) items.push({qty: Number(totals['دائرة'].toFixed(2)), desc: desc('دوائر (م²)','دائرة'), price:'', measType:'دائرة'});
   if(totals['زاوية'] > 0) items.push({qty: Number(totals['زاوية'].toFixed(2)), desc: desc('زوايا (م²)','زاوية'), price:'', measType:'زاوية'});
-  return items;
+  return items.map(it=> it.measType ? Object.assign(it, {draws: measDrawsForType(tables, it.measType)}) : it);
 }
 
 document.getElementById('btnMeasConvertQuote').addEventListener('click', ()=>{
@@ -4541,7 +4572,7 @@ document.getElementById('btnMeasConvertQuote').addEventListener('click', ()=>{
 });
 function convertMeasToQuote(rec){
   const items = measItemsFromTotals(computeMeasTotalsFrom(rec.tables), rec.tables)
-    .map(it=>({qty: it.qty, desc: it.desc, unit:'', price:'', amount:0}));
+    .map(it=>({qty: it.qty, desc: it.desc, unit:'', price:'', amount:0, measType: it.measType, draws: it.draws}));
   const pseudoInvoice = {
     id: '', docType: 'simple', no: nextInvoiceNo('simple'),
     date: new Date().toISOString().slice(0,10), delay: '',
