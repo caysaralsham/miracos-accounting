@@ -276,6 +276,10 @@
   .fac-card-head .dims{ direction:ltr; }
   .fac-card-note{ font-size:14px; font-weight:600; color:#222; margin-top:4px; }
   td.desc-td .item-draws{ margin-top:4px; }
+  .meas-warn{ background:#FDECEA; color:#B3261E; border:1px solid #F1B8B2; border-radius:8px; padding:8px 12px; font-size:13px; text-align:center; }
+  .corner-dirs{ display:flex; gap:6px; justify-content:center; align-items:center; flex-wrap:wrap; margin-top:6px; font-size:12px; color:var(--text-dim); }
+  .corner-dirs .btn{ padding:4px 9px; font-size:12px; }
+  .corner-dirs .btn.active{ background:var(--brass); color:#fff; border-color:var(--brass); }
   .item-draws{ display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px; }
   .item-draw{ display:inline-block; text-align:center; font-size:11px; color:#555; line-height:1.2; }
   .item-draw-cap{ font-size:11.5px; color:#333; max-width:200px; margin:0 auto; }
@@ -3920,27 +3924,33 @@ function circleSvg(D, d, edges, opts){
   return svgWrap(W, H, g);
 }
 // زاوية L: ضلع برا A (أفقي) وضلع برا B (عامودي) والعرض C — الضلع الجوا = البرا − العرض
+// اتجاه الزاوية = وين رأس الزاوية البراني: tr فوق يمين (افتراضي) / tl فوق يسار / br تحت يمين / bl تحت يسار
+function cornerDir(d){ return d==='l' ? 'tl' : (d==='tl'||d==='br'||d==='bl') ? d : 'tr'; }
+const CORNER_DIR_TXT = {tr:'فوق يمين', tl:'فوق يسار', br:'تحت يمين', bl:'تحت يسار'};
+const CORNER_DIR_ARROW = {tr:'↗', tl:'↖', br:'↘', bl:'↙'};
 // زاوية L: الطول A (أفقي) والعرض B (عامودي) وعرض الضلع C — الجوا = البرا − عرض الضلع
-// opts.dir: 'r' = الزاوية عاليمين (افتراضي)، 'l' = عاليسار (الرسمة بتنقلب)
 function cornerSvg(A, B, C, edges, opts){
   opts = opts||{}; edges = edges||{}; A = Number(A)||0; B = Number(B)||0; C = Number(C)||0;
-  if(A<=0 || B<=0 || C<=0) return '';
-  const left = opts.dir === 'l';
+  if(A<=0 || B<=0 || C<=0 || C >= Math.min(A,B)) return '';
+  const dir = cornerDir(opts.dir), left = dir==='tl'||dir==='bl', bottom = dir==='br'||dir==='bl';
   const maxW = opts.maxW||200, maxH = opts.maxH||110;
   const sc = Math.min(maxW/A, maxH/B);
   const a = Math.max(A*sc, 40), b = Math.max(B*sc, 40), c = Math.min(Math.max(C*sc, 10), Math.min(a,b)-12);
-  const pad = 78, padT = 24, padB = 22;
-  const W = a + pad*2, H = b + padT + padB;
-  const X = x => left ? (W - x) : x;           // قلب أفقي للزاوية اليسار
-  const x0 = pad, y0 = padT, x1 = x0 + a, y1 = y0 + b;
-  const line = (k, xa, ya, xb, yb)=> `<line x1="${X(xa)}" y1="${ya}" x2="${X(xb)}" y2="${yb}" ${edgeStroke(edges[k])} stroke-linecap="round"/>` + edgeHit(opts, k, `<line x1="${X(xa)}" y1="${ya}" x2="${X(xb)}" y2="${yb}"/>`);
-  let g = `<path d="M${X(x0)},${y0} L${X(x1)},${y0} L${X(x1)},${y1} L${X(x1-c)},${y1} L${X(x1-c)},${y0+c} L${X(x0)},${y0+c} Z" fill="#F4EFE4"/>`;
+  const pad = 78, padV = 26;
+  const W = a + pad*2, H = b + padV*2;
+  const X = x => left ? (W - x) : x;        // قلب يمين/يسار
+  const Y = y => bottom ? (H - y) : y;      // قلب فوق/تحت
+  const x0 = pad, y0 = padV, x1 = x0 + a, y1 = y0 + b;
+  const line = (k, xa, ya, xb, yb)=> `<line x1="${X(xa)}" y1="${Y(ya)}" x2="${X(xb)}" y2="${Y(yb)}" ${edgeStroke(edges[k])} stroke-linecap="round"/>` + edgeHit(opts, k, `<line x1="${X(xa)}" y1="${Y(ya)}" x2="${X(xb)}" y2="${Y(yb)}"/>`);
+  const pt = (x,y)=>`${X(x)},${Y(y)}`;
+  let g = `<path d="M${pt(x0,y0)} L${pt(x1,y0)} L${pt(x1,y1)} L${pt(x1-c,y1)} L${pt(x1-c,y0+c)} L${pt(x0,y0+c)} Z" fill="#F4EFE4"/>`;
   g += line('oa', x0,y0, x1,y0) + line('ob', x1,y0, x1,y1) + line('ia', x0,y0+c, x1-c,y0+c) + line('ib', x1-c,y0+c, x1-c,y1) + line('ea', x0,y0, x0,y0+c) + line('eb', x1-c,y1, x1,y1);
-  g += svgLbl(X((x0+x1)/2), y0-7, `طول ${fmtCm(A)} سم`, 13, true);
-  if(!opts.compact) g += svgLbl(X((x0+x1-c)/2), y0+c+15, `جوا ${fmtCm(A-C)}`, 12);
-  g += svgLbl(X(x1+38), (y0+y1)/2, `عرض ${fmtCm(B)}`, 13, true) + svgLbl(X(x1+38), (y0+y1)/2+14, 'سم', 12);
-  if(!opts.compact) g += svgLbl(X(x1-c-30), Math.max((y0+c+y1)/2+4, y0+c+36), `جوا ${fmtCm(B-C)}`, 12);
-  g += svgLbl(X(x0-38), y0+c/2+4, `الضلع ${fmtCm(C)}`, 12);
+  const ty = y => Y(y) + (bottom ? 0 : 0);
+  g += svgLbl(X((x0+x1)/2), bottom ? Y(y0)+16 : y0-8, `طول ${fmtCm(A)} سم`, 13, true);
+  if(!opts.compact) g += svgLbl(X((x0+x1-c)/2), bottom ? Y(y0+c)-6 : y0+c+15, `جوا ${fmtCm(A-C)}`, 12);
+  g += svgLbl(X(x1+38), H/2, `عرض ${fmtCm(B)}`, 13, true) + svgLbl(X(x1+38), H/2+14, 'سم', 12);
+  if(!opts.compact) g += svgLbl(X(x1-c-30), ty(Math.max((y0+c+y1)/2+4, y0+c+36)), `جوا ${fmtCm(B-C)}`, 12);
+  g += svgLbl(X(x0-38), Y(y0+c/2)+4, `الضلع ${fmtCm(C)}`, 12);
   return svgWrap(W, H, g);
 }
 // عامود (منظر من قدّام): القطر D والارتفاع Hh — لف فوق/تحت
@@ -3974,14 +3984,14 @@ function shapeOfMeasType(type){ return type==='دائرة' ? 'circle' : type==='
 function shapeDimsText(p){
   const L = fmtCm(p.l), W = fmtCm(p.w), C = fmtCm(p.h);
   if(p.shape==='circle') return Number(p.w)>0 ? `دائرة: برا ${L} جوا ${W} سم` : `دائرة: قطر ${L} سم`;
-  if(p.shape==='corner') return `زاوية ${p.dir==='l'?'يسار':'يمين'}: ${L} × ${W}، الضلع ${C} سم`;
+  if(p.shape==='corner') return `زاوية ${CORNER_DIR_TXT[cornerDir(p.dir)]}: ${L} × ${W}، الضلع ${C} سم`;
   if(p.shape==='column') return `عامود: قطر ${L}، ارتفاع ${W} سم`;
   return (Number(p.l)>0 && Number(p.w)>0) ? `${L} × ${W} سم` : '';
 }
 function shapeHasDims(p){
   const l = Number(p.l)>0, w = Number(p.w)>0, h = Number(p.h)>0;
   if(p.shape==='circle') return l;
-  if(p.shape==='corner') return l && w && h;
+  if(p.shape==='corner') return l && w && h && Number(p.h) < Math.min(Number(p.l), Number(p.w));
   return l && w;
 }
 
@@ -3990,8 +4000,12 @@ function measDrawable(type){ return !!MEAS_SPECS[type]; }
 function calcRowDrawHtml(type, r){
   const l = parseFloat(r.l)||0, w = parseFloat(r.w)||0, h = parseFloat(r.h)||0;
   const p = {shape: shapeOfMeasType(type), l:l*100, w:w*100, h:h*100};
+  if(p.shape==='corner' && p.l>0 && p.w>0 && p.h>0 && p.h >= Math.min(p.l, p.w)){
+    return `<div class="meas-warn">عرض الضلع (${fmtCm(p.h/100)}) لازم يكون أصغر من الطول والعرض — كل الخانات بالمتر، مثلاً 20 سم = <b>0.20</b></div>`;
+  }
   if(!shapeHasDims(p)) return '';
-  const dirBtn = p.shape==='corner' ? `<div style="text-align:center; margin-top:4px;"><button type="button" class="btn btn-sm corner-dir">الزاوية عـ${r.dir==='l'?'اليسار':'اليمين'} ⇄ اقلب</button></div>` : '';
+  const cur = cornerDir(r.dir);
+  const dirBtn = p.shape==='corner' ? `<div class="corner-dirs"><span>رأس الزاوية:</span>${['tl','tr','bl','br'].map(k=>`<button type="button" class="btn btn-sm corner-dir ${k===cur?'active':''}" data-dir="${k}" title="${CORNER_DIR_TXT[k]}">${CORNER_DIR_ARROW[k]} ${CORNER_DIR_TXT[k]}</button>`).join('')}</div>` : '';
   return shapeSvg(p.shape, p.l, p.w, p.h, r.edges, {hit:true, dir:r.dir}) + dirBtn + '<div class="piece-hint">اكبس على الضلع لتعلّم اللف</div>';
 }
 // زر قلب اتجاه الزاوية (يمين / يسار)
@@ -4000,7 +4014,7 @@ document.addEventListener('click', e=>{
   if(!btn) return;
   const box = btn.closest('.piece-draw');
   const row = measTables[box.dataset.drawT].rows[box.dataset.drawR];
-  row.dir = row.dir === 'l' ? 'r' : 'l';
+  row.dir = btn.dataset.dir;
   box.innerHTML = calcRowDrawHtml(measTables[box.dataset.drawT].type, row);
 });
 // كبسة على ضلع بالحاسبة
@@ -4081,7 +4095,7 @@ function calcToFactoryOrder(tablesArg, customerArg, dateArg){
       const c = Number(r.count)||1, note = String(r.note||'').trim();
       const shape = shapeOfMeasType(tbl.type);
       if(shape !== 'rect'){
-        const p = {shape, l:l*100, w:w*100, h:h*100, count:c, note, edges: Object.assign({}, r.edges||{}), ...(shape==='corner' ? {dir: r.dir==='l' ? 'l' : 'r'} : {})};
+        const p = {shape, l:l*100, w:w*100, h:h*100, count:c, note, edges: Object.assign({}, r.edges||{}), ...(shape==='corner' ? {dir: cornerDir(r.dir)} : {})};
         if(shapeHasDims(p)) pieces.push(p); else if(note) extras.push(note);
         return;
       }
@@ -4491,7 +4505,7 @@ function measDetailsForType(tables, type){
       return;
     }
     else if(type==='دائرة') d = parseFloat(r.w) ? `قطر برا ${n(r.l)} جوا ${n(r.w)}` : `قطر ${n(r.l)}`;
-    else if(type==='زاوية') d = `${r.dir==='l'?'يسار':'يمين'} ${n(r.l)}×${n(r.w)} عرض الضلع ${n(r.h)}`;
+    else if(type==='زاوية') d = `${CORNER_DIR_TXT[cornerDir(r.dir)]} ${n(r.l)}×${n(r.w)} عرض الضلع ${n(r.h)}`;
     else if(type==='طول') d = `${n(r.l)}`;
     else if(type==='مكعب') d = `${n(r.l)}×${n(r.w)}×${n(r.h)}`;
     else d = `${n(r.l)}×${n(r.w)}`;
