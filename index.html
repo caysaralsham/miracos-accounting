@@ -1124,10 +1124,13 @@
 </div>
 
 <div class="overlay" id="measurementsViewOverlay">
-  <div class="modal" style="max-width:760px;">
+  <div class="modal" style="max-width:820px;">
     <div class="modal-head">
       <h3>عرض القياسات</h3>
       <div style="display:flex; gap:8px;">
+        <button class="btn btn-sm" id="btnEditMeasurementsView">✏️ تعديل</button>
+        <button class="btn btn-sm" id="btnMeasViewToReceipt">تحويل لوصل</button>
+        <button class="btn btn-sm" id="btnMeasViewToQuote">تحويل لعرض سعر</button>
         <button class="btn btn-sm" id="btnShareMeasurementsView">مشاركة</button>
         <button class="btn btn-sm" id="btnPrintMeasurementsView">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M6 9V3h12v6M6 18h12v4H6v-4z"/><rect x="6" y="11" width="12" height="7"/></svg>
@@ -2296,7 +2299,7 @@ function cleanMeasDecimal(value){
   const raw = String(value||'').replace(/[,،٫]/g, '.');
   if(raw.includes('.')){
     const parts = raw.replace(/[^0-9.]/g, '').split('.');
-    return parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+    return (parts[0]||'0') + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
   }
   const digits = raw.replace(/[^0-9]/g, '');
   if(digits.length === 0) return '';
@@ -2956,7 +2959,7 @@ function viewReceipt(id){
       const rowsHtml = tbl.rows.map((row,i)=>{
         const cells = spec.cols.map((c,ci)=>{
           const field = ci===0?'l':ci===1?'w':'h';
-          return `<td>${row[field]||'—'}</td>`;
+          return `<td>${measNumShow(row[field])}</td>`;
         }).join('');
         const count = row.count===undefined || row.count===null || row.count==='' ? 1 : row.count;
         const base = measResultFor(tbl.type, row.l, row.w, row.h);
@@ -3859,6 +3862,7 @@ function wireMeasToggles(wrap, tables){
   });
 }
 
+function measNumShow(v){ const n = parseFloat(v); return (v===''||v==null||isNaN(n)) ? '—' : String(Number(n.toFixed(3))); }
 function emptyMeasRow(){ return {l:'', w:'', h:'', count:1, note:''}; }
 // خانة "التفاصيل" (اختيارية) بجدول متر مربع ومتر طول
 const MEAS_NOTE_TYPES = ['مربع','طول','عامود','دائرة'];
@@ -4003,18 +4007,7 @@ document.addEventListener('click', e=>{
 function renderFactorySheetHtml(order){
   const esc = escHtmlText;
   const d = order.date ? order.date.split('-').reverse().join('/') : fmtDateLatn(new Date());
-  const pieces = (order.pieces||[]).filter(p=> shapeHasDims(p) || String(p.note||'').trim());
-  let hasEdges = false;
-  const cards = pieces.map((p,i)=>{
-    const c = Number(p.count)||1;
-    const dims = shapeHasDims(p) ? shapeDimsText(p) : '';
-    if(p.edges && Object.values(p.edges).some(Boolean)) hasEdges = true;
-    return `<div class="fac-card">
-      <div class="fac-card-head"><span>#${i+1} <span class="dims">${dims}</span></span><span>العدد: ${c}</span></div>
-      ${String(p.note||'').trim() ? `<div class="fac-card-note">${esc(p.note)}</div>` : ''}
-      <div class="fac-draw">${shapeSvg(p.shape, p.l, p.w, p.h, p.edges, {maxW:230, maxH:100})}</div>
-    </div>`;
-  }).join('');
+  const {cards, hasEdges} = factoryCardsHtml(order.pieces);
   const extras = (order.extras||[]).map(t=>`<div class="fac-extra">${esc(t)}</div>`).join('');
   return `
     <div class="fac-sheet-head">
@@ -4028,6 +4021,22 @@ function renderFactorySheetHtml(order){
     ${extras}
     ${hasEdges ? '<div class="fac-legend"><i></i> الخط الأحمر = مكان اللف</div>' : ''}
   `;
+}
+function factoryCardsHtml(piecesIn){
+  const esc = escHtmlText;
+  const pieces = (piecesIn||[]).filter(p=> shapeHasDims(p) || String(p.note||'').trim());
+  let hasEdges = false;
+  const cards = pieces.map((p,i)=>{
+    const c = Number(p.count)||1;
+    const dims = shapeHasDims(p) ? shapeDimsText(p) : '';
+    if(p.edges && Object.values(p.edges).some(Boolean)) hasEdges = true;
+    return `<div class="fac-card">
+      <div class="fac-card-head"><span>#${i+1} <span class="dims">${dims}</span></span><span>العدد: ${c}</span></div>
+      ${String(p.note||'').trim() ? `<div class="fac-card-note">${esc(p.note)}</div>` : ''}
+      <div class="fac-draw">${shapeSvg(p.shape, p.l, p.w, p.h, p.edges, {maxW:230, maxH:100})}</div>
+    </div>`;
+  }).join('');
+  return {cards, hasEdges};
 }
 // تحويل جداول الحاسبة (بالمتر) لطلبية معمل (بالسنتي)
 function calcToFactoryOrder(tablesArg, customerArg, dateArg){
@@ -4251,7 +4260,7 @@ function renderMeasTables(){
         const raw = e.target.value.replace(/,/g, '.');
         if(raw.includes('.')){
           const parts = raw.replace(/[^0-9.]/g, '').split('.');
-          clean = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+          clean = (parts[0]||'0') + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
         } else {
           const digits = raw.replace(/[^0-9]/g, '');
           if(digits.length === 0){ clean = ''; }
@@ -4366,7 +4375,7 @@ function renderReceiptMeasTables(){
         const raw = e.target.value.replace(/,/g, '.');
         if(raw.includes('.')){
           const parts = raw.replace(/[^0-9.]/g, '').split('.');
-          clean = parts[0] + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
+          clean = (parts[0]||'0') + (parts.length > 1 ? '.' + parts.slice(1).join('') : '');
         } else {
           const digits = raw.replace(/[^0-9]/g, '');
           if(digits.length === 0){ clean = ''; }
@@ -4436,12 +4445,21 @@ function buildMeasurementRecord(allowNoName){
 }
 
 async function saveMeasurementRecord(rec){
-  measurementsList.push(rec);
+  const idx = editingMeasurementId ? measurementsList.findIndex(r=>r.id===editingMeasurementId) : -1;
+  if(idx >= 0){
+    rec.id = editingMeasurementId;
+    rec.date = measurementsList[idx].date || rec.date;
+    measurementsList[idx] = rec;
+  } else {
+    measurementsList.push(rec);
+  }
   saveMeasurementsList();
   renderMeasurementsTable();
 }
 
 function resetMeasForm(){
+  editingMeasurementId = null;
+  if(typeof updateMeasEditBanner === 'function') updateMeasEditBanner();
   document.getElementById('measCustomerName').value = '';
   document.getElementById('measCustomerPhone').value = '';
   measTables = [{type:'مربع', rows: Array.from({length:10}, emptyMeasRow)}];
@@ -4502,6 +4520,10 @@ function measItemsFromTotals(totals, tables){
 document.getElementById('btnMeasConvertQuote').addEventListener('click', ()=>{
   const rec = buildMeasurementRecord();
   if(!rec) return;
+  convertMeasToQuote(rec);
+  resetMeasForm();
+});
+function convertMeasToQuote(rec){
   const items = measItemsFromTotals(computeMeasTotalsFrom(rec.tables), rec.tables)
     .map(it=>({qty: it.qty, desc: it.desc, unit:'', price:'', amount:0}));
   const pseudoInvoice = {
@@ -4516,12 +4538,15 @@ document.getElementById('btnMeasConvertQuote').addEventListener('click', ()=>{
   document.getElementById('invId').value = '';
   document.getElementById('invoiceModalTitle').textContent = 'عرض سعر جديد (محوّل من قياسات)';
   toast('عبّي السعر لكل بند ثم احفظ عرض السعر');
-  resetMeasForm();
-});
+}
 
 document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
   const rec = buildMeasurementRecord();
   if(!rec) return;
+  convertMeasToReceipt(rec);
+  resetMeasForm();
+});
+function convertMeasToReceipt(rec){
   const totals = computeMeasTotalsFrom(rec.tables);
   const items = measItemsFromTotals(totals, rec.tables);
   const pseudoReceipt = {
@@ -4541,8 +4566,54 @@ document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
   document.getElementById('rcpId').value = '';
   document.getElementById('receiptModalTitle').textContent = 'وصل جديد (محوّل من قياسات)';
   toast('عبّي السعر لكل بند ثم احفظ الوصل');
-  resetMeasForm();
+}
+
+// أزرار نافذة القياسات المحفوظة: تعديل / تحويل لوصل / تحويل لعرض سعر
+function currentViewedMeasRec(){ return measurementsList.find(r=>r.id===currentViewedMeasurementId); }
+document.getElementById('btnMeasViewToReceipt').addEventListener('click', ()=>{
+  const rec = currentViewedMeasRec(); if(!rec) return;
+  document.getElementById('measurementsViewOverlay').classList.remove('show');
+  convertMeasToReceipt(JSON.parse(JSON.stringify(rec)));
 });
+document.getElementById('btnMeasViewToQuote').addEventListener('click', ()=>{
+  const rec = currentViewedMeasRec(); if(!rec) return;
+  document.getElementById('measurementsViewOverlay').classList.remove('show');
+  convertMeasToQuote(JSON.parse(JSON.stringify(rec)));
+});
+document.getElementById('btnEditMeasurementsView').addEventListener('click', ()=>{
+  const rec = currentViewedMeasRec(); if(rec) editMeasurementRecord(rec.id);
+});
+// تعديل قياس محفوظ: بيرجع للحاسبة، والحفظ بيعدّل نفس السجل بدل ما يعمل واحد جديد
+let editingMeasurementId = null;
+function editMeasurementRecord(id){
+  const rec = measurementsList.find(r=>r.id===id); if(!rec) return;
+  document.getElementById('measurementsViewOverlay').classList.remove('show');
+  document.querySelector('.nav-item[data-view="measurements"]').click();
+  editingMeasurementId = id;
+  document.getElementById('measCustomerName').value = rec.customerName||'';
+  document.getElementById('measCustomerPhone').value = rec.customerPhone||'';
+  measTables = JSON.parse(JSON.stringify(rec.tables)).map(t=>({...t, open:true, rows: t.rows.map(r=>({...emptyMeasRow(), ...r}))}));
+  measTables.forEach(t=>{ while(t.rows.length < 3) t.rows.push(emptyMeasRow()); });
+  renderMeasTables();
+  updateMeasEditBanner();
+  window.scrollTo({top:0, behavior:'smooth'});
+  toast('عدّل القياسات واضغط حفظ');
+}
+function updateMeasEditBanner(){
+  let b = document.getElementById('measEditBanner');
+  if(!b){
+    b = document.createElement('div'); b.id = 'measEditBanner';
+    b.style.cssText = 'background:#FFF4D6; border:1px solid #E8C873; border-radius:8px; padding:8px 12px; margin-bottom:12px; font-weight:700; display:flex; justify-content:space-between; align-items:center; gap:8px;';
+    const wrap = document.getElementById('measTablesWrap');
+    wrap.parentNode.insertBefore(b, wrap.parentNode.firstChild);
+  }
+  const rec = editingMeasurementId ? measurementsList.find(r=>r.id===editingMeasurementId) : null;
+  document.getElementById('btnMeasSaveOnly').textContent = rec ? 'حفظ التعديل' : 'حفظ فقط';
+  if(!rec){ b.style.display = 'none'; return; }
+  b.style.display = 'flex';
+  b.innerHTML = `<span>✏️ عم تعدّل قياسات: ${escHtmlText(rec.customerName||'')} — <span dir="ltr">${(rec.date||'').split('-').reverse().join('/')}</span></span><button type="button" class="btn btn-sm" id="btnCancelMeasEdit">إلغاء التعديل</button>`;
+  document.getElementById('btnCancelMeasEdit').addEventListener('click', ()=>{ resetMeasForm(); });
+}
 
 function renderMeasurementsTable(){
   const wrap = document.getElementById('measurementsTableWrap');
@@ -4563,6 +4634,7 @@ function renderMeasurementsTable(){
       <td>
         <div class="row-actions">
           <button class="btn btn-sm btn-ghost" onclick="viewMeasurementRecord('${rec.id}')" title="عرض/طباعة">👁</button>
+          <button class="btn btn-sm btn-ghost" onclick="editMeasurementRecord('${rec.id}')" title="تعديل">✏️</button>
           <button class="btn btn-sm btn-ghost" onclick="deleteMeasurementRecord('${rec.id}')" title="حذف">🗑</button>
         </div>
       </td>
@@ -4615,7 +4687,7 @@ function renderMeasurementRecordInto(rec){
     const rowsHtml = tbl.rows.map((r,i)=>{
       const cells = spec.cols.map((c,ci)=>{
         const field = ci===0?'l':ci===1?'w':'h';
-        return `<td>${r[field]||'—'}</td>`;
+        return `<td>${measNumShow(r[field])}</td>`;
       }).join('');
       const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
       const base = measResultFor(tbl.type, r.l, r.w, r.h);
@@ -4649,9 +4721,17 @@ function renderMeasurementRecordInto(rec){
       ${t['زاوية']>0 ? `<div><b>إجمالي الزوايا:</b> ${t['زاوية'].toFixed(2)} م²</div>` : ''}
     </div>`;
 
+  const draw = factoryCardsHtml(calcToFactoryOrder(rec.tables, rec.customerName||'', rec.date).pieces.filter(p=>shapeHasDims(p)));
+  const drawingsHtml = draw.cards ? `
+    <div style="margin-top:16px;">
+      <div style="font-weight:700; color:var(--brass-deep); margin-bottom:8px;">الرسومات</div>
+      <div class="fac-cards">${draw.cards}</div>
+      ${draw.hasEdges ? '<div class="fac-legend"><i></i> الخط الأحمر = مكان اللف</div>' : ''}
+    </div>` : '';
   document.getElementById('measurementsPrintArea').innerHTML = `
     ${tablesHtml}
     ${totalsHtml}
+    ${drawingsHtml}
   `;
 }
 document.getElementById('btnPrintMeasurementsView').addEventListener('click', ()=>window.print());
