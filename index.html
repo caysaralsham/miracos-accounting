@@ -669,7 +669,7 @@
           <button class="btn" id="btnMeasAddCorner">+ جدول زوايا</button>
         </div>
 
-        <div style="display:flex; gap:8px; margin-top:16px; border-top:1px solid var(--line); padding-top:14px; flex-wrap:wrap;">
+        <div id="measActionsBar" style="display:flex; gap:8px; margin-top:16px; border-top:1px solid var(--line); padding-top:14px; flex-wrap:wrap;">
           <button class="btn btn-primary" id="btnMeasSaveOnly">حفظ فقط</button>
           <button class="btn btn-primary" id="btnMeasSavePrint">حفظ وطباعة</button>
           <button class="btn btn-primary" id="btnMeasConvertReceipt" style="display:none;">تحويل لوصل دفع</button>
@@ -3860,7 +3860,7 @@ const MEAS_SPECS = {
   'طول': {label:'متر طول', cols:['طول (م)','العرض (مرجعي، م)']},
   'مكعب': {label:'متر مكعب', cols:['طول (م)','عرض (م)','سماكة (م)']},
   'عامود': {label:'عامود (القطر × 3.14 × الارتفاع = م²)', cols:['القطر (م)','الارتفاع (م)']},
-  'دائرة': {label:'دائرة (بتنحسب بالقطر البراني)', cols:['القطر برا (م)','القطر جوا (م)']},
+  'دائرة': {label:'دائرة', cols:['القطر برا (م)','القطر جوا (م)']},
   'زاوية': {label:'زاوية (بتنحسب الطول × العرض من برا)', cols:['الطول (م)','العرض (م)','الضلع 1 (م)','الضلع 2 (م)']}
 };
 
@@ -4205,6 +4205,107 @@ async function shareFactoryOrder(order){
   shareImageChoice(blob, fileName, title, '');
 }
 
+
+
+// ================== 📐 تعديل قياسات بند (بالوصل / عرض السعر / Devis / Facture) بالحاسبة الكاملة ==================
+// الزر 📐 بكل بند بيفتح حاسبة القياسات كاملة (كل الأشكال، الرسمات، اروندي/شطفة، الاتجاهات، التفاصيل)،
+// و"تطبيق على البند" بيرجّع العدد والبيان والرسمات للبند نفسه. شغل الحاسبة اللي كان مفتوح بيرجع متل ما كان.
+let itemMeasCtx = null;
+document.addEventListener('click', e=>{
+  const b = e.target.closest && e.target.closest('.it-measure, .inv-it-measure');
+  if(!b) return;
+  e.preventDefault(); e.stopPropagation();
+  openItemInCalc(b.closest('tr'), b.classList.contains('inv-it-measure') ? 'invoice' : 'receipt');
+}, true);
+function openItemInCalc(row, kind){
+  const overlayId = kind==='invoice' ? 'invoiceOverlay' : 'receiptOverlay';
+  const prevNav = document.querySelector('.nav-item.active');
+  itemMeasCtx = { row, kind, overlayId, prevView: prevNav ? prevNav.dataset.view : null,
+    saved: { tables: JSON.parse(JSON.stringify(measTables)), name: document.getElementById('measCustomerName').value,
+             phone: document.getElementById('measCustomerPhone').value, editing: editingMeasurementId } };
+  let tables = [];
+  if(row.dataset.draws && row.dataset.measType){
+    tables = tablesFromDocItems([{measType: row.dataset.measType, draws: JSON.parse(row.dataset.draws)}]);
+  }
+  if(!tables.length) tables = [{type:'مربع', open:true, rows: Array.from({length:5}, emptyMeasRow)}];
+  tables.forEach(t=>{ t.open = true; while(t.rows.length < 3) t.rows.push(emptyMeasRow()); });
+  document.getElementById(overlayId).classList.remove('show');
+  document.querySelector('.nav-item[data-view="measurements"]').click();
+  editingMeasurementId = null;
+  measTables = tables;
+  renderMeasTables();
+  if(typeof updateMeasEditBanner === 'function') updateMeasEditBanner();
+  document.getElementById('measActionsBar').style.display = 'none';
+  showItemMeasBanner();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function showItemMeasBanner(){
+  let b = document.getElementById('itemMeasBanner');
+  if(!b){
+    b = document.createElement('div'); b.id = 'itemMeasBanner';
+    b.style.cssText = 'background:#E8F4EC; border:1px solid #9CCFAE; border-radius:8px; padding:10px 12px; margin-bottom:12px; font-weight:700; display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; position:sticky; top:0; z-index:5;';
+    const wrap = document.getElementById('measTablesWrap');
+    wrap.parentNode.insertBefore(b, wrap.parentNode.firstChild);
+  }
+  const lbl = itemMeasCtx && itemMeasCtx.kind==='invoice' ? 'عرض السعر / الفاتورة' : 'الوصل';
+  b.style.display = 'flex';
+  b.innerHTML = `<span>📐 عم تعدّل قياسات بند من ${lbl}</span><span style="display:flex; gap:8px;"><button type="button" class="btn btn-primary btn-sm" id="btnItemMeasApply">✓ تطبيق على البند</button><button type="button" class="btn btn-sm" id="btnItemMeasCancel">إلغاء</button></span>`;
+  document.getElementById('btnItemMeasApply').onclick = applyItemMeas;
+  document.getElementById('btnItemMeasCancel').onclick = ()=>closeItemMeas();
+}
+function closeItemMeas(){
+  if(!itemMeasCtx) return;
+  const c = itemMeasCtx; itemMeasCtx = null;
+  const b = document.getElementById('itemMeasBanner'); if(b) b.style.display = 'none';
+  document.getElementById('measActionsBar').style.display = '';
+  measTables = c.saved.tables;
+  document.getElementById('measCustomerName').value = c.saved.name;
+  document.getElementById('measCustomerPhone').value = c.saved.phone;
+  editingMeasurementId = c.saved.editing;
+  renderMeasTables();
+  if(typeof updateMeasEditBanner === 'function') updateMeasEditBanner();
+  if(c.prevView && c.prevView !== 'measurements'){ const n = document.querySelector(`.nav-item[data-view="${c.prevView}"]`); if(n) n.click(); }
+  document.getElementById(c.overlayId).classList.add('show');
+}
+function setRowMeasItem(row, kind, it){
+  const pre = kind==='invoice' ? 'inv-it-' : 'it-';
+  const q = row.querySelector('.' + pre + 'qty'), d = row.querySelector('.' + pre + 'desc');
+  q.value = it.qty; d.value = it.desc;
+  if(it.measType) row.dataset.measType = it.measType; else delete row.dataset.measType;
+  if(it.draws && it.draws.length) row.dataset.draws = JSON.stringify(it.draws); else delete row.dataset.draws;
+  const td = d.closest('td');
+  td.querySelectorAll('.item-draws, .item-legend').forEach(x=>x.remove());
+  d.insertAdjacentHTML('afterend', drawsHtml(it.draws));
+  autoGrow(d);
+  q.dispatchEvent(new Event('input', {bubbles:true}));
+}
+function applyItemMeas(){
+  const c = itemMeasCtx; if(!c) return;
+  const tables = measTables.map(t=>({type:t.type, rows: t.rows.filter(measRowFilled)})).filter(t=>t.rows.length);
+  const items = measItemsFromTotals(computeMeasTotalsFrom(tables), tables);
+  if(!items.length){ toast('ما في قياسات — اكتب القياسات أو اضغط إلغاء'); return; }
+  const row = c.row, kind = c.kind;
+  // إذا البند كان فيه كتابة يدوية (بدون قياسات قبل)، منخلّيها ومنزيد القياسات بعدها
+  const oldDesc = (row.querySelector('.it-desc, .inv-it-desc')||{}).value || '';
+  if(!row.dataset.draws && oldDesc.trim()) items[0].desc = `${oldDesc.trim()} — ${items[0].desc}`;
+  closeItemMeas();
+  setRowMeasItem(row, kind, items[0]);
+  // إذا في أكتر من نوع (مثلاً مربع + زاوية) كل نوع بيصير بند لحاله تحت البند الأصلي
+  let after = row;
+  items.slice(1).forEach(it=>{
+    if(kind==='invoice') newInvoiceItemRow({qty:'', desc:'', unit:'', price:''}); else newItemRow({qty:'', desc:'', price:''});
+    const body = document.getElementById(kind==='invoice' ? 'invItemsBody' : 'itemsBody');
+    const rows = [...body.children].filter(tr=>tr.querySelector('.it-qty, .inv-it-qty'));
+    const nr = rows[rows.length-1];
+    const mr = nr.nextElementSibling && !nr.nextElementSibling.querySelector('.it-qty, .inv-it-qty') ? nr.nextElementSibling : null;
+    const afterTarget = (after.nextElementSibling && !after.nextElementSibling.querySelector('.it-qty, .inv-it-qty')) ? after.nextElementSibling : after;
+    afterTarget.after(nr); if(mr) nr.after(mr);
+    after = nr;
+    setRowMeasItem(nr, kind, it);
+  });
+  if(kind==='invoice') recalcInvoiceTotals(); else recalcTotals();
+  toast('انطبقت القياسات على البند');
+}
 
 // ================== تحويل موحّد بين: وصل / عرض سعر / Devis / Facture / حاسبة القياسات ==================
 // الأصل بيضل محفوظ متل ما هو، والجديد بيفتح لتراجعه وتحفظه. كل التفاصيل والرسمات بتنتقل.
