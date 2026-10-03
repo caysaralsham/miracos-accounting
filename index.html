@@ -278,6 +278,7 @@
   td.desc-td .item-draws{ margin-top:4px; }
   .item-draws{ display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px; }
   .item-draw{ display:inline-block; text-align:center; font-size:11px; color:#555; line-height:1.2; }
+  .item-draw-cap{ font-size:11.5px; color:#333; max-width:200px; margin:0 auto; }
   .item-draw svg{ display:inline-block; margin:0; transform-origin:top center; width:auto; height:auto; max-height:80px; }
   .fac-card .fac-draw{ text-align:center; margin-top:8px; }
   .fac-card svg{ display:inline-block; margin:0; vertical-align:top; } /* html2canvas بيقص الرسمة إذا margin:auto */
@@ -2960,7 +2961,9 @@ function viewReceipt(id){
   `).join('') || '<div class="totals-row"><span>لا توجد دفعات مسجلة</span><span>—</span></div>';
 
   let measTablesHtml = '';
-  if(r.measurementTables && r.measurementTables.length){
+  // إذا البنود فيها رسمات، ما في داعي لجداول القياسات المرفقة — كل التفاصيل بالرسمة
+  const itemsHaveDrawings = (r.items||[]).some(it=>(it.draws && it.draws.length) || it.measType);
+  if(r.measurementTables && r.measurementTables.length && !itemsHaveDrawings){
     const tablesPart = r.measurementTables.map(tbl=>{
       const spec = MEAS_SPECS[tbl.type];
       const headCols = spec.cols.map(c=>`<th>${c}</th>`).join('');
@@ -4038,25 +4041,21 @@ function measDrawsForType(tables, type){
   const tbls = (tables||[]).filter(t=>t.type===type);
   if(!tbls.length) return [];
   return calcToFactoryOrder(tbls, '', '').pieces.filter(p=>shapeHasDims(p))
-    .map(p=>({shape:p.shape, l:p.l, w:p.w, h:p.h||0, count:Number(p.count)||1, edges:p.edges||{}}));
+    .map(p=>({shape:p.shape, l:p.l, w:p.w, h:p.h||0, count:Number(p.count)||1, edges:p.edges||{}, note:String(p.note||'').trim()}));
 }
 function drawsHtml(pieces){
   if(!pieces || !pieces.length) return '';
   return `<div class="item-draws">${pieces.map(p=>{
     const c = Number(p.count)||1;
-    return `<div class="item-draw">${shapeSvg(p.shape, p.l, p.w, p.h, p.edges, {maxW:90, maxH:42, compact:true})}${c>1?`<div>×${c}</div>`:''}</div>`;
+    const cap = [c>1 ? `<b>العدد: ${c}</b>` : '', p.note ? escHtmlText(p.note) : ''].filter(Boolean).join(' · ');
+    return `<div class="item-draw">${shapeSvg(p.shape, p.l, p.w, p.h, p.edges, {maxW:90, maxH:42, compact:true})}${cap?`<div class="item-draw-cap">${cap}</div>`:''}</div>`;
   }).join('')}</div>`;
 }
 function itemMeasDrawingsHtml(it, tables){
   if(!it) return '';
   if(it.draws && it.draws.length) return drawsHtml(it.draws);
   if(!it.measType || !tables || !tables.length) return '';
-  const pieces = measDrawsForType(tables, it.measType);
-  if(!pieces.length) return '';
-  return `<div class="item-draws">${pieces.map(p=>{
-    const c = Number(p.count)||1;
-    return `<div class="item-draw">${shapeSvg(p.shape, p.l, p.w, p.h, p.edges, {maxW:90, maxH:42, compact:true})}${c>1?`<div>×${c}</div>`:''}</div>`;
-  }).join('')}</div>`;
+  return drawsHtml(measDrawsForType(tables, it.measType));
 }
 function factoryCardsHtml(piecesIn){
   const esc = escHtmlText;
