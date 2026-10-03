@@ -245,6 +245,35 @@
   .meas-toggle .meas-sum{font-size:12px; font-weight:600; color:var(--text-dim);}
   .meas-toggle .meas-arrow{display:inline-block; width:14px;}
   .meas-row-grid{display:grid; grid-template-columns:26px minmax(0,1fr) 1fr 1fr 70px 110px 30px; gap:6px; align-items:center; margin-bottom:5px;}
+  .meas-table-box.with-note .meas-row-grid{grid-template-columns:26px minmax(0,1fr) 1fr 2.2fr 70px 110px 30px;}
+  .meas-note{ text-align:right; }
+  /* رسمة القطعة + علامة اللف */
+  .piece-draw{ grid-column:1 / -1; padding:4px 0 8px; }
+  .piece-draw:empty{ display:none; }
+  .piece-draw svg{ display:block; margin:0 auto; max-width:100%; }
+  .piece-edge{ cursor:pointer; }
+  .piece-hint{ text-align:center; font-size:11px; color:var(--text-dim); margin-top:2px; }
+  .fac-row-grid{ display:grid; grid-template-columns:26px 100px 1fr 1fr 1fr 64px 2fr 30px; gap:6px; align-items:center; margin-bottom:5px; }
+  .fac-row-grid .piece-draw{ grid-column:1 / -1; }
+  @media (max-width:700px){
+    .fac-row-grid{ grid-template-columns:22px 1fr 1fr 1fr; }
+    .fac-row-grid .meas-note{ grid-column:2 / -1; }
+  }
+  /* ورقة المعمل */
+  .fac-sheet-head{ display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #222; padding-bottom:10px; margin-bottom:14px; gap:10px; }
+  .fac-ws{ font-size:22px; font-weight:800; }
+  .fac-sub{ font-size:14px; color:#555; margin-top:4px; }
+  .fac-date{ font-size:15px; font-weight:700; direction:ltr; }
+  .fac-cards{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .fac-card{ border:1px solid #cfcfcf; border-radius:8px; padding:10px 12px; break-inside:avoid; page-break-inside:avoid; background:#fff; }
+  .fac-card-head{ display:flex; justify-content:space-between; gap:8px; font-weight:800; font-size:15px; }
+  .fac-card-head .dims{ direction:ltr; }
+  .fac-card-note{ font-size:14px; font-weight:600; color:#222; margin-top:4px; }
+  .fac-card .fac-draw{ text-align:center; margin-top:8px; }
+  .fac-card svg{ display:inline-block; margin:0; vertical-align:top; } /* html2canvas بيقص الرسمة إذا margin:auto */
+  .fac-extra{ border:1px dashed #bbb; border-radius:8px; padding:8px 12px; margin-top:10px; font-size:14px; font-weight:600; }
+  .fac-legend{ margin-top:14px; font-size:13px; color:#444; display:flex; align-items:center; gap:8px; }
+  .fac-legend i{ display:inline-block; width:34px; height:6px; background:#D32F2F; border-radius:3px; }
   .meas-row-grid input[disabled]{background:var(--stone); color:var(--text-dim);}
   .meas-result{font-size:13px; font-weight:700; color:var(--brass-deep); text-align:center;}
   .meas-print-table{width:100%; border-collapse:collapse; font-size:13px; margin-top:6px;}
@@ -332,6 +361,8 @@
     }
     .meas-row-grid > *:nth-child(n+5){ grid-column:span 1; }
     .meas-row-grid input, .meas-row-grid .meas-result{ width:100%; min-width:0; }
+    .meas-table-box.with-note .meas-row-grid{ grid-template-columns:22px 1fr 1fr; }
+    .meas-row-grid .meas-note{ grid-column:2 / -1; }
   }
   @media (max-width: 420px){
     .stats-grid.cols-5, .stats-grid.cols-3{grid-template-columns:1fr;}
@@ -402,6 +433,10 @@
       <a class="nav-item" data-view="measurements">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"/><path d="M8 4v4M12 4v6M16 4v4M4 8h4M4 16h4M4 12h6"/></svg>
         حاسبة القياسات
+      </a>
+      <a class="nav-item" data-view="factory">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V10l6 4V10l6 4V6l6 4v11z"/><path d="M3 21h18"/></svg>
+        طلبية المعمل
       </a>
       <a class="nav-item" data-view="reports">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9"/><path d="M11 19V5"/><path d="M18 19v-7"/><path d="M2 19h20"/></svg>
@@ -579,6 +614,10 @@
             <label>الهاتف</label>
             <input type="text" id="measCustomerPhone" autocomplete="off">
           </div>
+          <div class="field">
+            <label>اسم المعمل</label>
+            <input type="text" id="measWorkshop" autocomplete="off">
+          </div>
         </div>
 
         <div id="measTablesWrap"></div>
@@ -589,6 +628,8 @@
           <button class="btn" id="btnMeasAddLen">+ جدول متر طول</button>
           <button class="btn" id="btnMeasAddCube">+ جدول متر مكعب</button>
           <button class="btn" id="btnMeasAddCol">+ جدول عامود</button>
+          <button class="btn" id="btnMeasAddCircle">+ جدول دوائر</button>
+          <button class="btn" id="btnMeasAddCorner">+ جدول زوايا</button>
         </div>
 
         <div style="display:flex; gap:8px; margin-top:16px; border-top:1px solid var(--line); padding-top:14px; flex-wrap:wrap;">
@@ -596,12 +637,38 @@
           <button class="btn btn-primary" id="btnMeasSavePrint">حفظ وطباعة</button>
           <button class="btn btn-primary" id="btnMeasConvertReceipt">تحويل لوصل دفع</button>
           <button class="btn btn-primary" id="btnMeasConvertQuote">تحويل لعرض سعر</button>
+          <button class="btn" id="btnMeasShare">مشاركة للمعمل</button>
+          <button class="btn" id="btnMeasToFactory">نقل لطلبية المعمل</button>
         </div>
       </div>
 
       <div class="panel">
         <div class="panel-head"><h2>القياسات المحفوظة</h2></div>
         <div id="measurementsTableWrap"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-factory">
+      <div class="topbar"><h1>طلبية المعمل</h1></div>
+      <div class="panel">
+        <div class="grid2">
+          <div class="field"><label>اسم المعمل</label><input type="text" id="facWorkshop" autocomplete="off"></div>
+          <div class="field"><label>اسم الزبون (اختياري)</label><input type="text" id="facCustomer" autocomplete="off"></div>
+          <div class="field"><label>التاريخ</label><input type="date" id="facDate"></div>
+        </div>
+        <div class="meas-table-box">
+          <div class="fac-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
+            <span></span><span>الشكل</span><span>قياس 1 (سم)</span><span>قياس 2 (سم)</span><span>قياس 3 (سم)</span><span>العدد</span><span>التفاصيل</span><span></span>
+          </div>
+          <div id="facRowsWrap"></div>
+          <button type="button" class="btn btn-sm" id="btnFacAddRow" style="margin-top:6px;">+ إضافة قطعة</button>
+          <div class="piece-hint" style="margin-top:8px;">اكبس على أي ضلع بالرسمة لتعلّم مكان اللف (بيصير أحمر) — كبسة تانية بتشيله</div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:16px; border-top:1px solid var(--line); padding-top:14px; flex-wrap:wrap;">
+          <button class="btn btn-primary" id="btnFacShare">مشاركة</button>
+          <button class="btn btn-primary" id="btnFacPreview">معاينة وطباعة</button>
+          <button class="btn" id="btnFacClear">مسح الكل</button>
+        </div>
       </div>
     </section>
 
@@ -1061,6 +1128,7 @@
     <div class="modal-head">
       <h3>عرض القياسات</h3>
       <div style="display:flex; gap:8px;">
+        <button class="btn btn-sm" id="btnShareMeasurementsView">مشاركة</button>
         <button class="btn btn-sm" id="btnPrintMeasurementsView">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M6 9V3h12v6M6 18h12v4H6v-4z"/><rect x="6" y="11" width="12" height="7"/></svg>
           طباعة
@@ -1070,6 +1138,22 @@
     </div>
     <div class="modal-body">
       <div class="receipt-view" id="measurementsPrintArea"></div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="factoryViewOverlay">
+  <div class="modal" style="max-width:820px;">
+    <div class="modal-head">
+      <h3>طلبية المعمل</h3>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-sm" id="btnFacViewShare">مشاركة</button>
+        <button class="btn btn-sm" id="btnFacViewPrint">طباعة</button>
+        <button class="close-x" data-close="factoryViewOverlay">×</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="receipt-view" id="factoryPrintArea"></div>
     </div>
   </div>
 </div>
@@ -1653,6 +1737,7 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.view === 'customers') renderReceiptsTable();
     if(item.dataset.view === 'expenses'){ renderExpensesTable(); renderExpenseCategoryChips(); }
     if(item.dataset.view === 'measurements') renderMeasurementsTable();
+    if(item.dataset.view === 'factory') renderFactoryPage();
     if(item.dataset.view === 'reports'){ renderReports(); renderPaymentHistoryTable(); }
     if(item.dataset.view === 'pricelist'){ renderPriceCategoryChips(); renderPriceListGrouped(); }
     if(item.dataset.view === 'customer-reports') renderCustomerReports();
@@ -2164,6 +2249,10 @@ function measResultFor(type, l, w, h){
   if(type==='مكعب') return {value: l*w*h, label: (l*w*h).toFixed(3)+' م³'};
   // عامود: القطر بالمتر (l) × 3.14 × الارتفاع بالمتر (w) = م²
   if(type==='عامود'){ const a = l*3.14*w; return {value: a, label: a.toFixed(2)+' م²'}; }
+  // دائرة: القطر برا (l) والقطر جوا (w، اختياري) → مساحة الحلقة م²
+  if(type==='دائرة'){ const a = 3.14/4*(l*l - w*w); return {value: Math.max(a,0), label: Math.max(a,0).toFixed(2)+' م²'}; }
+  // زاوية: ضلع برا 1 (l) + ضلع برا 2 (w) والعرض (h) → مساحة الزاوية م²
+  if(type==='زاوية'){ const a = h*(l + w - h); return {value: Math.max(a,0), label: Math.max(a,0).toFixed(2)+' م²'}; }
   return {value: l*w, label: (l*w).toFixed(2)+' م²'};
 }
 
@@ -2587,7 +2676,7 @@ async function buildAndSaveReceiptFromForm(){
   const paid = payments.reduce((s,p)=>s+p.amount,0);
 
   const measTablesToSave = receiptMeasTables
-    .map(tbl => ({type: tbl.type, rows: tbl.rows.filter(r => r.l || r.w || r.h)}))
+    .map(tbl => ({type: tbl.type, rows: tbl.rows.filter(measRowFilled)}))
     .filter(tbl => tbl.rows.length > 0);
 
   const id = document.getElementById('rcpId').value;
@@ -2874,12 +2963,13 @@ function viewReceipt(id){
         const total = base.value * (Number(count)||1);
         const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
         const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
-        return `<tr><td>${i+1}</td>${cells}<td>${count}</td><td>${resLabel}</td></tr>`;
+        const noteTd = measHasNote(tbl.type) ? `<td style="text-align:right;">${escHtmlText(row.note||'')}</td>` : '';
+        return `<tr><td>${i+1}</td>${cells}${noteTd}<td>${count}</td><td>${resLabel}</td></tr>`;
       }).join('');
       return `<div style="margin-top:14px;">
         <div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${spec.label}</div>
         <table class="meas-print-table">
-          <thead><tr><th>#</th>${headCols}<th>العدد</th><th>النتيجة</th></tr></thead>
+          <thead><tr><th>#</th>${headCols}${measHasNote(tbl.type)?'<th>التفاصيل</th>':''}<th>العدد</th><th>النتيجة</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>`;
@@ -2891,6 +2981,8 @@ function viewReceipt(id){
         ${t['طول']>0 ? `<div><b>إجمالي متر طول:</b> ${t['طول'].toFixed(2)} م.ط</div>` : ''}
         ${t['مكعب']>0 ? `<div><b>إجمالي متر مكعب:</b> ${t['مكعب'].toFixed(3)} م³</div>` : ''}
         ${t['عامود']>0 ? `<div><b>إجمالي العواميد:</b> ${t['عامود'].toFixed(2)} م²</div>` : ''}
+        ${t['دائرة']>0 ? `<div><b>إجمالي الدوائر:</b> ${t['دائرة'].toFixed(2)} م²</div>` : ''}
+        ${t['زاوية']>0 ? `<div><b>إجمالي الزوايا:</b> ${t['زاوية'].toFixed(2)} م²</div>` : ''}
       </div>`;
     measTablesHtml = `
       <hr style="margin:18px 0; border:none; border-top:1px dashed var(--line);">
@@ -3708,7 +3800,9 @@ const MEAS_SPECS = {
   'مربع': {label:'متر مربع', cols:['طول (م)','عرض (م)']},
   'طول': {label:'متر طول', cols:['طول (م)','العرض (مرجعي، م)']},
   'مكعب': {label:'متر مكعب', cols:['طول (م)','عرض (م)','سماكة (م)']},
-  'عامود': {label:'عامود (القطر × 3.14 × الارتفاع = م²)', cols:['القطر (م)','الارتفاع (م)']}
+  'عامود': {label:'عامود (القطر × 3.14 × الارتفاع = م²)', cols:['القطر (م)','الارتفاع (م)']},
+  'دائرة': {label:'دائرة (قطر برا وقطر جوا)', cols:['القطر برا (م)','القطر جوا (م)']},
+  'زاوية': {label:'زاوية (ضلعين من برا والعرض)', cols:['ضلع برا 1 (م)','ضلع برا 2 (م)','العرض (م)']}
 };
 
 function computeMeasTotalsFrom(tables){
@@ -3734,7 +3828,9 @@ function renderMeasTotals(tables, targetEl){
   el.innerHTML = card('إجمالي متر مربع', totals['مربع'], 'م²')
     + card('إجمالي متر طول', totals['طول'], 'م.ط')
     + card('إجمالي متر مكعب', totals['مكعب'], 'م³')
-    + (tables.some(t=>t.type==='عامود') ? card('إجمالي العواميد', totals['عامود'], 'م²') : '');
+    + (tables.some(t=>t.type==='عامود') ? card('إجمالي العواميد', totals['عامود'], 'م²') : '')
+    + (tables.some(t=>t.type==='دائرة') ? card('إجمالي الدوائر', totals['دائرة']||0, 'م²') : '')
+    + (tables.some(t=>t.type==='زاوية') ? card('إجمالي الزوايا', totals['زاوية']||0, 'م²') : '');
 }
 
 // جداول القياسات بتنطوى: بتطلع بس عنوانها وملخصها، وكبسة على العنوان بتفتحها
@@ -3763,10 +3859,317 @@ function wireMeasToggles(wrap, tables){
   });
 }
 
-function emptyMeasRow(){ return {l:'', w:'', h:'', count:1}; }
+function emptyMeasRow(){ return {l:'', w:'', h:'', count:1, note:''}; }
+// خانة "التفاصيل" (اختيارية) بجدول متر مربع ومتر طول
+const MEAS_NOTE_TYPES = ['مربع','طول','عامود','دائرة'];
+function measHasNote(type){ return MEAS_NOTE_TYPES.includes(type); }
+function measRowFilled(r){ return !!((r.l!=='' && r.l!=null) || (r.w!=='' && r.w!=null) || (r.h!=='' && r.h!=null) || String(r.note||'').trim()); }
+function measNoteInput(tbl, ti, ri, r){
+  return `<input type="text" class="meas-note" data-t="${ti}" data-r="${ri}" data-f="note" value="${escHtmlText(r.note||'').replace(/"/g,'&quot;')}">`;
+}
 
 // تنقل بين خانات جدول القياسات بالأسهم متل الإكسل: فوق/تحت = نفس الخانة بالصف
 // يلي قبل/بعد، يمين/يسار = الخانة يلي قبل/بعد بنفس الصف (بس إذا المؤشر بأول أو آخر النص).
+// ================== رسمة القطعة (بالسنتي) + علامات اللف ==================
+function fmtCm(v){ const n = Number(v)||0; return String(Number(n.toFixed(1))); }
+function pieceSvg(lCm, wCm, edges, opts){
+  opts = opts || {}; edges = edges || {};
+  const maxW = opts.maxW || 240, maxH = opts.maxH || 100;
+  lCm = Number(lCm)||0; wCm = Number(wCm)||0;
+  if(lCm<=0 || wCm<=0) return '';
+  const sc = Math.min(maxW/lCm, maxH/wCm);
+  const rw = Math.max(lCm*sc, 36), rh = Math.max(wCm*sc, 16);
+  const padTop = 22, padSide = 54, padBot = 12;
+  const W = rw + padSide*2, H = rh + padTop + padBot;
+  const x0 = padSide, y0 = padTop, x1 = x0 + rw, y1 = y0 + rh;
+  const RED = '#D32F2F', INK = '#333';
+  const edge = (k, xa, ya, xb, yb)=>{
+    const on = !!edges[k];
+    const vis = `<line x1="${xa}" y1="${ya}" x2="${xb}" y2="${yb}" stroke="${on?RED:INK}" stroke-width="${on?7:2}" stroke-linecap="round"/>`;
+    const hit = opts.hit ? `<line class="piece-edge" data-edge="${k}" x1="${xa}" y1="${ya}" x2="${xb}" y2="${yb}" stroke="rgba(0,0,0,0)" stroke-width="18"/>` : '';
+    return vis + hit;
+  };
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="font-family:Arial,sans-serif; direction:ltr;" direction="ltr">
+    <rect x="${x0}" y="${y0}" width="${rw}" height="${rh}" fill="#F4EFE4"/>
+    ${edge('t',x0,y0,x1,y0)}${edge('b',x0,y1,x1,y1)}${edge('r',x1,y0,x1,y1)}${edge('l',x0,y0,x0,y1)}
+    <text x="${(x0+x1)/2+4}" y="${y0-7}" text-anchor="start" font-size="13" font-weight="700" fill="#111">${fmtCm(lCm)}</text>
+    <text x="${(x0+x1)/2}" y="${y0-7}" text-anchor="end" font-size="12" fill="#444">سم</text>
+    <text x="${x1+26}" y="${(y0+y1)/2}" text-anchor="middle" font-size="13" font-weight="700" fill="#111">${fmtCm(wCm)}</text>
+    <text x="${x1+26}" y="${(y0+y1)/2+14}" text-anchor="middle" font-size="12" fill="#444">سم</text>
+  </svg>`;
+}
+// ---- أشكال تانية: دائرة، زاوية، عامود (من برا ومن جوا + اللف) ----
+function svgLbl(x, y, text, size, bold){ return `<text x="${x}" y="${y}" text-anchor="middle" font-size="${size||12}" ${bold?'font-weight="700"':''} fill="#111">${text}</text>`; }
+function svgWrap(W, H, inner){ return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="font-family:Arial,sans-serif; direction:ltr;" direction="ltr">${inner}</svg>`; }
+const EDGE_RED = '#D32F2F', EDGE_INK = '#333';
+function edgeStroke(on){ return `stroke="${on?EDGE_RED:EDGE_INK}" stroke-width="${on?7:2}"`; }
+function edgeHit(opts, k, el){ return opts.hit ? el.replace('/>', ` class="piece-edge" data-edge="${k}" stroke="rgba(0,0,0,0)" stroke-width="18" fill="none" pointer-events="stroke"/>`) : ''; }
+
+function circleSvg(D, d, edges, opts){
+  opts = opts||{}; edges = edges||{}; D = Number(D)||0; d = Number(d)||0;
+  if(D<=0) return '';
+  const R = Math.min(55, (opts.maxH||100)/2), r = d>0 ? Math.max(R*d/D, 6) : 0;
+  const W = R*2 + 200, H = R*2 + 24, cx = R + 14, cy = R + 12;
+  let g = `<circle cx="${cx}" cy="${cy}" r="${R}" fill="#F4EFE4" ${edgeStroke(edges.o)}/>` + edgeHit(opts,'o',`<circle cx="${cx}" cy="${cy}" r="${R}"/>`);
+  if(r>0) g += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#fff" ${edgeStroke(edges.i)}/>` + edgeHit(opts,'i',`<circle cx="${cx}" cy="${cy}" r="${r}"/>`);
+  const lx = cx + R + 95;
+  g += svgLbl(lx, cy - (r>0?6:-4), `قطر برا: ${fmtCm(D)} سم`, 13, true);
+  if(r>0) g += svgLbl(lx, cy + 14, `قطر جوا: ${fmtCm(d)} سم`, 13, true);
+  return svgWrap(W, H, g);
+}
+// زاوية L: ضلع برا A (أفقي) وضلع برا B (عامودي) والعرض C — الضلع الجوا = البرا − العرض
+function cornerSvg(A, B, C, edges, opts){
+  opts = opts||{}; edges = edges||{}; A = Number(A)||0; B = Number(B)||0; C = Number(C)||0;
+  if(A<=0 || B<=0 || C<=0) return '';
+  const maxW = opts.maxW||200, maxH = opts.maxH||110;
+  const sc = Math.min(maxW/A, maxH/B);
+  const a = Math.max(A*sc, 40), b = Math.max(B*sc, 40), c = Math.min(Math.max(C*sc, 10), Math.min(a,b)-12);
+  const padL = 70, padT = 24, padR = 70, padB = 22;
+  const x0 = padL, y0 = padT, x1 = x0 + a, y1 = y0 + b;
+  const W = a + padL + padR, H = b + padT + padB;
+  const line = (k, xa, ya, xb, yb)=> `<line x1="${xa}" y1="${ya}" x2="${xb}" y2="${yb}" ${edgeStroke(edges[k])} stroke-linecap="round"/>` + edgeHit(opts, k, `<line x1="${xa}" y1="${ya}" x2="${xb}" y2="${yb}"/>`);
+  let g = `<path d="M${x0},${y0} L${x1},${y0} L${x1},${y1} L${x1-c},${y1} L${x1-c},${y0+c} L${x0},${y0+c} Z" fill="#F4EFE4"/>`;
+  g += line('oa', x0,y0, x1,y0) + line('ob', x1,y0, x1,y1) + line('ia', x0,y0+c, x1-c,y0+c) + line('ib', x1-c,y0+c, x1-c,y1) + line('ea', x0,y0, x0,y0+c) + line('eb', x1-c,y1, x1,y1);
+  g += svgLbl((x0+x1)/2, y0-7, `برا ${fmtCm(A)} سم`, 13, true);
+  g += svgLbl((x0+x1-c)/2, y0+c+15, `جوا ${fmtCm(A-C)}`, 12);
+  g += svgLbl(x1+36, (y0+y1)/2, `برا ${fmtCm(B)}`, 13, true) + svgLbl(x1+36, (y0+y1)/2+14, 'سم', 12);
+  g += svgLbl(x1-c-34, (y0+c+y1)/2+4, `جوا ${fmtCm(B-C)}`, 12);
+  g += svgLbl(x0-32, y0+c/2+4, `عرض ${fmtCm(C)}`, 12);
+  return svgWrap(W, H, g);
+}
+// عامود (منظر من قدّام): القطر D والارتفاع Hh — لف فوق/تحت
+function columnSvg(D, Hh, edges, opts){
+  opts = opts||{}; edges = edges||{}; D = Number(D)||0; Hh = Number(Hh)||0;
+  if(D<=0 || Hh<=0) return '';
+  const maxW = opts.maxW||160, maxH = opts.maxH||120;
+  const sc = Math.min(maxW/D, maxH/Hh);
+  const w = Math.max(D*sc, 26), h = Math.max(Hh*sc, 30), ry = Math.min(9, w*0.18);
+  const padL = 110, padT = 30, padR = 30, padB = ry + 10;
+  const x0 = padL, y0 = padT + ry, x1 = x0 + w, y1 = y0 + h, cx = (x0+x1)/2;
+  const W = w + padL + padR, H = h + padT + ry + padB;
+  let g = `<path d="M${x0},${y0} L${x0},${y1} A${w/2},${ry} 0 0 0 ${x1},${y1} L${x1},${y0} Z" fill="#F4EFE4"/>`;
+  g += `<line x1="${x0}" y1="${y0}" x2="${x0}" y2="${y1}" stroke="${EDGE_INK}" stroke-width="2"/><line x1="${x1}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="${EDGE_INK}" stroke-width="2"/>`;
+  const topEl = `M${x0},${y0} A${w/2},${ry} 0 1 0 ${x1},${y0} A${w/2},${ry} 0 1 0 ${x0},${y0} Z`;
+  g += `<path d="${topEl}" fill="#EDE5D3" ${edgeStroke(edges.t)}/>` + edgeHit(opts,'t',`<path d="${topEl}"/>`);
+  const bot = `M${x0},${y1} A${w/2},${ry} 0 0 0 ${x1},${y1}`;
+  g += `<path d="${bot}" fill="none" ${edgeStroke(edges.b)}/>` + edgeHit(opts,'b',`<path d="${bot}"/>`);
+  g += svgLbl(cx, padT-12, `قطر ${fmtCm(D)} سم`, 13, true);
+  g += svgLbl(x0-50, (y0+y1)/2, `ارتفاع ${fmtCm(Hh)}`, 13, true) + svgLbl(x0-50, (y0+y1)/2+14, 'سم', 12);
+  return svgWrap(W, H, g);
+}
+// الشكل حسب النوع: rect | circle | corner | column — القياسات بالسنتي
+function shapeSvg(shape, a, b, c, edges, opts){
+  if(shape==='circle') return circleSvg(a, b, edges, opts);
+  if(shape==='corner') return cornerSvg(a, b, c, edges, opts);
+  if(shape==='column') return columnSvg(a, b, edges, opts);
+  return pieceSvg(a, b, edges, opts);
+}
+function shapeOfMeasType(type){ return type==='دائرة' ? 'circle' : type==='زاوية' ? 'corner' : type==='عامود' ? 'column' : 'rect'; }
+function shapeDimsText(p){
+  const L = fmtCm(p.l), W = fmtCm(p.w), C = fmtCm(p.h);
+  if(p.shape==='circle') return Number(p.w)>0 ? `دائرة: برا ${L} جوا ${W} سم` : `دائرة: قطر ${L} سم`;
+  if(p.shape==='corner') return `زاوية: برا ${L} × ${W}، عرض ${C} سم`;
+  if(p.shape==='column') return `عامود: قطر ${L}، ارتفاع ${W} سم`;
+  return (Number(p.l)>0 && Number(p.w)>0) ? `${L} × ${W} سم` : '';
+}
+function shapeHasDims(p){
+  const l = Number(p.l)>0, w = Number(p.w)>0, h = Number(p.h)>0;
+  if(p.shape==='circle') return l;
+  if(p.shape==='corner') return l && w && h;
+  return l && w;
+}
+
+// كل جداول الحاسبة إلها رسمة
+function measDrawable(type){ return !!MEAS_SPECS[type]; }
+function calcRowDrawHtml(type, r){
+  const l = parseFloat(r.l)||0, w = parseFloat(r.w)||0, h = parseFloat(r.h)||0;
+  const p = {shape: shapeOfMeasType(type), l:l*100, w:w*100, h:h*100};
+  if(!shapeHasDims(p)) return '';
+  return shapeSvg(p.shape, p.l, p.w, p.h, r.edges, {hit:true}) + '<div class="piece-hint">اكبس على الضلع لتعلّم اللف</div>';
+}
+// كبسة على ضلع بالحاسبة
+document.addEventListener('click', e=>{
+  const hit = e.target.closest && e.target.closest('#measTablesWrap .piece-edge');
+  if(!hit) return;
+  const box = hit.closest('.piece-draw');
+  const t = box.dataset.drawT, r = box.dataset.drawR, k = hit.dataset.edge;
+  const row = measTables[t].rows[r];
+  row.edges = Object.assign({}, row.edges||{}); row.edges[k] = !row.edges[k];
+  box.innerHTML = calcRowDrawHtml(measTables[t].type, row);
+});
+
+// ================== ورقة المعمل ==================
+// order = {workshop, customer, date, pieces:[{l,w,count,note,edges}] (بالسنتي), extras:[نص]}
+function renderFactorySheetHtml(order){
+  const esc = escHtmlText;
+  const d = order.date ? order.date.split('-').reverse().join('/') : fmtDateLatn(new Date());
+  const pieces = (order.pieces||[]).filter(p=> shapeHasDims(p) || String(p.note||'').trim());
+  let hasEdges = false;
+  const cards = pieces.map((p,i)=>{
+    const c = Number(p.count)||1;
+    const dims = shapeHasDims(p) ? shapeDimsText(p) : '';
+    if(p.edges && Object.values(p.edges).some(Boolean)) hasEdges = true;
+    return `<div class="fac-card">
+      <div class="fac-card-head"><span>#${i+1} <span class="dims">${dims}</span></span><span>العدد: ${c}</span></div>
+      ${String(p.note||'').trim() ? `<div class="fac-card-note">${esc(p.note)}</div>` : ''}
+      <div class="fac-draw">${shapeSvg(p.shape, p.l, p.w, p.h, p.edges, {maxW:230, maxH:100})}</div>
+    </div>`;
+  }).join('');
+  const extras = (order.extras||[]).map(t=>`<div class="fac-extra">${esc(t)}</div>`).join('');
+  return `
+    <div class="fac-sheet-head">
+      <div>
+        <div class="fac-ws">${order.workshop ? 'المعمل: ' + esc(order.workshop) : 'طلبية المعمل'}</div>
+        ${order.customer ? `<div class="fac-sub">الزبون: ${esc(order.customer)}</div>` : ''}
+      </div>
+      <div class="fac-date">${d}</div>
+    </div>
+    ${cards ? `<div class="fac-cards">${cards}</div>` : ''}
+    ${extras}
+    ${hasEdges ? '<div class="fac-legend"><i></i> الخط الأحمر = مكان اللف</div>' : ''}
+  `;
+}
+// تحويل جداول الحاسبة (بالمتر) لطلبية معمل (بالسنتي)
+function calcToFactoryOrder(tablesArg, customerArg, dateArg){
+  const pieces = [], extras = [];
+  (tablesArg || measTables).forEach(tbl=>{
+    tbl.rows.forEach(r=>{
+      const l = parseFloat(r.l)||0, w = parseFloat(r.w)||0, h = parseFloat(r.h)||0;
+      const c = Number(r.count)||1, note = String(r.note||'').trim();
+      const shape = shapeOfMeasType(tbl.type);
+      if(shape !== 'rect'){
+        const p = {shape, l:l*100, w:w*100, h:h*100, count:c, note, edges: Object.assign({}, r.edges||{})};
+        if(shapeHasDims(p)) pieces.push(p); else if(note) extras.push(note);
+        return;
+      }
+      if(l>0 && w>0){
+        let n = note;
+        if(tbl.type==='مكعب' && h>0) n = `سماكة ${fmtCm(h*100)} سم${n?' — '+n:''}`;
+        pieces.push({shape:'rect', l: l*100, w: w*100, count: c, note: n, edges: Object.assign({}, r.edges||{})});
+      } else if(l>0 && tbl.type==='طول'){
+        extras.push(`متر طول: ${fmtCm(l*100)} سم${c>1?` (×${c})`:''}${note?' — '+note:''}`);
+      } else if(note){
+        extras.push(note);
+      }
+    });
+  });
+  return {
+    workshop: document.getElementById('measWorkshop').value.trim(),
+    customer: customerArg !== undefined ? customerArg : document.getElementById('measCustomerName').value.trim(),
+    date: dateArg || new Date().toISOString().slice(0,10),
+    pieces, extras
+  };
+}
+async function shareFactoryOrder(order){
+  if(typeof html2canvas === 'undefined'){ toast('تعذر إنشاء الصورة — تأكد من الاتصال بالإنترنت'); return; }
+  if(!(order.pieces||[]).some(p=>shapeHasDims(p) || String(p.note||'').trim()) && !(order.extras||[]).length){ toast('ما في قطع لترسلها'); return; }
+  const area = document.getElementById('factoryPrintArea');
+  area.innerHTML = renderFactorySheetHtml(order);
+  await new Promise(r=>setTimeout(r, 100));
+  let blob;
+  try{ blob = await captureAsPage(area); }
+  catch(e){ console.error(e); toast('تعذر إنشاء الصورة'); return; }
+  const title = order.workshop ? `طلبية ${order.workshop}` : 'طلبية المعمل';
+  const fileName = `${title}-${order.date||''}.jpg`.replace(/\s+/g,'-');
+  shareImageChoice(blob, fileName, title, '');
+}
+
+// ---------- صفحة طلبية المعمل ----------
+const FACTORY_DRAFT_KEY = 'miracos_factory_draft';
+function emptyFacPiece(){ return {shape:'rect', l:'', w:'', h:'', count:1, note:'', edges:{}}; }
+const FAC_SHAPES = {
+  rect:   {label:'مستطيل', f:['طول','عرض']},
+  circle: {label:'دائرة',  f:['قطر برا','قطر جوا']},
+  corner: {label:'زاوية',  f:['ضلع برا 1','ضلع برا 2','العرض']},
+  column: {label:'عامود',  f:['القطر','الارتفاع']}
+};
+let factoryOrder = (()=>{
+  try{ const d = JSON.parse(safeLocal.getItem(FACTORY_DRAFT_KEY)||'null'); if(d && Array.isArray(d.pieces)) return d; }catch(e){}
+  return {workshop:'', customer:'', date:'', pieces: Array.from({length:5}, emptyFacPiece)};
+})();
+function saveFactoryDraft(){ try{ safeLocal.setItem(FACTORY_DRAFT_KEY, JSON.stringify(factoryOrder)); }catch(e){} }
+function facRowDrawHtml(p){
+  const q = {shape: p.shape||'rect', l: parseFloat(p.l)||0, w: parseFloat(p.w)||0, h: parseFloat(p.h)||0};
+  if(!shapeHasDims(q)) return '';
+  return shapeSvg(q.shape, q.l, q.w, q.h, p.edges, {hit:true});
+}
+function renderFactoryPage(){
+  document.getElementById('facWorkshop').value = factoryOrder.workshop||'';
+  document.getElementById('facCustomer').value = factoryOrder.customer||'';
+  document.getElementById('facDate').value = factoryOrder.date || new Date().toISOString().slice(0,10);
+  const wrap = document.getElementById('facRowsWrap');
+  wrap.innerHTML = factoryOrder.pieces.map((p,ri)=>{ const sp = FAC_SHAPES[p.shape||'rect']; return `
+    <div class="fac-row-grid">
+      <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
+      <select data-fac-shape="${ri}">${Object.entries(FAC_SHAPES).map(([k,v])=>`<option value="${k}" ${k===(p.shape||'rect')?'selected':''}>${v.label}</option>`).join('')}</select>
+      <input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="0" data-r="${ri}" data-f="l" value="${p.l||''}" placeholder="${sp.f[0]}">
+      <input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="0" data-r="${ri}" data-f="w" value="${p.w||''}" placeholder="${sp.f[1]}">
+      ${sp.f[2] ? `<input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="0" data-r="${ri}" data-f="h" value="${p.h||''}" placeholder="${sp.f[2]}">` : '<span></span>'}
+      <input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="0" data-r="${ri}" data-f="count" value="${p.count===''||p.count==null?1:p.count}">
+      <input type="text" class="meas-note" data-t="0" data-r="${ri}" data-f="note" value="${escHtmlText(p.note||'').replace(/"/g,'&quot;')}">
+      <button type="button" class="btn btn-ghost btn-sm" data-fac-del="${ri}" title="حذف">✕</button>
+      <div class="piece-draw" data-fac-draw="${ri}">${facRowDrawHtml(p)}</div>
+    </div>`; }).join('');
+}
+(function wireFactoryPage(){
+  const wrap = document.getElementById('facRowsWrap');
+  wrap.addEventListener('keydown', e=>{ if(e.target.tagName==='INPUT') handleMeasArrowNav(e, wrap); });
+  wrap.addEventListener('input', e=>{
+    const el = e.target; if(el.tagName!=='INPUT') return;
+    const r = el.dataset.r, f = el.dataset.f, p = factoryOrder.pieces[r];
+    if(f === 'note'){ p.note = el.value; saveFactoryDraft(); return; }
+    const clean = cleanMeasDecimal(el.value);
+    if(clean !== el.value) el.value = clean;
+    p[f] = clean;
+    if(f==='l' || f==='w' || f==='h'){ const d = wrap.querySelector(`[data-fac-draw="${r}"]`); if(d) d.innerHTML = facRowDrawHtml(p); }
+    saveFactoryDraft();
+  });
+  wrap.addEventListener('change', e=>{
+    const sel = e.target.closest('[data-fac-shape]');
+    if(!sel) return;
+    const p = factoryOrder.pieces[sel.dataset.facShape];
+    p.shape = sel.value; p.edges = {};
+    saveFactoryDraft(); renderFactoryPage();
+  });
+  wrap.addEventListener('click', e=>{
+    const del = e.target.closest('[data-fac-del]');
+    if(del){ factoryOrder.pieces.splice(Number(del.dataset.facDel),1); if(!factoryOrder.pieces.length) factoryOrder.pieces.push(emptyFacPiece()); saveFactoryDraft(); renderFactoryPage(); return; }
+    const hit = e.target.closest('.piece-edge');
+    if(hit){
+      const box = hit.closest('[data-fac-draw]'), p = factoryOrder.pieces[box.dataset.facDraw];
+      p.edges = Object.assign({}, p.edges||{}); p.edges[hit.dataset.edge] = !p.edges[hit.dataset.edge];
+      box.innerHTML = facRowDrawHtml(p); saveFactoryDraft();
+    }
+  });
+  ['facWorkshop','facCustomer','facDate'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', ()=>{
+      factoryOrder.workshop = document.getElementById('facWorkshop').value;
+      factoryOrder.customer = document.getElementById('facCustomer').value;
+      factoryOrder.date = document.getElementById('facDate').value;
+      saveFactoryDraft();
+    });
+  });
+  document.getElementById('btnFacAddRow').addEventListener('click', ()=>{ factoryOrder.pieces.push(emptyFacPiece()); saveFactoryDraft(); renderFactoryPage(); });
+  document.getElementById('btnFacClear').addEventListener('click', ()=>{
+    if(!confirm('مسح كل القطع من طلبية المعمل؟')) return;
+    factoryOrder = {workshop: factoryOrder.workshop, customer:'', date:'', pieces: Array.from({length:5}, emptyFacPiece)};
+    saveFactoryDraft(); renderFactoryPage();
+  });
+  const currentOrder = ()=>({
+    workshop: (factoryOrder.workshop||'').trim(), customer: (factoryOrder.customer||'').trim(),
+    date: factoryOrder.date || new Date().toISOString().slice(0,10),
+    pieces: factoryOrder.pieces.map(p=>({shape:p.shape||'rect', l:parseFloat(p.l)||0, w:parseFloat(p.w)||0, h:parseFloat(p.h)||0, count:p.count, note:p.note, edges:p.edges})),
+    extras: []
+  });
+  document.getElementById('btnFacShare').addEventListener('click', ()=>shareFactoryOrder(currentOrder()));
+  document.getElementById('btnFacPreview').addEventListener('click', ()=>{
+    document.getElementById('factoryPrintArea').innerHTML = renderFactorySheetHtml(currentOrder());
+    document.getElementById('factoryViewOverlay').classList.add('show');
+  });
+  document.getElementById('btnFacViewPrint').addEventListener('click', ()=>window.print());
+  document.getElementById('btnFacViewShare').addEventListener('click', ()=>shareFactoryOrder(currentOrder()));
+})();
+
 function handleMeasArrowNav(e, scopeEl){
   const t = e.target.dataset.t, r = parseInt(e.target.dataset.r, 10), f = e.target.dataset.f;
   if(e.key === 'ArrowUp' || e.key === 'ArrowDown'){
@@ -3774,6 +4177,12 @@ function handleMeasArrowNav(e, scopeEl){
     const targetEl = scopeEl.querySelector(`input[data-t="${t}"][data-r="${targetR}"][data-f="${f}"]`);
     if(targetEl){ e.preventDefault(); targetEl.focus(); targetEl.select(); }
   } else if(e.key === 'ArrowLeft' || e.key === 'ArrowRight'){
+    // خانة التفاصيل نص: الأسهم بتحرك المؤشر جوا الكلام، وبتنقل للخانة الجنب بس إذا المؤشر بطرف النص
+    if(f === 'note'){
+      const el = e.target, atStart = el.selectionStart === 0 && el.selectionEnd === 0, atEnd = el.selectionStart === el.value.length;
+      // RTL: يمين = بداية النص، يسار = آخره
+      if(!(e.key === 'ArrowRight' && atStart) && !(e.key === 'ArrowLeft' && atEnd) && el.value) return;
+    }
     // نقلة فورية بين الخانات بالأسهم يمين/يسار، متل الإكسل — بلا شرط على مكان المؤشر جوا النص.
     const rowFields = [...scopeEl.querySelectorAll(`input[data-t="${t}"][data-r="${r}"]`)];
     const idx = rowFields.indexOf(e.target);
@@ -3792,14 +4201,14 @@ function renderMeasTables(){
   measTables.forEach((tbl, ti)=>{
     const spec = MEAS_SPECS[tbl.type];
     const box = document.createElement('div');
-    box.className = 'meas-table-box';
+    box.className = 'meas-table-box' + (measHasNote(tbl.type) ? ' with-note' : '');
     let headCols = spec.cols.map(c=>`<span>${c}</span>`).join('');
     let rowsHtml = tbl.rows.map((r,ri)=>{
       let inputs = spec.cols.map((c,ci)=>{
         const field = ci===0?'l':ci===1?'w':'h';
         return `<input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
       }).join('');
-      const pad = spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '';
+      const pad = measHasNote(tbl.type) ? measNoteInput(tbl, ti, ri, r) : (spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '');
       const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
       const base = measResultFor(tbl.type, r.l, r.w, r.h);
       const total = base.value * (Number(count)||1);
@@ -3811,6 +4220,7 @@ function renderMeasTables(){
         <input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="count" value="${count}" title="العدد">
         <span class="meas-result" data-result-t="${ti}" data-result-r="${ri}">${resLabel}</span>
         <button type="button" class="btn btn-ghost btn-sm" data-delrow="${ti}-${ri}" title="حذف">✕</button>
+        ${measDrawable(tbl.type) ? `<div class="piece-draw" data-draw-t="${ti}" data-draw-r="${ri}">${calcRowDrawHtml(tbl.type, r)}</div>` : ''}
       </div>`;
     }).join('');
     box.innerHTML = `
@@ -3820,7 +4230,7 @@ function renderMeasTables(){
       </div>
       <div class="meas-body" style="${tbl.open?'':'display:none;'}">
       <div class="meas-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
-        <span></span>${headCols}${spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):''}<span>العدد</span><span>النتيجة</span><span></span>
+        <span></span>${headCols}${measHasNote(tbl.type)?'<span>التفاصيل</span>':(spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):'')}<span>العدد</span><span>النتيجة</span><span></span>
       </div>
       ${rowsHtml}
       <button type="button" class="btn btn-sm" data-addrow="${ti}" style="margin-top:6px;">+ إضافة قياس</button>
@@ -3835,6 +4245,7 @@ function renderMeasTables(){
     el.addEventListener('keydown', e=>handleMeasArrowNav(e, wrap));
     el.addEventListener('input', e=>{
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
+      if(f === 'note'){ measTables[t].rows[r].note = e.target.value; return; }
       let clean;
       {
         const raw = e.target.value.replace(/,/g, '.');
@@ -3860,6 +4271,8 @@ function renderMeasTables(){
       const unit = measTables[t].type==='طول' ? ' م.ط' : (measTables[t].type==='مكعب' ? ' م³' : ' م²');
       const resultEl = wrap.querySelector(`.meas-result[data-result-t="${t}"][data-result-r="${r}"]`);
       if(resultEl) resultEl.textContent = total.toFixed(measTables[t].type==='مكعب'?3:2) + unit;
+      const drawEl = wrap.querySelector(`.piece-draw[data-draw-t="${t}"][data-draw-r="${r}"]`);
+      if(drawEl) drawEl.innerHTML = calcRowDrawHtml(measTables[t].type, row);
       renderMeasTotals(measTables);
     });
   });
@@ -3892,6 +4305,8 @@ document.getElementById('btnMeasAddSq').addEventListener('click', ()=>addMeasTab
 document.getElementById('btnMeasAddLen').addEventListener('click', ()=>addMeasTable('طول'));
 document.getElementById('btnMeasAddCube').addEventListener('click', ()=>addMeasTable('مكعب'));
 document.getElementById('btnMeasAddCol').addEventListener('click', ()=>addMeasTable('عامود'));
+document.getElementById('btnMeasAddCircle').addEventListener('click', ()=>addMeasTable('دائرة'));
+document.getElementById('btnMeasAddCorner').addEventListener('click', ()=>addMeasTable('زاوية'));
 
 // ---------- جداول القياسات المرفقة بنافذة الوصل (قابلة للتعديل والإضافة حتى بعد الحفظ) ----------
 let receiptMeasTables = [];
@@ -3903,14 +4318,14 @@ function renderReceiptMeasTables(){
   receiptMeasTables.forEach((tbl, ti)=>{
     const spec = MEAS_SPECS[tbl.type];
     const box = document.createElement('div');
-    box.className = 'meas-table-box';
+    box.className = 'meas-table-box' + (measHasNote(tbl.type) ? ' with-note' : '');
     let headCols = spec.cols.map(c=>`<span>${c}</span>`).join('');
     let rowsHtml = tbl.rows.map((r,ri)=>{
       let inputs = spec.cols.map((c,ci)=>{
         const field = ci===0?'l':ci===1?'w':'h';
         return `<input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
       }).join('');
-      const pad = spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '';
+      const pad = measHasNote(tbl.type) ? measNoteInput(tbl, ti, ri, r) : (spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '');
       const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
       const base = measResultFor(tbl.type, r.l, r.w, r.h);
       const total = base.value * (Number(count)||1);
@@ -3931,7 +4346,7 @@ function renderReceiptMeasTables(){
       </div>
       <div class="meas-body" style="${tbl.open?'':'display:none;'}">
       <div class="meas-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
-        <span></span>${headCols}${spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):''}<span>العدد</span><span>النتيجة</span><span></span>
+        <span></span>${headCols}${measHasNote(tbl.type)?'<span>التفاصيل</span>':(spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):'')}<span>العدد</span><span>النتيجة</span><span></span>
       </div>
       ${rowsHtml}
       <button type="button" class="btn btn-sm" data-rcp-addrow="${ti}" style="margin-top:6px;">+ إضافة قياس</button>
@@ -3945,6 +4360,7 @@ function renderReceiptMeasTables(){
     el.addEventListener('keydown', e=>handleMeasArrowNav(e, wrap));
     el.addEventListener('input', e=>{
       const t = e.target.dataset.t, r = e.target.dataset.r, f = e.target.dataset.f;
+      if(f === 'note'){ receiptMeasTables[t].rows[r].note = e.target.value; return; }
       let clean;
       {
         const raw = e.target.value.replace(/,/g, '.');
@@ -4002,12 +4418,12 @@ document.getElementById('btnRcpMeasAddLen').addEventListener('click', ()=>addRec
 document.getElementById('btnRcpMeasAddCube').addEventListener('click', ()=>addReceiptMeasTable('مكعب'));
 document.getElementById('btnRcpMeasAddCol').addEventListener('click', ()=>addReceiptMeasTable('عامود'));
 
-function buildMeasurementRecord(){
+function buildMeasurementRecord(allowNoName){
   const name = document.getElementById('measCustomerName').value.trim();
-  if(!name){ toast('يرجى إدخال اسم الزبون'); return null; }
+  if(!name && !allowNoName){ toast('يرجى إدخال اسم الزبون'); return null; }
   const tables = measTables.map(tbl=>({
     type: tbl.type,
-    rows: tbl.rows.filter(r=> (r.l!=='' && r.l!==null) || (r.w!=='' && r.w!==null) || (r.h!=='' && r.h!==null))
+    rows: tbl.rows.filter(measRowFilled)
   })).filter(tbl=>tbl.rows.length>0);
   if(tables.length===0){ toast('يرجى إدخال قياس واحد على الأقل'); return null; }
   return {
@@ -4055,24 +4471,31 @@ function measDetailsForType(tables, type){
   const n = v => { const x = parseFloat(v)||0; return String(Number(x.toFixed(3))); };
   const parts = [];
   (tables||[]).filter(t=>t.type===type).forEach(t=>t.rows.forEach(r=>{
-    if(!(parseFloat(r.l)||parseFloat(r.w)||parseFloat(r.h))) return;
+    const note = String(r.note||'').trim();
+    const hasDims = !!(parseFloat(r.l)||parseFloat(r.w)||parseFloat(r.h));
+    if(!hasDims){ if(note) parts.push(note); return; }
     const c = Number(r.count)||1;
     let d;
     if(type==='عامود') d = `قطر ${n(r.l)} × ارتفاع ${n(r.w)}`;
+    else if(type==='دائرة') d = parseFloat(r.w) ? `قطر برا ${n(r.l)} جوا ${n(r.w)}` : `قطر ${n(r.l)}`;
+    else if(type==='زاوية') d = `برا ${n(r.l)}×${n(r.w)} عرض ${n(r.h)}`;
     else if(type==='طول') d = `${n(r.l)}`;
     else if(type==='مكعب') d = `${n(r.l)}×${n(r.w)}×${n(r.h)}`;
     else d = `${n(r.l)}×${n(r.w)}`;
-    parts.push(c > 1 ? `${d} (×${c})` : d);
+    d = c > 1 ? `${d} (×${c})` : d;
+    parts.push(note ? `${d} ${note}` : d);
   }));
   return parts.join('، ');
 }
 function measItemsFromTotals(totals, tables){
   const items = [];
   const desc = (label, type) => { const d = measDetailsForType(tables, type); return d ? `${label}: ${d}` : label; };
-  if(totals['مربع'] > 0) items.push({qty: Number(totals['مربع'].toFixed(2)), desc: desc('متر مربع','مربع'), price:''});
-  if(totals['طول'] > 0) items.push({qty: Number(totals['طول'].toFixed(2)), desc: desc('متر طول','طول'), price:''});
+  if(totals['مربع'] > 0 || measDetailsForType(tables,'مربع')) items.push({qty: Number(totals['مربع'].toFixed(2)), desc: desc('متر مربع','مربع'), price:''});
+  if(totals['طول'] > 0 || measDetailsForType(tables,'طول')) items.push({qty: Number(totals['طول'].toFixed(2)), desc: desc('متر طول','طول'), price:''});
   if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: desc('متر مكعب','مكعب'), price:''});
   if(totals['عامود'] > 0) items.push({qty: Number(totals['عامود'].toFixed(2)), desc: desc('عامود (م²)','عامود'), price:''});
+  if(totals['دائرة'] > 0) items.push({qty: Number(totals['دائرة'].toFixed(2)), desc: desc('دوائر (م²)','دائرة'), price:''});
+  if(totals['زاوية'] > 0) items.push({qty: Number(totals['زاوية'].toFixed(2)), desc: desc('زوايا (م²)','زاوية'), price:''});
   return items;
 }
 
@@ -4157,9 +4580,16 @@ async function deleteMeasurementRecord(id){
   toast('تم الحذف');
 }
 
+let currentViewedMeasurementId = null;
 function viewMeasurementRecord(id){
   const rec = measurementsList.find(r=>r.id===id);
   if(!rec) return;
+  currentViewedMeasurementId = id;
+  renderMeasurementRecordInto(rec);
+  document.getElementById('measurementsViewOverlay').classList.add('show');
+}
+// بيرسم ورقة القياسات (نفس شكل الطباعة) — بتستعمل للعرض وللمشاركة كصورة
+function renderMeasurementRecordInto(rec){
   const measDocHead = `
     <div class="receipt-top">
       <div class="receipt-brand">
@@ -4192,16 +4622,17 @@ function viewMeasurementRecord(id){
       const total = base.value * (Number(count)||1);
       const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
       const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
-      return `<tr><td>${i+1}</td>${cells}<td>${count}</td><td>${resLabel}</td></tr>`;
+      const noteTd = measHasNote(tbl.type) ? `<td style="text-align:right;">${escHtmlText(r.note||'')}</td>` : '';
+      return `<tr><td>${i+1}</td>${cells}${noteTd}<td>${count}</td><td>${resLabel}</td></tr>`;
     }).join('');
     const headRow = tblIndex===0
-      ? `<tr class="print-head-row"><td colspan="${spec.cols.length+3}">${measDocHead}<div style="font-weight:700; color:var(--brass-deep); margin:10px 0 6px;">${spec.label}</div></td></tr>`
+      ? `<tr class="print-head-row"><td colspan="${spec.cols.length+3+(measHasNote(tbl.type)?1:0)}">${measDocHead}<div style="font-weight:700; color:var(--brass-deep); margin:10px 0 6px;">${spec.label}</div></td></tr>`
       : '';
     return `
       <div style="margin-top:14px;">
         ${tblIndex>0 ? `<div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${spec.label}</div>` : ''}
         <table class="meas-print-table">
-          <thead>${headRow}<tr><th>#</th>${headCols}<th>العدد</th><th>النتيجة</th></tr></thead>
+          <thead>${headRow}<tr><th>#</th>${headCols}${measHasNote(tbl.type)?'<th>التفاصيل</th>':''}<th>العدد</th><th>النتيجة</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>`;
@@ -4214,15 +4645,46 @@ function viewMeasurementRecord(id){
       ${t['طول']>0 ? `<div><b>إجمالي متر طول:</b> ${t['طول'].toFixed(2)} م.ط</div>` : ''}
       ${t['مكعب']>0 ? `<div><b>إجمالي متر مكعب:</b> ${t['مكعب'].toFixed(3)} م³</div>` : ''}
       ${t['عامود']>0 ? `<div><b>إجمالي العواميد:</b> ${t['عامود'].toFixed(2)} م²</div>` : ''}
+      ${t['دائرة']>0 ? `<div><b>إجمالي الدوائر:</b> ${t['دائرة'].toFixed(2)} م²</div>` : ''}
+      ${t['زاوية']>0 ? `<div><b>إجمالي الزوايا:</b> ${t['زاوية'].toFixed(2)} م²</div>` : ''}
     </div>`;
 
   document.getElementById('measurementsPrintArea').innerHTML = `
     ${tablesHtml}
     ${totalsHtml}
   `;
-  document.getElementById('measurementsViewOverlay').classList.add('show');
 }
 document.getElementById('btnPrintMeasurementsView').addEventListener('click', ()=>window.print());
+
+// مشاركة ورقة القياسات كصورة (للمعمل مثلاً) — بدون تحويل لوصل أو عرض سعر وبدون حفظ
+async function shareMeasurementRecord(rec){
+  if(typeof html2canvas === 'undefined'){ toast('تعذر إنشاء الصورة — تأكد من الاتصال بالإنترنت'); return; }
+  renderMeasurementRecordInto(rec);
+  await new Promise(r=>setTimeout(r, 150));
+  let blob;
+  try{ blob = await captureAsPage(document.getElementById('measurementsPrintArea')); }
+  catch(e){ console.error(e); toast('تعذر إنشاء الصورة'); return; }
+  const who = rec.customerName ? ` — ${rec.customerName}` : '';
+  const fileName = `قياسات${rec.customerName ? '-' + rec.customerName : ''}-${rec.date||''}.jpg`.replace(/\s+/g,'-');
+  shareImageChoice(blob, fileName, `قياسات${who}`, rec.customerPhone || '');
+}
+document.getElementById('btnMeasShare').addEventListener('click', ()=>{
+  shareFactoryOrder(calcToFactoryOrder());
+});
+document.getElementById('btnMeasToFactory').addEventListener('click', ()=>{
+  const o = calcToFactoryOrder();
+  if(!o.pieces.length && !o.extras.length){ toast('ما في قياسات لتنقلها'); return; }
+  const pieces = o.pieces.map(p=>({shape: p.shape||'rect', l: fmtCm(p.l), w: fmtCm(p.w), h: p.h ? fmtCm(p.h) : '', count: p.count, note: p.note, edges: p.edges}));
+  o.extras.forEach(t=>pieces.push({shape:'rect', l:'', w:'', h:'', count:1, note:t, edges:{}}));
+  factoryOrder = {workshop: o.workshop || factoryOrder.workshop || '', customer: o.customer, date: o.date, pieces};
+  saveFactoryDraft();
+  document.querySelector('.nav-item[data-view="factory"]').click();
+  toast('انتقلت القياسات لطلبية المعمل');
+});
+document.getElementById('btnShareMeasurementsView').addEventListener('click', ()=>{
+  const rec = measurementsList.find(r=>r.id===currentViewedMeasurementId);
+  if(rec) shareFactoryOrder(calcToFactoryOrder(rec.tables, rec.customerName||'', rec.date));
+});
 
 renderMeasTables();
 
