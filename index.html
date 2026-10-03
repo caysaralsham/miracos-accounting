@@ -445,10 +445,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"/><path d="M8 4v4M12 4v6M16 4v4M4 8h4M4 16h4M4 12h6"/></svg>
         حاسبة القياسات
       </a>
-      <a class="nav-item" data-view="factory">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21V10l6 4V10l6 4V6l6 4v11z"/><path d="M3 21h18"/></svg>
-        طلبية المعمل
-      </a>
       <a class="nav-item" data-view="reports">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9"/><path d="M11 19V5"/><path d="M18 19v-7"/><path d="M2 19h20"/></svg>
         التقارير
@@ -644,38 +640,13 @@
           <button class="btn btn-primary" id="btnMeasSavePrint">حفظ وطباعة</button>
           <button class="btn btn-primary" id="btnMeasConvertReceipt">تحويل لوصل دفع</button>
           <button class="btn btn-primary" id="btnMeasConvertQuote">تحويل لعرض سعر</button>
-          <button class="btn" id="btnMeasShare">مشاركة للمعمل</button>
-          <button class="btn" id="btnMeasToFactory">نقل لطلبية المعمل</button>
+          <button class="btn" id="btnMeasShare">للمعمل (مشاركة / طباعة)</button>
         </div>
       </div>
 
       <div class="panel">
         <div class="panel-head"><h2>القياسات المحفوظة</h2></div>
         <div id="measurementsTableWrap"></div>
-      </div>
-    </section>
-
-    <section class="view" id="view-factory">
-      <div class="topbar"><h1>طلبية المعمل</h1></div>
-      <div class="panel">
-        <div class="grid2">
-          <div class="field"><label>اسم المعمل</label><input type="text" id="facWorkshop" autocomplete="off"></div>
-          <div class="field"><label>اسم الزبون (اختياري)</label><input type="text" id="facCustomer" autocomplete="off"></div>
-          <div class="field"><label>التاريخ</label><input type="date" id="facDate"></div>
-        </div>
-        <div class="meas-table-box">
-          <div class="fac-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
-            <span></span><span>الشكل</span><span>قياس 1 (سم)</span><span>قياس 2 (سم)</span><span>قياس 3 (سم)</span><span>العدد</span><span>التفاصيل</span><span></span>
-          </div>
-          <div id="facRowsWrap"></div>
-          <button type="button" class="btn btn-sm" id="btnFacAddRow" style="margin-top:6px;">+ إضافة قطعة</button>
-          <div class="piece-hint" style="margin-top:8px;">اكبس على أي ضلع بالرسمة لتعلّم مكان اللف (بيصير أحمر) — كبسة تانية بتشيله</div>
-        </div>
-        <div style="display:flex; gap:8px; margin-top:16px; border-top:1px solid var(--line); padding-top:14px; flex-wrap:wrap;">
-          <button class="btn btn-primary" id="btnFacShare">مشاركة</button>
-          <button class="btn btn-primary" id="btnFacPreview">معاينة وطباعة</button>
-          <button class="btn" id="btnFacClear">مسح الكل</button>
-        </div>
       </div>
     </section>
 
@@ -978,6 +949,7 @@
     <div class="modal-head">
       <h3>عرض الوصل</h3>
       <div style="display:flex; gap:8px;">
+        <button class="btn btn-sm" id="btnReceiptToFactory">للمعمل</button>
         <button class="btn btn-sm" id="btnShareReceipt">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
           مشاركة
@@ -1095,6 +1067,7 @@
       <h3 id="viewInvoiceTitle">Document</h3>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-sm" id="btnConvertInvoiceFromView">➜🧾 تحويل إلى وصل</button>
+        <button class="btn btn-sm" id="btnInvoiceToFactory">للمعمل</button>
         <button class="btn btn-sm" id="btnShareInvoice">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
           مشاركة
@@ -1138,7 +1111,7 @@
         <button class="btn btn-sm" id="btnEditMeasurementsView">✏️ تعديل</button>
         <button class="btn btn-sm" id="btnMeasViewToReceipt">تحويل لوصل</button>
         <button class="btn btn-sm" id="btnMeasViewToQuote">تحويل لعرض سعر</button>
-        <button class="btn btn-sm" id="btnShareMeasurementsView">مشاركة</button>
+        <button class="btn btn-sm" id="btnShareMeasurementsView">للمعمل</button>
         <button class="btn btn-sm" id="btnPrintMeasurementsView">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M6 9V3h12v6M6 18h12v4H6v-4z"/><rect x="6" y="11" width="12" height="7"/></svg>
           طباعة
@@ -1155,8 +1128,9 @@
 <div class="overlay" id="factoryViewOverlay">
   <div class="modal" style="max-width:820px;">
     <div class="modal-head">
-      <h3>طلبية المعمل</h3>
-      <div style="display:flex; gap:8px;">
+      <h3>ورقة المعمل</h3>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <input type="text" id="facViewWorkshop" placeholder="اسم المعمل" autocomplete="off" style="width:150px; padding:6px 10px; font-size:13px;">
         <button class="btn btn-sm" id="btnFacViewShare">مشاركة</button>
         <button class="btn btn-sm" id="btnFacViewPrint">طباعة</button>
         <button class="close-x" data-close="factoryViewOverlay">×</button>
@@ -1747,7 +1721,6 @@ document.querySelectorAll('.nav-item').forEach(item=>{
     if(item.dataset.view === 'customers') renderReceiptsTable();
     if(item.dataset.view === 'expenses'){ renderExpensesTable(); renderExpenseCategoryChips(); }
     if(item.dataset.view === 'measurements') renderMeasurementsTable();
-    if(item.dataset.view === 'factory') renderFactoryPage();
     if(item.dataset.view === 'reports'){ renderReports(); renderPaymentHistoryTable(); }
     if(item.dataset.view === 'pricelist'){ renderPriceCategoryChips(); renderPriceListGrouped(); }
     if(item.dataset.view === 'customer-reports') renderCustomerReports();
@@ -4118,101 +4091,41 @@ async function shareFactoryOrder(order){
   shareImageChoice(blob, fileName, title, '');
 }
 
-// ---------- صفحة طلبية المعمل ----------
-const FACTORY_DRAFT_KEY = 'miracos_factory_draft';
-function emptyFacPiece(){ return {shape:'rect', l:'', w:'', h:'', count:1, note:'', edges:{}}; }
-const FAC_SHAPES = {
-  rect:   {label:'مستطيل', f:['طول','عرض']},
-  circle: {label:'دائرة',  f:['قطر برا','قطر جوا']},
-  corner: {label:'زاوية',  f:['ضلع برا 1','ضلع برا 2','العرض']},
-  column: {label:'عامود',  f:['القطر','الارتفاع']}
-};
-let factoryOrder = (()=>{
-  try{ const d = JSON.parse(safeLocal.getItem(FACTORY_DRAFT_KEY)||'null'); if(d && Array.isArray(d.pieces)) return d; }catch(e){}
-  return {workshop:'', customer:'', date:'', pieces: Array.from({length:5}, emptyFacPiece)};
-})();
-function saveFactoryDraft(){ try{ safeLocal.setItem(FACTORY_DRAFT_KEY, JSON.stringify(factoryOrder)); }catch(e){} }
-function facRowDrawHtml(p){
-  const q = {shape: p.shape||'rect', l: parseFloat(p.l)||0, w: parseFloat(p.w)||0, h: parseFloat(p.h)||0};
-  if(!shapeHasDims(q)) return '';
-  return shapeSvg(q.shape, q.l, q.w, q.h, p.edges, {hit:true});
+// ---------- معاينة ورقة المعمل (بدون لوغو وبدون أسعار) ----------
+let lastFactoryOrder = null;
+function openFactoryPreview(order){
+  lastFactoryOrder = order;
+  document.getElementById('facViewWorkshop').value = order.workshop || '';
+  document.getElementById('factoryPrintArea').innerHTML = renderFactorySheetHtml(order);
+  document.getElementById('factoryViewOverlay').classList.add('show');
 }
-function renderFactoryPage(){
-  document.getElementById('facWorkshop').value = factoryOrder.workshop||'';
-  document.getElementById('facCustomer').value = factoryOrder.customer||'';
-  document.getElementById('facDate').value = factoryOrder.date || new Date().toISOString().slice(0,10);
-  const wrap = document.getElementById('facRowsWrap');
-  wrap.innerHTML = factoryOrder.pieces.map((p,ri)=>{ const sp = FAC_SHAPES[p.shape||'rect']; return `
-    <div class="fac-row-grid">
-      <span style="font-size:12px; color:var(--text-dim);">${ri+1}</span>
-      <select data-fac-shape="${ri}">${Object.entries(FAC_SHAPES).map(([k,v])=>`<option value="${k}" ${k===(p.shape||'rect')?'selected':''}>${v.label}</option>`).join('')}</select>
-      <input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="0" data-r="${ri}" data-f="l" value="${p.l||''}" placeholder="${sp.f[0]}">
-      <input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="0" data-r="${ri}" data-f="w" value="${p.w||''}" placeholder="${sp.f[1]}">
-      ${sp.f[2] ? `<input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="0" data-r="${ri}" data-f="h" value="${p.h||''}" placeholder="${sp.f[2]}">` : '<span></span>'}
-      <input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="0" data-r="${ri}" data-f="count" value="${p.count===''||p.count==null?1:p.count}">
-      <input type="text" class="meas-note" data-t="0" data-r="${ri}" data-f="note" value="${escHtmlText(p.note||'').replace(/"/g,'&quot;')}">
-      <button type="button" class="btn btn-ghost btn-sm" data-fac-del="${ri}" title="حذف">✕</button>
-      <div class="piece-draw" data-fac-draw="${ri}">${facRowDrawHtml(p)}</div>
-    </div>`; }).join('');
+document.getElementById('facViewWorkshop').addEventListener('input', e=>{
+  if(!lastFactoryOrder) return;
+  lastFactoryOrder.workshop = e.target.value.trim();
+  const mw = document.getElementById('measWorkshop'); if(mw) mw.value = e.target.value;
+  document.getElementById('factoryPrintArea').innerHTML = renderFactorySheetHtml(lastFactoryOrder);
+});
+document.getElementById('btnFacViewPrint').addEventListener('click', ()=>window.print());
+document.getElementById('btnFacViewShare').addEventListener('click', ()=>{ if(lastFactoryOrder) shareFactoryOrder(lastFactoryOrder); });
+// ورقة المعمل من بنود وصل / عرض سعر: الرسمات والتفاصيل بس، بدون أسعار
+function factoryOrderFromItems(items, customer){
+  const pieces = [], extras = [];
+  (items||[]).forEach(it=>{
+    if(it.draws && it.draws.length) it.draws.forEach(d=>pieces.push(Object.assign({}, d)));
+    else if(String(it.desc||'').trim()) extras.push(`${it.qty ? it.qty + ' × ' : ''}${it.desc}`);
+  });
+  return {workshop: (document.getElementById('measWorkshop')||{}).value || '', customer: customer||'', date: new Date().toISOString().slice(0,10), pieces, extras};
 }
-(function wireFactoryPage(){
-  const wrap = document.getElementById('facRowsWrap');
-  wrap.addEventListener('keydown', e=>{ if(e.target.tagName==='INPUT') handleMeasArrowNav(e, wrap); });
-  wrap.addEventListener('input', e=>{
-    const el = e.target; if(el.tagName!=='INPUT') return;
-    const r = el.dataset.r, f = el.dataset.f, p = factoryOrder.pieces[r];
-    if(f === 'note'){ p.note = el.value; saveFactoryDraft(); return; }
-    const clean = cleanMeasDecimal(el.value);
-    if(clean !== el.value) el.value = clean;
-    p[f] = clean;
-    if(f==='l' || f==='w' || f==='h'){ const d = wrap.querySelector(`[data-fac-draw="${r}"]`); if(d) d.innerHTML = facRowDrawHtml(p); }
-    saveFactoryDraft();
-  });
-  wrap.addEventListener('change', e=>{
-    const sel = e.target.closest('[data-fac-shape]');
-    if(!sel) return;
-    const p = factoryOrder.pieces[sel.dataset.facShape];
-    p.shape = sel.value; p.edges = {};
-    saveFactoryDraft(); renderFactoryPage();
-  });
-  wrap.addEventListener('click', e=>{
-    const del = e.target.closest('[data-fac-del]');
-    if(del){ factoryOrder.pieces.splice(Number(del.dataset.facDel),1); if(!factoryOrder.pieces.length) factoryOrder.pieces.push(emptyFacPiece()); saveFactoryDraft(); renderFactoryPage(); return; }
-    const hit = e.target.closest('.piece-edge');
-    if(hit){
-      const box = hit.closest('[data-fac-draw]'), p = factoryOrder.pieces[box.dataset.facDraw];
-      p.edges = Object.assign({}, p.edges||{}); p.edges[hit.dataset.edge] = !p.edges[hit.dataset.edge];
-      box.innerHTML = facRowDrawHtml(p); saveFactoryDraft();
-    }
-  });
-  ['facWorkshop','facCustomer','facDate'].forEach(id=>{
-    document.getElementById(id).addEventListener('input', ()=>{
-      factoryOrder.workshop = document.getElementById('facWorkshop').value;
-      factoryOrder.customer = document.getElementById('facCustomer').value;
-      factoryOrder.date = document.getElementById('facDate').value;
-      saveFactoryDraft();
-    });
-  });
-  document.getElementById('btnFacAddRow').addEventListener('click', ()=>{ factoryOrder.pieces.push(emptyFacPiece()); saveFactoryDraft(); renderFactoryPage(); });
-  document.getElementById('btnFacClear').addEventListener('click', ()=>{
-    if(!confirm('مسح كل القطع من طلبية المعمل؟')) return;
-    factoryOrder = {workshop: factoryOrder.workshop, customer:'', date:'', pieces: Array.from({length:5}, emptyFacPiece)};
-    saveFactoryDraft(); renderFactoryPage();
-  });
-  const currentOrder = ()=>({
-    workshop: (factoryOrder.workshop||'').trim(), customer: (factoryOrder.customer||'').trim(),
-    date: factoryOrder.date || new Date().toISOString().slice(0,10),
-    pieces: factoryOrder.pieces.map(p=>({shape:p.shape||'rect', l:parseFloat(p.l)||0, w:parseFloat(p.w)||0, h:parseFloat(p.h)||0, count:p.count, note:p.note, edges:p.edges})),
-    extras: []
-  });
-  document.getElementById('btnFacShare').addEventListener('click', ()=>shareFactoryOrder(currentOrder()));
-  document.getElementById('btnFacPreview').addEventListener('click', ()=>{
-    document.getElementById('factoryPrintArea').innerHTML = renderFactorySheetHtml(currentOrder());
-    document.getElementById('factoryViewOverlay').classList.add('show');
-  });
-  document.getElementById('btnFacViewPrint').addEventListener('click', ()=>window.print());
-  document.getElementById('btnFacViewShare').addEventListener('click', ()=>shareFactoryOrder(currentOrder()));
-})();
+document.getElementById('btnReceiptToFactory').addEventListener('click', ()=>{
+  const r = receipts.find(x=>x.id===currentViewedReceiptId); if(!r) return;
+  document.getElementById('viewReceiptOverlay').classList.remove('show');
+  openFactoryPreview(factoryOrderFromItems(r.items, r.name));
+});
+document.getElementById('btnInvoiceToFactory').addEventListener('click', ()=>{
+  const inv = invoices.find(x=>x.id===currentViewedInvoiceId); if(!inv) return;
+  document.getElementById('viewInvoiceOverlay').classList.remove('show');
+  openFactoryPreview(factoryOrderFromItems(inv.items, inv.clientName));
+});
 
 function handleMeasArrowNav(e, scopeEl){
   const t = e.target.dataset.t, r = parseInt(e.target.dataset.r, 10), f = e.target.dataset.f;
@@ -4540,7 +4453,12 @@ function measDetailsForType(tables, type){
     if(!hasDims){ if(note) parts.push(note); return; }
     const c = Number(r.count)||1;
     let d;
-    if(type==='عامود') d = `قطر ${n(r.l)} × ارتفاع ${n(r.w)}`;
+    if(type==='عامود'){
+      const one = (parseFloat(r.l)||0)*3.14*(parseFloat(r.w)||0);
+      d = `قطر ${n(r.l)} × ارتفاع ${n(r.w)} (العامود ${one.toFixed(2)} م²)`;
+      parts.push(`${d} — العدد: ${c}${note ? ' ' + note : ''}`);
+      return;
+    }
     else if(type==='دائرة') d = parseFloat(r.w) ? `قطر برا ${n(r.l)} جوا ${n(r.w)}` : `قطر ${n(r.l)}`;
     else if(type==='زاوية') d = `برا ${n(r.l)}×${n(r.w)} عرض ${n(r.h)}`;
     else if(type==='طول') d = `${n(r.l)}`;
@@ -4795,21 +4713,15 @@ async function shareMeasurementRecord(rec){
   shareImageChoice(blob, fileName, `قياسات${who}`, rec.customerPhone || '');
 }
 document.getElementById('btnMeasShare').addEventListener('click', ()=>{
-  shareFactoryOrder(calcToFactoryOrder());
-});
-document.getElementById('btnMeasToFactory').addEventListener('click', ()=>{
   const o = calcToFactoryOrder();
-  if(!o.pieces.length && !o.extras.length){ toast('ما في قياسات لتنقلها'); return; }
-  const pieces = o.pieces.map(p=>({shape: p.shape||'rect', l: fmtCm(p.l), w: fmtCm(p.w), h: p.h ? fmtCm(p.h) : '', count: p.count, note: p.note, edges: p.edges}));
-  o.extras.forEach(t=>pieces.push({shape:'rect', l:'', w:'', h:'', count:1, note:t, edges:{}}));
-  factoryOrder = {workshop: o.workshop || factoryOrder.workshop || '', customer: o.customer, date: o.date, pieces};
-  saveFactoryDraft();
-  document.querySelector('.nav-item[data-view="factory"]').click();
-  toast('انتقلت القياسات لطلبية المعمل');
+  if(!o.pieces.length && !o.extras.length){ toast('ما في قياسات'); return; }
+  openFactoryPreview(o);
 });
 document.getElementById('btnShareMeasurementsView').addEventListener('click', ()=>{
   const rec = measurementsList.find(r=>r.id===currentViewedMeasurementId);
-  if(rec) shareFactoryOrder(calcToFactoryOrder(rec.tables, rec.customerName||'', rec.date));
+  if(!rec) return;
+  document.getElementById('measurementsViewOverlay').classList.remove('show');
+  openFactoryPreview(calcToFactoryOrder(rec.tables, rec.customerName||'', rec.date));
 });
 
 renderMeasTables();
