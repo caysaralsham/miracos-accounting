@@ -278,7 +278,7 @@
   .fac-card-note{ font-size:14px; font-weight:600; color:#222; margin-top:4px; }
   td.desc-td .item-draws{ margin-top:4px; }
   .conv-wrap{ position:relative; display:inline-block; }
-  .conv-menu{ display:none; position:absolute; top:calc(100% + 4px); inset-inline-start:0; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.15); z-index:50; min-width:150px; padding:4px; }
+  .conv-menu{ display:none; position:absolute; top:calc(100% + 4px); inset-inline-end:0; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 8px 24px rgba(0,0,0,.15); z-index:50; min-width:150px; padding:4px; }
   .conv-menu.show{ display:block; }
   .conv-menu button{ display:block; width:100%; text-align:right; background:none; border:none; padding:8px 12px; font-family:inherit; font-size:13.5px; font-weight:600; cursor:pointer; border-radius:6px; color:var(--ink); }
   .conv-menu button:hover{ background:var(--marble-2, #F2EEE4); }
@@ -883,7 +883,8 @@
       <h3 id="receiptModalTitle">وصل دفع جديد</h3>
       <div style="display:flex; align-items:center; gap:8px;">
         <button class="btn btn-sm" id="btnReceiptEditToFactory" style="display:none; font-size:12px; padding:4px 10px;" title="ورقة القياسات للمعمل بدون أسعار">للمعمل</button>
-        <button class="btn btn-sm" id="btnReceiptToQuote" style="display:none; font-size:12px; padding:4px 10px;" title="تحويل إلى عرض سعر">➜📄 عرض سعر</button>
+        <button class="btn btn-sm" id="btnReceiptToQuote" style="display:none;">➜📄 عرض سعر</button>
+        <span class="conv-wrap"><button type="button" class="btn btn-sm" id="btnConvReceiptEdit" style="font-size:12px; padding:4px 10px;">⇄ تحويل</button><div class="conv-menu"></div></span>
         <button class="close-x" data-close="receiptOverlay">×</button>
       </div>
     </div>
@@ -940,14 +941,15 @@
         <textarea id="rcpNote" rows="2"></textarea>
       </div>
 
-      <hr style="margin:16px 0; border:none; border-top:1px solid var(--line);">
-      <label style="margin-bottom:8px;">جداول القياسات المرفقة (اختياري)</label>
+      <!-- جداول القياسات المرفقة: مخفية (كل التفاصيل صارت بالرسمات تحت البنود)، والبيانات بتضل محفوظة -->
+      <div style="display:none;">
       <div id="rcpMeasTablesWrap"></div>
       <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
         <button type="button" class="btn btn-sm" id="btnRcpMeasAddSq">+ جدول متر مربع</button>
         <button type="button" class="btn btn-sm" id="btnRcpMeasAddLen">+ جدول متر طول</button>
         <button type="button" class="btn btn-sm" id="btnRcpMeasAddCube">+ جدول متر مكعب</button>
         <button type="button" class="btn btn-sm" id="btnRcpMeasAddCol">+ جدول عامود</button>
+      </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -995,7 +997,10 @@
   <div class="modal" style="max-width:780px;">
     <div class="modal-head">
       <h3 id="invoiceModalTitle">فاتورة جديدة</h3>
-      <button class="close-x" data-close="invoiceOverlay">×</button>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="conv-wrap"><button type="button" class="btn btn-sm" id="btnConvInvoiceEdit" style="font-size:12px; padding:4px 10px;">⇄ تحويل</button><div class="conv-menu"></div></span>
+        <button class="close-x" data-close="invoiceOverlay">×</button>
+      </div>
     </div>
     <div class="modal-body">
       <input type="hidden" id="invId">
@@ -2580,7 +2585,7 @@ function openReceiptModal(receipt){
   recalcTotals();
   document.getElementById('rcpDelivered').checked = !!(receipt && receipt.delivered);
   // زر "تحويل إلى عرض سعر" بيظهر بس بتعديل وصل محفوظ (مش بالوصل الجديد ولا النسخة ولا المحوّل)
-  document.getElementById('btnReceiptToQuote').style.display = (receipt && receipt.id) ? '' : 'none';
+  document.getElementById('btnReceiptToQuote').style.display = 'none';
   document.getElementById('receiptOverlay').classList.add('show');
   requestAnimationFrame(()=>growAllDesc(document.getElementById('receiptOverlay')));
   // زر "للمعمل" بيظهر إذا بنود الوصل فيها قياسات مرسومة (حتى قبل الحفظ)
@@ -4275,6 +4280,41 @@ wireConvertMenu('btnConvReceiptView', 'receipt', ()=>{
 wireConvertMenu('btnConvInvoiceView', ()=>{ const inv = invoices.find(x=>x.id===currentViewedInvoiceId); return inv ? (inv.docType||'simple') : ''; }, ()=>{
   const inv = invoices.find(x=>x.id===currentViewedInvoiceId); return inv ? docFromInvoice(inv) : null;
 }, ()=>document.getElementById('viewInvoiceOverlay').classList.remove('show'));
+// من نافذة تعديل الوصل نفسها (حتى قبل الحفظ) — بياخد اللي مكتوب هلأ
+wireConvertMenu('btnConvReceiptEdit', 'receipt', ()=>{
+  const items = [...document.querySelectorAll('#itemsBody tr')].map(row=>{
+    const q = row.querySelector('.it-qty'), d = row.querySelector('.it-desc'), pr = row.querySelector('.it-price');
+    if(!q || !d) return null;
+    const qty = Number(q.value)||0, desc = d.value.trim(), price = Number(pr.value)||0;
+    if(!desc && !qty && !price) return null;
+    return {qty, desc, unit:'', price, amount: qty*price,
+      ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {})};
+  }).filter(Boolean);
+  const dur = document.getElementById('rcpDuration').value.trim();
+  return {kind:'receipt', label: `وصل رقم ${document.getElementById('rcpNo').value}`,
+    name: document.getElementById('rcpName').value.trim(), phone: document.getElementById('rcpPhone').value.trim(), address: document.getElementById('rcpAddress').value.trim(),
+    delay: dur ? `${dur} يوم` : '', duration: dur, note: document.getElementById('rcpNote').value.trim(),
+    items, discount: Number(document.getElementById('rcpDiscount').value)||0,
+    tables: (typeof receiptMeasTables!=='undefined' && receiptMeasTables.length) ? JSON.parse(JSON.stringify(receiptMeasTables)) : null};
+}, ()=>{ convertingFromInvoiceId = null; document.getElementById('receiptOverlay').classList.remove('show'); });
+
+// من نافذة تعديل عرض السعر / Devis / Facture (حتى قبل الحفظ)
+wireConvertMenu('btnConvInvoiceEdit', ()=>document.getElementById('invDocType').value, ()=>{
+  const items = [...document.querySelectorAll('#invItemsBody tr')].map(row=>{
+    const q = row.querySelector('.inv-it-qty'), d = row.querySelector('.inv-it-desc'), pr = row.querySelector('.inv-it-price'), u = row.querySelector('.inv-it-unit');
+    if(!q || !d) return null;
+    const qty = Number(q.value)||0, desc = d.value.trim(), price = Number(pr.value)||0;
+    if(!desc && !qty && !price) return null;
+    return {qty, desc, unit: u ? u.value.trim() : '', price, amount: qty*price,
+      ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {})};
+  }).filter(Boolean);
+  const v = id => (document.getElementById(id)||{}).value || '';
+  const dt = v('invDocType'), lbl = dt==='facture' ? 'Facture' : dt==='devis' ? 'Devis' : 'عرض سعر';
+  return {kind: dt, label: `${lbl} ${v('invNo')}`, name: v('invClientName').trim(), phone: v('invClientPhone').trim(), address: v('invClientAddress').trim(),
+    rc: v('invClientRC'), nif: v('invClientNIF'), nis: v('invClientNIS'), delay: v('invDelay'), duration: parseInt(v('invDelay'),10)||'',
+    note: v('invNote').trim(), items, discount:0, tables:null};
+}, ()=>document.getElementById('invoiceOverlay').classList.remove('show'));
+
 // من الحاسبة / القياسات المحفوظة
 function docFromMeasRec(rec){
   const items = measItemsFromTotals(computeMeasTotalsFrom(rec.tables), rec.tables).map(it=>({...it, unit:'', amount:0}));
