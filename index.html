@@ -269,6 +269,9 @@
   .fac-card-head{ display:flex; justify-content:space-between; gap:8px; font-weight:800; font-size:15px; }
   .fac-card-head .dims{ direction:ltr; }
   .fac-card-note{ font-size:14px; font-weight:600; color:#222; margin-top:4px; }
+  .item-draws{ display:flex; flex-wrap:wrap; gap:4px 12px; margin-top:6px; }
+  .item-draw{ display:inline-block; text-align:center; font-size:11px; color:#555; line-height:1.2; }
+  .item-draw svg{ display:inline-block; margin:0; transform-origin:top center; width:auto; height:auto; max-height:80px; }
   .fac-card .fac-draw{ text-align:center; margin-top:8px; }
   .fac-card svg{ display:inline-block; margin:0; vertical-align:top; } /* html2canvas بيقص الرسمة إذا margin:auto */
   .fac-extra{ border:1px dashed #bbb; border-radius:8px; padding:8px 12px; margin-top:10px; font-size:14px; font-weight:600; }
@@ -2277,6 +2280,7 @@ function newItemRow(item){
     <td><button type="button" class="btn btn-ghost btn-sm it-measure" title="قياس">📐</button></td>
     <td><button class="btn btn-ghost btn-sm it-remove">✕</button></td>
   `;
+  if(item.measType) row.dataset.measType = item.measType;
   document.getElementById('itemsBody').appendChild(row);
   requestAnimationFrame(()=>autoGrow(row.querySelector('.it-desc')));
   const qty = row.querySelector('.it-qty');
@@ -2661,7 +2665,7 @@ async function buildAndSaveReceiptFromForm(){
     const qty = Number(qtyEl.value)||0;
     const desc = row.querySelector('.it-desc').value.trim();
     const price = Number(row.querySelector('.it-price').value)||0;
-    if(desc || qty || price) items.push({qty, desc, price, amount: qty*price});
+    if(desc || qty || price) items.push({qty, desc, price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {})});
   });
   const hasDetails = items.some(it=>it.desc);
   if(!hasDetails){ toast('يرجى كتابة تفاصيل البند (النوع) — خانة إجبارية'); return null; }
@@ -2944,7 +2948,7 @@ function viewReceipt(id){
   if(!r) return;
   currentViewedReceiptId = id;
   const itemsRows = r.items.map(it=>`
-    <tr><td>${it.qty}</td><td>${it.desc}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+    <tr><td>${it.qty}</td><td>${it.desc}${itemMeasDrawingsHtml(it, r.measurementTables)}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
   `).join('');
   const payList = getReceiptPayments(r);
   const paymentsRows = payList.map(p=>`
@@ -3935,9 +3939,9 @@ function cornerSvg(A, B, C, edges, opts){
   let g = `<path d="M${x0},${y0} L${x1},${y0} L${x1},${y1} L${x1-c},${y1} L${x1-c},${y0+c} L${x0},${y0+c} Z" fill="#F4EFE4"/>`;
   g += line('oa', x0,y0, x1,y0) + line('ob', x1,y0, x1,y1) + line('ia', x0,y0+c, x1-c,y0+c) + line('ib', x1-c,y0+c, x1-c,y1) + line('ea', x0,y0, x0,y0+c) + line('eb', x1-c,y1, x1,y1);
   g += svgLbl((x0+x1)/2, y0-7, `برا ${fmtCm(A)} سم`, 13, true);
-  g += svgLbl((x0+x1-c)/2, y0+c+15, `جوا ${fmtCm(A-C)}`, 12);
+  if(!opts.compact) g += svgLbl((x0+x1-c)/2, y0+c+15, `جوا ${fmtCm(A-C)}`, 12);
   g += svgLbl(x1+36, (y0+y1)/2, `برا ${fmtCm(B)}`, 13, true) + svgLbl(x1+36, (y0+y1)/2+14, 'سم', 12);
-  g += svgLbl(x1-c-34, (y0+c+y1)/2+4, `جوا ${fmtCm(B-C)}`, 12);
+  if(!opts.compact) g += svgLbl(x1-c-34, (y0+c+y1)/2+4, `جوا ${fmtCm(B-C)}`, 12);
   g += svgLbl(x0-32, y0+c/2+4, `عرض ${fmtCm(C)}`, 12);
   return svgWrap(W, H, g);
 }
@@ -4021,6 +4025,18 @@ function renderFactorySheetHtml(order){
     ${extras}
     ${hasEdges ? '<div class="fac-legend"><i></i> الخط الأحمر = مكان اللف</div>' : ''}
   `;
+}
+// رسومات صغيرة تحت بيان البند بالوصل (من جداول القياسات المرفقة بنفس النوع)
+function itemMeasDrawingsHtml(it, tables){
+  if(!it || !it.measType || !tables || !tables.length) return '';
+  const tbls = tables.filter(t=>t.type===it.measType);
+  if(!tbls.length) return '';
+  const pieces = calcToFactoryOrder(tbls, '', '').pieces.filter(p=>shapeHasDims(p));
+  if(!pieces.length) return '';
+  return `<div class="item-draws">${pieces.map(p=>{
+    const c = Number(p.count)||1;
+    return `<div class="item-draw">${shapeSvg(p.shape, p.l, p.w, p.h, p.edges, {maxW:90, maxH:42, compact:true})}${c>1?`<div>×${c}</div>`:''}</div>`;
+  }).join('')}</div>`;
 }
 function factoryCardsHtml(piecesIn){
   const esc = escHtmlText;
@@ -4508,12 +4524,12 @@ function measDetailsForType(tables, type){
 function measItemsFromTotals(totals, tables){
   const items = [];
   const desc = (label, type) => { const d = measDetailsForType(tables, type); return d ? `${label}: ${d}` : label; };
-  if(totals['مربع'] > 0 || measDetailsForType(tables,'مربع')) items.push({qty: Number(totals['مربع'].toFixed(2)), desc: desc('متر مربع','مربع'), price:''});
-  if(totals['طول'] > 0 || measDetailsForType(tables,'طول')) items.push({qty: Number(totals['طول'].toFixed(2)), desc: desc('متر طول','طول'), price:''});
-  if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: desc('متر مكعب','مكعب'), price:''});
-  if(totals['عامود'] > 0) items.push({qty: Number(totals['عامود'].toFixed(2)), desc: desc('عامود (م²)','عامود'), price:''});
-  if(totals['دائرة'] > 0) items.push({qty: Number(totals['دائرة'].toFixed(2)), desc: desc('دوائر (م²)','دائرة'), price:''});
-  if(totals['زاوية'] > 0) items.push({qty: Number(totals['زاوية'].toFixed(2)), desc: desc('زوايا (م²)','زاوية'), price:''});
+  if(totals['مربع'] > 0 || measDetailsForType(tables,'مربع')) items.push({qty: Number(totals['مربع'].toFixed(2)), desc: desc('متر مربع','مربع'), price:'', measType:'مربع'});
+  if(totals['طول'] > 0 || measDetailsForType(tables,'طول')) items.push({qty: Number(totals['طول'].toFixed(2)), desc: desc('متر طول','طول'), price:'', measType:'طول'});
+  if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: desc('متر مكعب','مكعب'), price:'', measType:'مكعب'});
+  if(totals['عامود'] > 0) items.push({qty: Number(totals['عامود'].toFixed(2)), desc: desc('عامود (م²)','عامود'), price:'', measType:'عامود'});
+  if(totals['دائرة'] > 0) items.push({qty: Number(totals['دائرة'].toFixed(2)), desc: desc('دوائر (م²)','دائرة'), price:'', measType:'دائرة'});
+  if(totals['زاوية'] > 0) items.push({qty: Number(totals['زاوية'].toFixed(2)), desc: desc('زوايا (م²)','زاوية'), price:'', measType:'زاوية'});
   return items;
 }
 
