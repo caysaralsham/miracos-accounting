@@ -5496,7 +5496,8 @@ if('serviceWorker' in navigator){
     wrap.querySelector('[data-mirsam-btn]').addEventListener('click',()=>wrap.querySelector('[data-mirsam-file]').click());
     wrap.querySelector('[data-mirsam-file]').addEventListener('change',async e=>{const fl=e.target.files[0];e.target.value='';if(!fl)return;
       let d;try{d=JSON.parse(await fl.text());if(d.app!=='mirsam-decor'||!d.images)throw 0}catch(_){toast('هاد الملف مو ملف مشروع من مرسم ديكور');return}
-      chooseVariant(d,v=>applyProject(k,d,v))});
+      const v=d.images.pure?'pure':(d.images.withDetails?'withDetails':Object.keys(KIND).find(x=>d.images[x]));if(!v){toast('الملف ما فيه رسمة');return}
+      applyProject(k,d,v)});
   }
   function chooseVariant(d,cb){
     const opts=Object.keys(KIND).filter(x=>d.images[x]);if(!opts.length){toast('الملف ما فيه رسمة');return}
@@ -5529,8 +5530,9 @@ if('serviceWorker' in navigator){
   }
   async function renderPrev(k){
     const box=document.querySelector(`[data-mirsam-prev="${k}"]`);if(!box)return;const m=MD[k];
+    const ov=document.getElementById(k==='rcp'?'receiptOverlay':'invoiceOverlay');if(ov)ov.classList.toggle('mirsam-on',!!m);
     if(!m){box.innerHTML='';return}
-    box.innerHTML=`<div style="display:flex;gap:10px;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:8px;"><img data-mirsam-thumb style="width:110px;height:80px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--line);"><div style="flex:1;font-size:13px;"><b>📐 ${esc(m.name||m.title)}</b><br><span style="color:var(--text-dim);">${esc(KIND[m.kind]||'')} — بتطلع مع الطباعة والمشاركة</span></div><button type="button" class="btn btn-ghost btn-sm" data-mirsam-del>إزالة</button></div>`;
+    box.innerHTML=`<div style="display:flex;gap:10px;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:8px;"><img data-mirsam-thumb style="width:110px;height:80px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--line);"><div style="flex:1;font-size:13px;"><b>📐 ${esc(m.name||m.title)}</b><br><span style="color:var(--text-dim);">بتطلع مع الطباعة والمشاركة، ورسمات حاسبة القياسات بتختفي من الطباعة طول ما هي موجودة (بياناتها بتضل محفوظة)</span></div><button type="button" class="btn btn-ghost btn-sm" data-mirsam-del>إزالة</button></div>`;
     box.querySelector('[data-mirsam-del]').onclick=()=>{MD[k]=null;renderPrev(k)};
     const src=m.img||await loadImg(m);const t=box.querySelector('[data-mirsam-thumb]');if(t&&src)t.src=src;
   }
@@ -5558,13 +5560,24 @@ if('serviceWorker' in navigator){
   function attach(areaId,meta){
     const area=document.getElementById(areaId);if(!area)return;
     const old=area.querySelector('.mirsam-print');if(old)old.remove();
+    area.classList.toggle('mirsam-on',!!meta);
     if(!meta)return;
     const box=document.createElement('div');box.className='mirsam-print';const pure=meta.kind==='pure';
-    box.style.cssText='margin-top:12px;text-align:center;page-break-inside:avoid;break-inside:avoid;'+(pure?'':'page-break-before:always;break-before:page;');
-    box.innerHTML=pure?`<div style="font-weight:700;font-size:13px;margin-bottom:4px;">${esc(meta.title||'الرسمة')}</div><img style="max-width:100%;max-height:105mm;width:auto;height:auto;object-fit:contain;border:1px solid #e5e0d6;border-radius:6px;">`:`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
+    box.style.cssText='margin-top:12px;text-align:center;page-break-inside:avoid;break-inside:avoid;';
+    box.innerHTML=pure?`<div style="font-weight:700;font-size:13px;margin-bottom:4px;">${esc(meta.title||'الرسمة')}</div><img style="max-width:100%;width:auto;height:auto;object-fit:contain;border:1px solid #e5e0d6;border-radius:6px;">`:`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
     area.appendChild(box);
-    lastLoad=loadImg(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.remove();return res()}im.onload=()=>res();im.onerror=()=>res();im.src=src}));
+    lastLoad=loadImg(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.remove();return res()}im.onload=()=>{fitBox(area,box,im);res()};im.onerror=()=>res();im.src=src}));
   }
+  // يختار حجم الرسمة لحاله: بنفس الورقة إذا في محل وبتنقرا منيح، وإلا بورقة لحالها بحجم كبير
+  function fitBox(area,box,im){
+    const PAGE=1000,MINR=380,img=box.querySelector('img');box.style.pageBreakBefore='';box.style.breakBefore='';
+    img.style.maxHeight='none';img.style.width='auto';img.style.maxWidth='100%';
+    const w=Math.min(area.clientWidth||720,720),nat=w*im.naturalHeight/Math.max(1,im.naturalWidth);
+    const before=box.getBoundingClientRect().top-area.getBoundingClientRect().top,used=before%PAGE,remain=PAGE-used-50;
+    if(remain>=Math.min(nat,MINR)){img.style.maxHeight=Math.round(Math.min(nat,remain))+'px'}
+    else{box.style.pageBreakBefore='always';box.style.breakBefore='page';img.style.maxHeight=Math.round(Math.min(nat,PAGE-70))+'px'}
+  }
+  const st=document.createElement('style');st.textContent='.mirsam-on .item-draws,.mirsam-on .item-legend{display:none!important}';document.head.appendChild(st);
   const _viewR=viewReceipt;viewReceipt=function(id){_viewR(id);const r=receipts.find(x=>x.id===id);attach('receiptPrintArea',r&&r.mirsamDrawing)};
   const _viewI=viewInvoice;viewInvoice=function(id){_viewI(id);const v=invoices.find(x=>x.id===id);attach('invoicePrintArea',v&&v.mirsamDrawing)};
   const _cap=captureAsPage;captureAsPage=async function(area){try{await lastLoad}catch(e){}return _cap(area)};
