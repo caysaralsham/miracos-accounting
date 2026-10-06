@@ -5475,6 +5475,104 @@ if('serviceWorker' in navigator){
     renderTrash();
   });
 })();
+
+/* ================= مرسم ديكور: استيراد رسمة لوصل الدفع وعرض السعر ================= */
+(function(){
+  const MD={rcp:null,inv:null},drwCache={};let carry=null,lastLoad=Promise.resolve();
+  const KIND={withDetails:'الرسمة مع التفاصيل',drawingOnly:'الرسمة بس',workshop:'نسخة المعمل'};
+  const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  function compress(src){return new Promise(res=>{const im=new Image();im.onload=()=>{let w=Math.min(1500,im.width),q=.85,out=null;
+    for(let i=0;i<7;i++){const h=Math.round(im.height*w/im.width),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);out=c.toDataURL('image/jpeg',q);if(out.length<850000)break;w=Math.round(w*.82);q=Math.max(.6,q-.05)}
+    res(out)};im.onerror=()=>res(null);im.src=src})}
+  async function loadImg(meta){if(!meta||!meta.id)return null;if(drwCache[meta.id])return drwCache[meta.id];
+    try{const d=await db.collection(FS_COLLECTION).doc(meta.id).get();if(d.exists&&d.data().img){drwCache[meta.id]=d.data().img;return drwCache[meta.id]}}catch(e){console.error(e)}return null}
+
+  // ---- واجهة داخل نافذة الوصل/عرض السعر ----
+  function addUI(k,afterId){
+    const anchor=document.getElementById(afterId);if(!anchor)return;
+    const wrap=document.createElement('div');wrap.style.cssText='margin-top:10px;';
+    wrap.innerHTML=`<button type="button" class="btn btn-sm" data-mirsam-btn="${k}">📐 من مرسم ديكور</button><input type="file" accept=".json,application/json" hidden data-mirsam-file="${k}"><div data-mirsam-prev="${k}" style="margin-top:8px;"></div>`;
+    anchor.insertAdjacentElement('afterend',wrap);
+    wrap.querySelector('[data-mirsam-btn]').addEventListener('click',()=>wrap.querySelector('[data-mirsam-file]').click());
+    wrap.querySelector('[data-mirsam-file]').addEventListener('change',async e=>{const fl=e.target.files[0];e.target.value='';if(!fl)return;
+      let d;try{d=JSON.parse(await fl.text());if(d.app!=='mirsam-decor'||!d.images)throw 0}catch(_){toast('هاد الملف مو ملف مشروع من مرسم ديكور');return}
+      chooseVariant(d,v=>applyProject(k,d,v))});
+  }
+  function chooseVariant(d,cb){
+    const opts=Object.keys(KIND).filter(x=>d.images[x]);if(!opts.length){toast('الملف ما فيه رسمة');return}
+    const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px;';
+    ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:340px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.25);">
+      <div style="font-weight:800;margin-bottom:4px;">${esc(d.name)}</div><div style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">${esc(d.title)}${d.customer&&d.customer.name?' — '+esc(d.customer.name):''}</div>
+      ${opts.map(o=>`<button type="button" class="btn ${o==='withDetails'?'btn-primary':''}" data-v="${o}" style="width:100%;margin-bottom:8px;">${KIND[o]}</button>`).join('')}
+      <button type="button" class="btn btn-ghost" data-v="" style="width:100%;">إلغاء</button></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(e.target===ov||b){ov.remove();if(b&&b.dataset.v)cb(b.dataset.v)}});
+  }
+  async function applyProject(k,d,v){
+    const img=await compress(d.images[v]);if(!img){toast('تعذر قراءة الرسمة');return}
+    const c=d.customer||{},q=(d.quote&&d.quote.rows)||[];
+    const set=(id,val)=>{const el=document.getElementById(id);if(el&&!el.value.trim()&&val)el.value=val};
+    if(k==='rcp'){set('rcpName',c.name);set('rcpPhone',c.phone);set('rcpAddress',c.addr)}
+    else{set('invClientName',c.name);set('invClientPhone',c.phone);set('invClientAddress',c.addr)}
+    const body=document.getElementById(k==='rcp'?'itemsBody':'invItemsBody');
+    const rows=[...body.querySelectorAll('tr')];
+    const isEmpty=r=>[...r.querySelectorAll('input,textarea')].every(i=>!String(i.value||'').trim());
+    if(rows.length===1&&isEmpty(rows[0]))rows[0].remove();
+    const items=q.length?q:[{desc:d.title+' — '+d.name,qty:1,unit:'',price:''}];
+    for(const r of items){
+      if(k==='rcp')newItemRow({qty:r.qty||1,desc:(r.desc||'')+(r.unit?` (${r.unit})`:''),price:r.price||''});
+      else newInvoiceItemRow({qty:r.qty||1,desc:r.desc||'',unit:r.unit||'',price:r.price||''});
+    }
+    if(k==='rcp'){if(typeof recalcTotals==='function')recalcTotals()}else{if(typeof recalcInvoiceTotals==='function')recalcInvoiceTotals()}
+    MD[k]={id:null,kind:v,title:d.title||'',name:d.name||'',img,dirty:true};renderPrev(k);
+    toast('انضافت الرسمة والبنود من مرسم ديكور');
+  }
+  async function renderPrev(k){
+    const box=document.querySelector(`[data-mirsam-prev="${k}"]`);if(!box)return;const m=MD[k];
+    if(!m){box.innerHTML='';return}
+    box.innerHTML=`<div style="display:flex;gap:10px;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:8px;"><img data-mirsam-thumb style="width:110px;height:80px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--line);"><div style="flex:1;font-size:13px;"><b>📐 ${esc(m.name||m.title)}</b><br><span style="color:var(--text-dim);">${esc(KIND[m.kind]||'')} — بتطلع مع الطباعة والمشاركة</span></div><button type="button" class="btn btn-ghost btn-sm" data-mirsam-del>إزالة</button></div>`;
+    box.querySelector('[data-mirsam-del]').onclick=()=>{MD[k]=null;renderPrev(k)};
+    const src=m.img||await loadImg(m);const t=box.querySelector('[data-mirsam-thumb]');if(t&&src)t.src=src;
+  }
+  async function persist(k){
+    const m=MD[k];if(!m)return null;
+    if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name};
+    const id=m.id||('mirsam_drw_'+uid());
+    try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name}}
+    catch(e){console.error(e);toast('تعذر حفظ الرسمة على السحابة');return null}
+  }
+
+  // ---- ربط مع الحفظ والفتح والتحويل ----
+  const _openR=openReceiptModal;openReceiptModal=function(r){_openR(r);const m=carry||(r&&r.mirsamDrawing?{...r.mirsamDrawing,dirty:false}:null);carry=null;MD.rcp=m;renderPrev('rcp')};
+  const _openI=openInvoiceModal;openInvoiceModal=function(inv){_openI(inv);const m=carry||(inv&&inv.mirsamDrawing?{...inv.mirsamDrawing,dirty:false}:null);carry=null;MD.inv=m;renderPrev('inv')};
+  const _saveR=buildAndSaveReceiptFromForm;buildAndSaveReceiptFromForm=async function(){
+    const meta=await persist('rcp');const id=await _saveR();if(!id)return id;
+    const r=receipts.find(x=>x.id===id);if(r){if(meta)r.mirsamDrawing=meta;else delete r.mirsamDrawing;saveReceipts()}return id};
+  const _saveI=buildAndSaveInvoiceFromForm;buildAndSaveInvoiceFromForm=async function(){
+    const meta=await persist('inv');const id=await _saveI();if(!id)return id;
+    const v=invoices.find(x=>x.id===id);if(v){if(meta)v.mirsamDrawing=meta;else delete v.mirsamDrawing;saveInvoices()}return id};
+  const _convI=convertInvoiceToReceipt;convertInvoiceToReceipt=function(id){const inv=invoices.find(i=>i.id===id);carry=inv&&inv.mirsamDrawing?{...inv.mirsamDrawing,dirty:false}:null;try{_convI(id)}finally{carry=null}};
+  const rtq=document.getElementById('btnReceiptToQuote');if(rtq)rtq.addEventListener('click',()=>{carry=MD.rcp?{...MD.rcp}:null},true);
+
+  // ---- العرض والطباعة والمشاركة ----
+  function attach(areaId,meta){
+    const area=document.getElementById(areaId);if(!area)return;
+    const old=area.querySelector('.mirsam-print');if(old)old.remove();
+    if(!meta)return;
+    const box=document.createElement('div');box.className='mirsam-print';box.style.cssText='margin-top:16px;text-align:center;page-break-inside:avoid;break-inside:avoid;';
+    box.innerHTML=`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
+    area.appendChild(box);
+    lastLoad=loadImg(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.remove();return res()}im.onload=()=>res();im.onerror=()=>res();im.src=src}));
+  }
+  const _viewR=viewReceipt;viewReceipt=function(id){_viewR(id);const r=receipts.find(x=>x.id===id);attach('receiptPrintArea',r&&r.mirsamDrawing)};
+  const _viewI=viewInvoice;viewInvoice=function(id){_viewI(id);const v=invoices.find(x=>x.id===id);attach('invoicePrintArea',v&&v.mirsamDrawing)};
+  const _cap=captureAsPage;captureAsPage=async function(area){try{await lastLoad}catch(e){}return _cap(area)};
+  window.addEventListener('beforeprint',()=>{});
+
+  addUI('rcp','rcpItemsCount');
+  addUI('inv','invItemsCount');
+})();
+
 </script>
 </body>
 </html>
