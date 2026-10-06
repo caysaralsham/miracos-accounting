@@ -5479,7 +5479,7 @@ if('serviceWorker' in navigator){
 /* ================= مرسم ديكور: استيراد رسمة لوصل الدفع وعرض السعر ================= */
 (function(){
   const MD={rcp:null,inv:null},drwCache={};let carry=null,lastLoad=Promise.resolve();
-  const KIND={withDetails:'الرسمة مع التفاصيل',drawingOnly:'الرسمة بس',workshop:'نسخة المعمل'};
+  const KIND={pure:'الرسمة صافية (بتساع مع الوصل)',withDetails:'الرسمة مع التفاصيل (ورقة كاملة)',drawingOnly:'الرسمة بس (ورقة كاملة)',workshop:'نسخة المعمل (ورقة كاملة)'};
   const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   function compress(src){return new Promise(res=>{const im=new Image();im.onload=()=>{let w=Math.min(1500,im.width),q=.85,out=null;
     for(let i=0;i<7;i++){const h=Math.round(im.height*w/im.width),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);out=c.toDataURL('image/jpeg',q);if(out.length<850000)break;w=Math.round(w*.82);q=Math.max(.6,q-.05)}
@@ -5503,7 +5503,7 @@ if('serviceWorker' in navigator){
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px;';
     ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:340px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.25);">
       <div style="font-weight:800;margin-bottom:4px;">${esc(d.name)}</div><div style="font-size:12.5px;color:var(--text-dim);margin-bottom:14px;">${esc(d.title)}${d.customer&&d.customer.name?' — '+esc(d.customer.name):''}</div>
-      ${opts.map(o=>`<button type="button" class="btn ${o==='withDetails'?'btn-primary':''}" data-v="${o}" style="width:100%;margin-bottom:8px;">${KIND[o]}</button>`).join('')}
+      ${opts.map(o=>`<button type="button" class="btn ${o===opts[0]?'btn-primary':''}" data-v="${o}" style="width:100%;margin-bottom:8px;">${KIND[o]}</button>`).join('')}
       <button type="button" class="btn btn-ghost" data-v="" style="width:100%;">إلغاء</button></div>`;
     document.body.appendChild(ov);
     ov.addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(e.target===ov||b){ov.remove();if(b&&b.dataset.v)cb(b.dataset.v)}});
@@ -5559,8 +5559,9 @@ if('serviceWorker' in navigator){
     const area=document.getElementById(areaId);if(!area)return;
     const old=area.querySelector('.mirsam-print');if(old)old.remove();
     if(!meta)return;
-    const box=document.createElement('div');box.className='mirsam-print';box.style.cssText='margin-top:16px;text-align:center;page-break-inside:avoid;break-inside:avoid;';
-    box.innerHTML=`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
+    const box=document.createElement('div');box.className='mirsam-print';const pure=meta.kind==='pure';
+    box.style.cssText='margin-top:12px;text-align:center;page-break-inside:avoid;break-inside:avoid;'+(pure?'':'page-break-before:always;break-before:page;');
+    box.innerHTML=pure?`<div style="font-weight:700;font-size:13px;margin-bottom:4px;">${esc(meta.title||'الرسمة')}</div><img style="max-width:100%;max-height:105mm;width:auto;height:auto;object-fit:contain;border:1px solid #e5e0d6;border-radius:6px;">`:`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
     area.appendChild(box);
     lastLoad=loadImg(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.remove();return res()}im.onload=()=>res();im.onerror=()=>res();im.src=src}));
   }
