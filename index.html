@@ -5557,17 +5557,23 @@ if('serviceWorker' in navigator){
     if(!d||!d.images||!d.images.pure){toast('ما وصلت رسمة');return}
     const img=await compress(d.images.pure);if(!img){toast('تعذر قراءة الرسمة');return}
     const old=MD[k];
-    MD[k]={id:old&&old.id||null,kind:'pure',title:d.title||'',name:d.name||'',img,dirty:true,mstate:d.mstate||null};renderPrev(k);
-    // سطر جاهز للكتابة: أول سطر فاضي (أو سطر جديد) وفيه نوع الرسمة، وبتقدر تعدّله
-    const body=document.getElementById(k==='rcp'?'itemsBody':'invItemsBody');
+    const lines=(d.lines&&d.lines.length?d.lines:[{desc:d.title||'',qty:1,unit:''}]).map(l=>({desc:String(l.desc||''),qty:l.qty||1,unit:l.unit||''}));
+    const rcp=k==='rcp',mk=l=>rcp?(l.desc+(l.unit?` (${l.unit})`:'')):l.desc;
+    MD[k]={id:old&&old.id||null,kind:'pure',title:d.title||'',name:d.name||'',img,dirty:true,mstate:d.mstate||null,lines:lines.map(mk)};renderPrev(k);
+    // البنود: بنود الرسمة القديمة اللي ما انعدلت بتنشال (وسعرها بينحفظ)، والفاضية بتنشال، وبعدين بتنضاف البنود الجديدة
+    const body=document.getElementById(rcp?'itemsBody':'invItemsBody');if(!body)return;
+    const dsc=r=>(r.querySelector('textarea')||{}).value||'',prc=r=>(r.querySelector(rcp?'.it-price':'.inv-it-price')||{}).value||'';
     const empty=r=>[...r.querySelectorAll('input,textarea')].every(i=>!String(i.value||'').trim());
-    let row=body&&[...body.querySelectorAll('tr')].find(empty);
-    if(body&&!row&&!old){if(k==='rcp')newItemRow();else newInvoiceItemRow();row=body.lastElementChild}
-    const ta=row&&row.querySelector('textarea,input[type=text],.it-desc,.inv-desc');
-    if(ta){if(!ta.value.trim()&&d.title)ta.value=d.title+' ';if(!row.querySelector('input[type=number]').value)row.querySelector('input[type=number]').value=1;
-      ta.dispatchEvent(new Event('input',{bubbles:true}));row.querySelectorAll('input[type=number]').forEach(i=>i.dispatchEvent(new Event('input',{bubbles:true})));
-      setTimeout(()=>{ta.scrollIntoView({block:'center',behavior:'smooth'});ta.focus();try{ta.setSelectionRange(ta.value.length,ta.value.length)}catch(_){}},150)}
-    toast('انضافت الرسمة — كمّل النوع والتفاصيل والسعر');
+    const oldL=(old&&old.lines)||[],keep={};
+    for(const r of [...body.querySelectorAll('tr')]){const n=oldL.indexOf(dsc(r).trim());if(n>=0){const key=oldL[n].split(' — ')[0];if(!(key in keep))keep[key]=prc(r);r.remove()}else if(empty(r))r.remove()}
+    let first=null;
+    lines.forEach(l=>{const price=keep[mk(l).split(' — ')[0]]||'';
+      if(rcp)newItemRow({qty:l.qty,desc:mk(l),price});else newInvoiceItemRow({qty:l.qty,desc:l.desc,unit:l.unit,price});
+      if(!first)first=body.lastElementChild});
+    if(rcp){if(typeof recalcTotals==='function')recalcTotals()}else{if(typeof recalcInvoiceTotals==='function')recalcInvoiceTotals()}
+    const pi=first&&first.querySelector(rcp?'.it-price':'.inv-it-price');
+    if(pi)setTimeout(()=>{pi.scrollIntoView({block:'center',behavior:'smooth'});pi.focus()},150);
+    toast('انضافت الرسمة والبنود — حط الأسعار، وبتقدر تعدّل أو تحذف أي سطر');
   }
   async function renderPrev(k){
     const box=document.querySelector(`[data-mirsam-prev="${k}"]`);if(!box)return;const m=MD[k];
@@ -5580,9 +5586,9 @@ if('serviceWorker' in navigator){
   }
   async function persist(k){
     const m=MD[k];if(!m)return null;
-    if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{})};
+    if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{})};
     const id=m.id||('mirsam_drw_'+uid());
-    try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{})}}
+    try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{})}}
     catch(e){console.error(e);toast('تعذر حفظ الرسمة على السحابة');return null}
   }
 
