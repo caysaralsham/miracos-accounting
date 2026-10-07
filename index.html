@@ -5557,6 +5557,8 @@ if('serviceWorker' in navigator){
     if(!d||!d.images||!d.images.pure){toast('ما وصلت رسمة');return}
     const img=await compress(d.images.pure);if(!img){toast('تعذر قراءة الرسمة');return}
     const old=MD[k];
+    {const c=d.customer||{},set=(id,v)=>{const el=document.getElementById(id);if(el&&!el.value.trim()&&v)el.value=v};
+     if(k==='rcp'){set('rcpName',c.name);set('rcpPhone',c.phone);set('rcpAddress',c.addr)}else{set('invClientName',c.name);set('invClientPhone',c.phone);set('invClientAddress',c.addr)}}
     const lines=(d.lines&&d.lines.length?d.lines:[{desc:d.title||'',qty:1,unit:''}]).map(l=>({desc:String(l.desc||''),qty:l.qty||1,unit:l.unit||''}));
     const rcp=k==='rcp',mk=l=>rcp?(l.desc+(l.unit?` (${l.unit})`:'')):l.desc;
     MD[k]={id:old&&old.id||null,kind:'pure',title:d.title||'',name:d.name||'',img,dirty:true,mstate:d.mstate||null,lines:lines.map(mk)};renderPrev(k);
@@ -5633,6 +5635,25 @@ if('serviceWorker' in navigator){
 
   addUI('rcp','rcpItemsCount');
   addUI('inv','invItemsCount');
+
+  // ---- رسمة جاية من مرسم ديكور (زر «↗ إلى ميراكوس») ----
+  const MQ=new URLSearchParams(location.search).get('mirsam');
+  if(['rcp','inv','devis'].includes(MQ)&&window.opener){
+    history.replaceState(null,'',location.pathname);
+    const OKO=o=>/^https:\/\/([a-z0-9-]+\.)*(cesar-alcham\.com|github\.io|pages\.dev)$/.test(o)||/^http:\/\/localhost(:\d+)?$/.test(o);
+    const k=MQ==='rcp'?'rcp':'inv';let opened=false,done=false,ping=null;
+    const ready=()=>{try{const ls=document.getElementById('loginScreen');return firebase.auth().currentUser&&(!ls||getComputedStyle(ls).display==='none')}catch(e){return false}};
+    const onMsg=async e=>{if(done||e.source!==window.opener||!OKO(e.origin)||!e.data||e.data.type!=='mirsam-result')return;
+      done=true;clearInterval(ping);removeEventListener('message',onMsg);
+      try{window.opener.postMessage({type:'mirsam-got'},e.origin)}catch(_){}
+      await applyDrawing(k,e.data.data)};
+    addEventListener('message',onMsg);
+    const tick=setInterval(()=>{if(!ready())return;clearInterval(tick);
+      if(!opened){opened=true;if(k==='rcp')openReceiptModal();else{openInvoiceModal();if(MQ==='devis'){const dt=document.getElementById('invDocType');dt.value='devis';dt.dispatchEvent(new Event('change'))}}}
+      const send=()=>{try{window.opener&&window.opener.postMessage({type:'mirsam-ready'},'*')}catch(_){}};
+      send();ping=setInterval(()=>{if(done||!window.opener){clearInterval(ping);return}send()},1500);
+      setTimeout(()=>{if(!done){clearInterval(ping);toast('ما وصلت الرسمة من مرسم — جرّب ترسلها مرة تانية')}},120000)},600);
+  }
 })();
 
 </script>
