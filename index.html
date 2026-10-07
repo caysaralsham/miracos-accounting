@@ -5636,23 +5636,28 @@ if('serviceWorker' in navigator){
   addUI('rcp','rcpItemsCount');
   addUI('inv','invItemsCount');
 
-  // ---- رسمة جاية من مرسم ديكور (زر «↗ إلى ميراكوس») ----
-  const MQ=new URLSearchParams(location.search).get('mirsam');
-  if(['rcp','inv','devis'].includes(MQ)&&window.opener){
-    history.replaceState(null,'',location.pathname);
-    const OKO=o=>/^https:\/\/([a-z0-9-]+\.)*(cesar-alcham\.com|github\.io|pages\.dev)$/.test(o)||/^http:\/\/localhost(:\d+)?$/.test(o);
-    const k=MQ==='rcp'?'rcp':'inv';let opened=false,done=false,ping=null;
-    const ready=()=>{try{const ls=document.getElementById('loginScreen');return firebase.auth().currentUser&&(!ls||getComputedStyle(ls).display==='none')}catch(e){return false}};
-    const onMsg=async e=>{if(done||e.source!==window.opener||!OKO(e.origin)||!e.data||e.data.type!=='mirsam-result')return;
-      done=true;clearInterval(ping);removeEventListener('message',onMsg);
-      try{window.opener.postMessage({type:'mirsam-got'},e.origin)}catch(_){}
-      await applyDrawing(k,e.data.data)};
-    addEventListener('message',onMsg);
-    const tick=setInterval(()=>{if(!ready())return;clearInterval(tick);
-      if(!opened){opened=true;if(k==='rcp')openReceiptModal();else{openInvoiceModal();if(MQ==='devis'){const dt=document.getElementById('invDocType');dt.value='devis';dt.dispatchEvent(new Event('change'))}}}
-      const send=()=>{try{window.opener&&window.opener.postMessage({type:'mirsam-ready'},'*')}catch(_){}};
-      send();ping=setInterval(()=>{if(done||!window.opener){clearInterval(ping);return}send()},1500);
-      setTimeout(()=>{if(!done){clearInterval(ping);toast('ما وصلت الرسمة من مرسم — جرّب ترسلها مرة تانية')}},120000)},600);
+  // ---- رسمة جاية من مرسم ديكور (زر «↗ إلى ميراكوس»): البيانات بالرابط، والصورة بتترسم بمرسم مخفي ----
+  let MQ=new URLSearchParams(location.search).get('mirsam');
+  if(MQ){history.replaceState(null,'',location.pathname);
+    try{MQ=decodeURIComponent(MQ)}catch(_){}MQ=MQ.replace(/^web\+[a-z]+:(\/\/)?/,'');
+    let P=null;try{const b=atob(MQ.replace(/-/g,'+').replace(/_/g,'/'));P=JSON.parse(new TextDecoder().decode(Uint8Array.from(b,c=>c.charCodeAt(0))))}catch(e){console.error(e)}
+    if(P&&['rcp','inv','devis'].includes(P.k)){
+      const k=P.k==='rcp'?'rcp':'inv';
+      const ready=()=>{try{const ls=document.getElementById('loginScreen');return firebase.auth().currentUser&&(!ls||getComputedStyle(ls).display==='none')}catch(e){return false}};
+      const tick=setInterval(()=>{if(!ready())return;clearInterval(tick);
+        if(k==='rcp')openReceiptModal();else{openInvoiceModal();if(P.k==='devis'){const dt=document.getElementById('invDocType');dt.value='devis';dt.dispatchEvent(new Event('change'))}}
+        const c=P.c||{},set=(id,v)=>{const el=document.getElementById(id);if(el&&!el.value.trim()&&v)el.value=v};
+        if(k==='rcp'){set('rcpName',c.name);set('rcpPhone',c.phone);set('rcpAddress',c.addr)}else{set('invClientName',c.name);set('invClientPhone',c.phone);set('invClientAddress',c.addr)}
+        toast('عم جهّز الرسمة من مرسم ديكور…');
+        const fr=document.createElement('iframe');fr.src=STUDIO+'&v='+Date.now();fr.setAttribute('aria-hidden','true');fr.tabIndex=-1;
+        fr.style.cssText='position:fixed;left:-3000px;top:0;width:1200px;height:900px;border:0;opacity:0;pointer-events:none;';
+        let done=false;const end=()=>{removeEventListener('message',on);fr.remove()};
+        const on=async e=>{if(e.origin!==STUDIO_ORIGIN||e.source!==fr.contentWindow||!e.data)return;
+          if(e.data.type==='mirsam-ready')fr.contentWindow.postMessage({type:'mirsam-init',customer:c,mstate:{tab:P.t,state:P.s||{}},auto:true},STUDIO_ORIGIN);
+          else if(e.data.type==='mirsam-result'&&!done){done=true;end();await applyDrawing(k,e.data.data)}};
+        addEventListener('message',on);document.body.appendChild(fr);
+        setTimeout(()=>{if(!done){end();toast('ما قدرت جيب الرسمة من مرسم — تأكد من الإنترنت وجرّب مرة تانية')}},60000)},600);
+    }
   }
 })();
 
