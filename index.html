@@ -5491,9 +5491,10 @@ if('serviceWorker' in navigator){
   function addUI(k,afterId){
     const anchor=document.getElementById(afterId);if(!anchor)return;
     const wrap=document.createElement('div');wrap.style.cssText='margin-top:10px;';
-    wrap.innerHTML=`<button type="button" class="btn btn-sm" data-mirsam-btn="${k}">📐 من مرسم ديكور</button><input type="file" accept=".json,application/json" hidden data-mirsam-file="${k}"><div data-mirsam-prev="${k}" style="margin-top:8px;"></div>`;
+    wrap.innerHTML=`<button type="button" class="btn btn-sm btn-primary" data-mirsam-draw="${k}">✏️ ارسم الآن</button> <button type="button" class="btn btn-sm" data-mirsam-btn="${k}">📐 من مرسم ديكور</button><input type="file" accept=".json,application/json" hidden data-mirsam-file="${k}"><div data-mirsam-prev="${k}" style="margin-top:8px;"></div>`;
     anchor.insertAdjacentElement('afterend',wrap);
     wrap.querySelector('[data-mirsam-btn]').addEventListener('click',()=>wrap.querySelector('[data-mirsam-file]').click());
+    wrap.querySelector('[data-mirsam-draw]').addEventListener('click',()=>openStudio(k));
     wrap.querySelector('[data-mirsam-file]').addEventListener('change',async e=>{const fl=e.target.files[0];e.target.value='';if(!fl)return;
       let d;try{d=JSON.parse(await fl.text());if(d.app!=='mirsam-decor'||!d.images)throw 0}catch(_){toast('هاد الملف مو ملف مشروع من مرسم ديكور');return}
       const v=d.images.pure?'pure':(d.images.withDetails?'withDetails':Object.keys(KIND).find(x=>d.images[x]));if(!v){toast('الملف ما فيه رسمة');return}
@@ -5528,19 +5529,50 @@ if('serviceWorker' in navigator){
     MD[k]={id:null,kind:v,title:d.title||'',name:d.name||'',img,dirty:true};renderPrev(k);
     toast('انضافت الرسمة والبنود من مرسم ديكور');
   }
+  // ---- مرسم جوّا ميراكوس: ارسم وارجع الرسمة مباشرة ----
+  const STUDIO='https://cesar-alcham.com/studio-q7m4/?embed=1',STUDIO_ORIGIN='https://cesar-alcham.com';
+  let studio=null;
+  function openStudio(k){
+    if(studio)return;
+    const g=id=>{const el=document.getElementById(id);return el?el.value.trim():''};
+    const customer=k==='rcp'?{name:g('rcpName'),phone:g('rcpPhone'),addr:g('rcpAddress')}:{name:g('invClientName'),phone:g('invClientPhone'),addr:g('invClientAddress')};
+    const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;z-index:100000;background:#fff;display:flex;flex-direction:column;';
+    ov.innerHTML='<div style="padding:6px 12px;font-size:12.5px;color:#666;background:#f5f1e8;display:flex;justify-content:space-between;align-items:center;"><span>مرسم ديكور — لما تخلص اضغط «↩ إرسال إلى ميراكوس»</span><button type="button" class="btn btn-ghost btn-sm" data-x>✕ سكّر</button></div><iframe src="'+STUDIO+'" style="flex:1;border:0;width:100%;" allow="clipboard-write"></iframe>';
+    document.body.appendChild(ov);
+    const fr=ov.querySelector('iframe');
+    const close=()=>{window.removeEventListener('message',onMsg);ov.remove();studio=null};
+    const onMsg=async e=>{
+      if(e.origin!==STUDIO_ORIGIN||e.source!==fr.contentWindow||!e.data)return;
+      const t=e.data.type;
+      if(t==='mirsam-ready')fr.contentWindow.postMessage({type:'mirsam-init',customer,mstate:MD[k]&&MD[k].mstate||null},STUDIO_ORIGIN);
+      else if(t==='mirsam-cancel')close();
+      else if(t==='mirsam-result'){close();await applyDrawing(k,e.data.data)}
+    };
+    window.addEventListener('message',onMsg);
+    ov.querySelector('[data-x]').onclick=()=>{if(confirm('تسكير مرسم بدون ما ترجع الرسمة؟'))close()};
+    studio=ov;
+  }
+  async function applyDrawing(k,d){
+    if(!d||!d.images||!d.images.pure){toast('ما وصلت رسمة');return}
+    const img=await compress(d.images.pure);if(!img){toast('تعذر قراءة الرسمة');return}
+    const old=MD[k];
+    MD[k]={id:old&&old.id||null,kind:'pure',title:d.title||'',name:d.name||'',img,dirty:true,mstate:d.mstate||null};renderPrev(k);
+    toast('انضافت الرسمة — اكتب النوع والتفاصيل والسعر');
+  }
   async function renderPrev(k){
     const box=document.querySelector(`[data-mirsam-prev="${k}"]`);if(!box)return;const m=MD[k];
     const ov=document.getElementById(k==='rcp'?'receiptOverlay':'invoiceOverlay');if(ov)ov.classList.toggle('mirsam-on',!!m);
     if(!m){box.innerHTML='';return}
     box.innerHTML=`<div style="display:flex;gap:10px;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:8px;"><img data-mirsam-thumb style="width:110px;height:80px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--line);"><div style="flex:1;font-size:13px;"><b>📐 ${esc(m.name||m.title)}</b><br><span style="color:var(--text-dim);">بتطلع مع الطباعة والمشاركة، ورسمات حاسبة القياسات بتختفي من الطباعة طول ما هي موجودة (بياناتها بتضل محفوظة)</span></div><button type="button" class="btn btn-ghost btn-sm" data-mirsam-del>إزالة</button></div>`;
     box.querySelector('[data-mirsam-del]').onclick=()=>{MD[k]=null;renderPrev(k)};
+    if(m.mstate){const eb=document.createElement('button');eb.type='button';eb.className='btn btn-sm';eb.textContent='✏️ عدّل الرسمة';eb.onclick=()=>openStudio(k);box.firstElementChild.appendChild(eb)}
     const src=m.img||await loadImg(m);const t=box.querySelector('[data-mirsam-thumb]');if(t&&src)t.src=src;
   }
   async function persist(k){
     const m=MD[k];if(!m)return null;
-    if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name};
+    if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{})};
     const id=m.id||('mirsam_drw_'+uid());
-    try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name}}
+    try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{})}}
     catch(e){console.error(e);toast('تعذر حفظ الرسمة على السحابة');return null}
   }
 
