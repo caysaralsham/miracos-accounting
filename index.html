@@ -5520,7 +5520,7 @@ if('serviceWorker' in navigator){
     const rows=[...body.querySelectorAll('tr')];
     const isEmpty=r=>[...r.querySelectorAll('input,textarea')].every(i=>!String(i.value||'').trim());
     if(rows.length===1&&isEmpty(rows[0]))rows[0].remove();
-    const items=q.length?q:[{desc:d.title+' — '+d.name,qty:1,unit:'',price:''}];
+    const items=q.length?q:(d.lines&&d.lines.length?d.lines:[{desc:d.title||d.name||'',qty:1,unit:'',price:''}]);
     for(const r of items){
       if(k==='rcp')newItemRow({qty:r.qty||1,desc:(r.desc||'')+(r.unit?` (${r.unit})`:''),price:r.price||''});
       else newInvoiceItemRow({qty:r.qty||1,desc:r.desc||'',unit:r.unit||'',price:r.price||''});
@@ -5537,7 +5537,7 @@ if('serviceWorker' in navigator){
     const g=id=>{const el=document.getElementById(id);return el?el.value.trim():''};
     const customer=k==='rcp'?{name:g('rcpName'),phone:g('rcpPhone'),addr:g('rcpAddress')}:{name:g('invClientName'),phone:g('invClientPhone'),addr:g('invClientAddress')};
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;z-index:100000;background:#fff;display:flex;flex-direction:column;';
-    ov.innerHTML='<div style="padding:6px 12px;font-size:12.5px;color:#666;background:#f5f1e8;display:flex;justify-content:space-between;align-items:center;"><span>مرسم ديكور — لما تخلص اضغط «↩ إرسال إلى ميراكوس»</span><button type="button" class="btn btn-ghost btn-sm" data-x>✕ سكّر</button></div><iframe src="'+STUDIO+'" style="flex:1;border:0;width:100%;" allow="clipboard-write"></iframe>';
+    ov.innerHTML='<div style="padding:6px 12px;font-size:12.5px;color:#666;background:#f5f1e8;display:flex;justify-content:space-between;align-items:center;"><span>مرسم ديكور — لما تخلص اضغط «↩ إرسال إلى ميراكوس»</span><button type="button" class="btn btn-ghost btn-sm" data-x>✕ سكّر</button></div><iframe src="'+STUDIO+'&v='+Date.now()+'" style="flex:1;border:0;width:100%;" allow="clipboard-write"></iframe>';
     document.body.appendChild(ov);
     const fr=ov.querySelector('iframe');
     const H=document.documentElement,B=document.body,oldH=H.style.overflow,oldB=B.style.overflow;H.style.overflow='hidden';B.style.overflow='hidden';
