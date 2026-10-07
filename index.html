@@ -5540,7 +5540,8 @@ if('serviceWorker' in navigator){
     ov.innerHTML='<div style="padding:6px 12px;font-size:12.5px;color:#666;background:#f5f1e8;display:flex;justify-content:space-between;align-items:center;"><span>مرسم ديكور — لما تخلص اضغط «↩ إرسال إلى ميراكوس»</span><button type="button" class="btn btn-ghost btn-sm" data-x>✕ سكّر</button></div><iframe src="'+STUDIO+'" style="flex:1;border:0;width:100%;" allow="clipboard-write"></iframe>';
     document.body.appendChild(ov);
     const fr=ov.querySelector('iframe');
-    const close=()=>{window.removeEventListener('message',onMsg);ov.remove();studio=null};
+    const H=document.documentElement,B=document.body,oldH=H.style.overflow,oldB=B.style.overflow;H.style.overflow='hidden';B.style.overflow='hidden';
+    const close=()=>{window.removeEventListener('message',onMsg);ov.remove();H.style.overflow=oldH;B.style.overflow=oldB;studio=null};
     const onMsg=async e=>{
       if(e.origin!==STUDIO_ORIGIN||e.source!==fr.contentWindow||!e.data)return;
       const t=e.data.type;
@@ -5557,7 +5558,16 @@ if('serviceWorker' in navigator){
     const img=await compress(d.images.pure);if(!img){toast('تعذر قراءة الرسمة');return}
     const old=MD[k];
     MD[k]={id:old&&old.id||null,kind:'pure',title:d.title||'',name:d.name||'',img,dirty:true,mstate:d.mstate||null};renderPrev(k);
-    toast('انضافت الرسمة — اكتب النوع والتفاصيل والسعر');
+    // سطر جاهز للكتابة: أول سطر فاضي (أو سطر جديد) وفيه نوع الرسمة، وبتقدر تعدّله
+    const body=document.getElementById(k==='rcp'?'itemsBody':'invItemsBody');
+    const empty=r=>[...r.querySelectorAll('input,textarea')].every(i=>!String(i.value||'').trim());
+    let row=body&&[...body.querySelectorAll('tr')].find(empty);
+    if(body&&!row&&!old){if(k==='rcp')newItemRow();else newInvoiceItemRow();row=body.lastElementChild}
+    const ta=row&&row.querySelector('textarea,input[type=text],.it-desc,.inv-desc');
+    if(ta){if(!ta.value.trim()&&d.title)ta.value=d.title+' ';if(!row.querySelector('input[type=number]').value)row.querySelector('input[type=number]').value=1;
+      ta.dispatchEvent(new Event('input',{bubbles:true}));row.querySelectorAll('input[type=number]').forEach(i=>i.dispatchEvent(new Event('input',{bubbles:true})));
+      setTimeout(()=>{ta.scrollIntoView({block:'center',behavior:'smooth'});ta.focus();try{ta.setSelectionRange(ta.value.length,ta.value.length)}catch(_){}},150)}
+    toast('انضافت الرسمة — كمّل النوع والتفاصيل والسعر');
   }
   async function renderPrev(k){
     const box=document.querySelector(`[data-mirsam-prev="${k}"]`);if(!box)return;const m=MD[k];
