@@ -5537,7 +5537,7 @@ if('serviceWorker' in navigator){
     const g=id=>{const el=document.getElementById(id);return el?el.value.trim():''};
     const customer=!k?{name:'',phone:'',addr:''}:k==='rcp'?{name:g('rcpName'),phone:g('rcpPhone'),addr:g('rcpAddress')}:{name:g('invClientName'),phone:g('invClientPhone'),addr:g('invClientAddress')};
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;z-index:100000;background:#fff;display:flex;flex-direction:column;';
-    ov.innerHTML='<div style="padding:6px 12px;font-size:12.5px;color:#666;background:#f5f1e8;display:flex;justify-content:space-between;align-items:center;"><span>مرسم ديكور — لما تخلص اضغط «↩ إرسال إلى ميراكوس»</span><button type="button" class="btn btn-ghost btn-sm" data-x>✕ سكّر</button></div><iframe src="'+STUDIO+(k?'':'&hub=1')+'&v='+Date.now()+'" style="flex:1;border:0;width:100%;" allow="clipboard-write"></iframe>';
+    ov.innerHTML='<div style="padding:6px 12px;font-size:12.5px;color:#666;background:#f5f1e8;display:flex;justify-content:space-between;align-items:center;"><span>مرسم ديكور — لما تخلص اضغط «↩ تحويل»</span><button type="button" class="btn btn-ghost btn-sm" data-x>✕ سكّر</button></div><iframe src="'+STUDIO+(k?'':'&hub=1')+'&v='+Date.now()+'" style="flex:1;border:0;width:100%;" allow="clipboard-write"></iframe>';
     document.body.appendChild(ov);
     const fr=ov.querySelector('iframe');
     const H=document.documentElement,B=document.body,oldH=H.style.overflow,oldB=B.style.overflow;H.style.overflow='hidden';B.style.overflow='hidden';
@@ -5557,9 +5557,17 @@ if('serviceWorker' in navigator){
   function pickDoc(d){
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
     ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:340px;text-align:center"><b>وين بدك تحط الرسمة؟</b><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0 14px">${esc(d.name||d.title||'')}</div>
-      <button type="button" class="btn btn-primary" data-k="rcp" style="width:100%;margin-bottom:8px">🧾 وصل دفع جديد</button><button type="button" class="btn btn-primary" data-k="inv" style="width:100%;margin-bottom:8px">📄 عرض سعر جديد</button><button type="button" class="btn btn-primary" data-k="devis" style="width:100%;margin-bottom:8px">📑 Devis جديد</button><button type="button" class="btn btn-ghost" data-k="" style="width:100%">إلغاء</button></div>`;
+      <button type="button" class="btn btn-primary" data-k="rcp" style="width:100%;margin-bottom:8px">🧾 وصل دفع جديد</button><button type="button" class="btn btn-primary" data-k="inv" style="width:100%;margin-bottom:8px">📄 عرض سعر جديد</button><button type="button" class="btn btn-primary" data-k="devis" style="width:100%;margin-bottom:8px">📑 Devis جديد</button>${FS_DOC!=='factory'?'<button type="button" class="btn" data-k="job" style="width:100%;margin-bottom:8px">🏭 طلب للمعمل</button>':''}<button type="button" class="btn btn-ghost" data-k="" style="width:100%">إلغاء</button></div>`;
     document.body.appendChild(ov);
     ov.addEventListener('click',async e=>{const b=e.target.closest('[data-k]');if(e.target!==ov&&!b)return;ov.remove();if(!b||!b.dataset.k)return;
+      if(b.dataset.k==='job'){
+        const name=prompt('اسم الزبون للطلب:',(d.customer&&d.customer.name)||'');if(name===null)return;
+        try{const img=await compress(d.images.pure);const id='mirsam_drw_'+uid();await db.collection(FS_COLLECTION).doc(id).set({img,kind:'pure',title:d.title||'',name:d.name||'',createdAt:new Date().toISOString()});
+          const job={id:'job_'+Date.now().toString(36),at:Date.now(),status:'جديد',cust:{name:name.trim(),phone:(d.customer&&d.customer.phone)||'',addr:(d.customer&&d.customer.addr)||''},
+            items:(d.lines||[]).map(l=>({qty:String(l.qty||''),desc:l.desc||'',unit:l.unit||''})),draw:{id,kind:'pure',title:d.title||'',name:d.name||''},note:''};
+          await db.collection(FS_COLLECTION).doc('factory_inbox').set({jobs:firebase.firestore.FieldValue.arrayUnion(job)},{merge:true});toast('✓ انبعت للمعمل — بتلاقيه بـ «🏭 طلبات المعمل»')}
+        catch(err){console.error(err);toast('ما انبعت — تأكد من الإنترنت')}
+        return}
       const kk=b.dataset.k==='rcp'?'rcp':'inv';if(kk==='rcp')openReceiptModal();else{openInvoiceModal();if(b.dataset.k==='devis'){const dt=document.getElementById('invDocType');dt.value='devis';dt.dispatchEvent(new Event('change'))}}
       await applyDrawing(kk,d)});
   }
