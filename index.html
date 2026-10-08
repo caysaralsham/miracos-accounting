@@ -5636,6 +5636,57 @@ if('serviceWorker' in navigator){
   addUI('rcp','rcpItemsCount');
   addUI('inv','invItemsCount');
 
+  // ---- تحويل من المعرض للمعمل (بدون أسعار) — صندوق مشترك: مستند factory_inbox ----
+  const INBOX='factory_inbox';
+  if(FS_DOC!=='factory'){
+    for(const k of ['rcp','inv']){const pv=document.querySelector(`[data-mirsam-prev="${k}"]`);if(!pv)continue;
+      const b=document.createElement('button');b.type='button';b.className='btn btn-sm';b.textContent='🏭 إرسال للمعمل (بدون سعر)';b.style.marginInlineStart='4px';
+      pv.parentElement.insertBefore(b,pv);
+      b.onclick=async()=>{
+        const g=id=>{const el=document.getElementById(id);return el?el.value.trim():''};
+        const cust=k==='rcp'?{name:g('rcpName'),phone:g('rcpPhone'),addr:g('rcpAddress')}:{name:g('invClientName'),phone:g('invClientPhone'),addr:g('invClientAddress')};
+        const body=document.getElementById(k==='rcp'?'itemsBody':'invItemsBody');
+        const items=[...body.querySelectorAll('tr')].map(r=>({qty:(r.querySelector('input[type=number]')||{}).value||'',desc:((r.querySelector('textarea')||{}).value||'').trim(),unit:(r.querySelector('.inv-it-unit')||{}).value||''})).filter(x=>x.desc);
+        if(!cust.name&&!items.length){toast('اكتب الزبون والبنود أول');return}
+        if(!confirm(`إرسال طلب «${cust.name||'بدون اسم'}» للمعمل؟ (${items.length} بند، بدون أسعار)`))return;
+        b.disabled=true;
+        try{const draw=await persist(k);
+          const job={id:'job_'+Date.now().toString(36),at:Date.now(),cust,items,draw:draw||null,note:g(k==='rcp'?'rcpNote':'invNote')};
+          await db.collection(FS_COLLECTION).doc(INBOX).set({jobs:firebase.firestore.FieldValue.arrayUnion(job)},{merge:true});
+          toast('✓ انبعت للمعمل');
+        }catch(e){console.error(e);toast('ما انبعت — تأكد من الإنترنت')}
+        b.disabled=false};
+    }
+  } else {
+    const badge=document.createElement('button');badge.type='button';badge.className='btn btn-primary';
+    badge.style.cssText='position:fixed;bottom:18px;left:18px;z-index:9000;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);';
+    document.body.appendChild(badge);let jobs=[];
+    const fmtD=t=>new Date(t).toLocaleDateString('fr-FR')+' '+new Date(t).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+    const start=()=>{try{db.collection(FS_COLLECTION).doc(INBOX).onSnapshot(d=>{jobs=(d.exists&&d.data().jobs)||[];badge.textContent='📥 طلبات من المعرض ('+jobs.length+')';badge.style.display=jobs.length?'':'none'})}catch(e){setTimeout(start,1500)}};
+    const wait=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(wait);start()}},1000);
+    async function take(job){
+      openReceiptModal();
+      const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v};
+      set('rcpName',job.cust.name);set('rcpPhone',job.cust.phone);set('rcpAddress',job.cust.addr);set('rcpNote',job.note);
+      const body=document.getElementById('itemsBody');body.innerHTML='';
+      (job.items.length?job.items:[{qty:'',desc:''}]).forEach(x=>newItemRow({qty:x.qty,desc:x.desc+(x.unit?` (${x.unit})`:''),price:''}));
+      if(typeof recalcTotals==='function')recalcTotals();
+      if(job.draw){MD.rcp={...job.draw,dirty:false};renderPrev('rcp')}
+      try{await db.collection(FS_COLLECTION).doc(INBOX).update({jobs:firebase.firestore.FieldValue.arrayRemove(job)})}catch(e){console.error(e)}
+      toast('انفتح طلب المعرض كوصل جديد — احفظه');
+    }
+    badge.onclick=()=>{
+      const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+      ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:460px;max-height:80vh;overflow:auto"><div style="font-weight:800;margin-bottom:10px">📥 طلبات من المعرض</div>${jobs.slice().sort((a,b)=>b.at-a.at).map(j=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px"><b>${esc(j.cust.name||'بدون اسم')}</b> <span style="color:var(--text-dim);font-size:12px">${fmtD(j.at)}</span><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)).join('<br>')}${j.draw?'<br>📐 مع رسمة':''}</div><button type="button" class="btn btn-sm btn-primary" data-j="${j.id}">فتح كوصل</button> <button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}">حذف</button></div>`).join('')}<button type="button" class="btn btn-ghost" data-x style="width:100%">إغلاق</button></div>`;
+      document.body.appendChild(ov);
+      ov.addEventListener('click',async e=>{const t=e.target;
+        if(t===ov||t.closest('[data-x]'))return ov.remove();
+        const o=t.closest('[data-j]'),d=t.closest('[data-del]');
+        if(o){ov.remove();await take(jobs.find(j=>j.id===o.dataset.j))}
+        else if(d&&confirm('حذف هالطلب؟')){const j=jobs.find(x=>x.id===d.dataset.del);ov.remove();try{await db.collection(FS_COLLECTION).doc(INBOX).update({jobs:firebase.firestore.FieldValue.arrayRemove(j)})}catch(e){console.error(e)}}});
+    };
+  }
+
   // ---- رسمة جاية من مرسم ديكور (زر «↗ إلى ميراكوس»): البيانات بالرابط، والصورة بتترسم بمرسم مخفي ----
   let MQ=new URLSearchParams(location.search).get('mirsam');
   if(MQ){history.replaceState(null,'',location.pathname);
