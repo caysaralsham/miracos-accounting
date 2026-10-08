@@ -5535,9 +5535,9 @@ if('serviceWorker' in navigator){
   function openStudio(k){
     if(studio)return;
     const g=id=>{const el=document.getElementById(id);return el?el.value.trim():''};
-    const customer=k==='rcp'?{name:g('rcpName'),phone:g('rcpPhone'),addr:g('rcpAddress')}:{name:g('invClientName'),phone:g('invClientPhone'),addr:g('invClientAddress')};
+    const customer=!k?{name:'',phone:'',addr:''}:k==='rcp'?{name:g('rcpName'),phone:g('rcpPhone'),addr:g('rcpAddress')}:{name:g('invClientName'),phone:g('invClientPhone'),addr:g('invClientAddress')};
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;z-index:100000;background:#fff;display:flex;flex-direction:column;';
-    ov.innerHTML='<div style="padding:6px 12px;font-size:12.5px;color:#666;background:#f5f1e8;display:flex;justify-content:space-between;align-items:center;"><span>مرسم ديكور — لما تخلص اضغط «↩ إرسال إلى ميراكوس»</span><button type="button" class="btn btn-ghost btn-sm" data-x>✕ سكّر</button></div><iframe src="'+STUDIO+'&v='+Date.now()+'" style="flex:1;border:0;width:100%;" allow="clipboard-write"></iframe>';
+    ov.innerHTML='<div style="padding:6px 12px;font-size:12.5px;color:#666;background:#f5f1e8;display:flex;justify-content:space-between;align-items:center;"><span>مرسم ديكور — لما تخلص اضغط «↩ إرسال إلى ميراكوس»</span><button type="button" class="btn btn-ghost btn-sm" data-x>✕ سكّر</button></div><iframe src="'+STUDIO+(k?'':'&hub=1')+'&v='+Date.now()+'" style="flex:1;border:0;width:100%;" allow="clipboard-write"></iframe>';
     document.body.appendChild(ov);
     const fr=ov.querySelector('iframe');
     const H=document.documentElement,B=document.body,oldH=H.style.overflow,oldB=B.style.overflow;H.style.overflow='hidden';B.style.overflow='hidden';
@@ -5545,13 +5545,23 @@ if('serviceWorker' in navigator){
     const onMsg=async e=>{
       if(e.origin!==STUDIO_ORIGIN||e.source!==fr.contentWindow||!e.data)return;
       const t=e.data.type;
-      if(t==='mirsam-ready')fr.contentWindow.postMessage({type:'mirsam-init',customer,mstate:MD[k]&&MD[k].mstate||null},STUDIO_ORIGIN);
+      if(t==='mirsam-ready')fr.contentWindow.postMessage({type:'mirsam-init',customer,mstate:k&&MD[k]&&MD[k].mstate||null},STUDIO_ORIGIN);
       else if(t==='mirsam-cancel')close();
-      else if(t==='mirsam-result'){close();await applyDrawing(k,e.data.data)}
+      else if(t==='mirsam-result'){close();if(k)await applyDrawing(k,e.data.data);else pickDoc(e.data.data)}
     };
     window.addEventListener('message',onMsg);
     ov.querySelector('[data-x]').onclick=()=>{if(confirm('تسكير مرسم بدون ما ترجع الرسمة؟'))close()};
     studio=ov;
+  }
+  // مرسم من القائمة الجانبية: بعد الرسم بتختار وين تنحط الرسمة
+  function pickDoc(d){
+    const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:340px;text-align:center"><b>وين بدك تحط الرسمة؟</b><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0 14px">${esc(d.name||d.title||'')}</div>
+      <button type="button" class="btn btn-primary" data-k="rcp" style="width:100%;margin-bottom:8px">🧾 وصل دفع جديد</button><button type="button" class="btn btn-primary" data-k="inv" style="width:100%;margin-bottom:8px">📄 عرض سعر جديد</button><button type="button" class="btn btn-primary" data-k="devis" style="width:100%;margin-bottom:8px">📑 Devis جديد</button><button type="button" class="btn btn-ghost" data-k="" style="width:100%">إلغاء</button></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click',async e=>{const b=e.target.closest('[data-k]');if(e.target!==ov&&!b)return;ov.remove();if(!b||!b.dataset.k)return;
+      const kk=b.dataset.k==='rcp'?'rcp':'inv';if(kk==='rcp')openReceiptModal();else{openInvoiceModal();if(b.dataset.k==='devis'){const dt=document.getElementById('invDocType');dt.value='devis';dt.dispatchEvent(new Event('change'))}}
+      await applyDrawing(kk,d)});
   }
   async function applyDrawing(k,d){
     if(!d||!d.images||!d.images.pure){toast('ما وصلت رسمة');return}
@@ -5638,6 +5648,7 @@ if('serviceWorker' in navigator){
 
   // ---- تحويل من المعرض للمعمل (بدون أسعار) — صندوق مشترك: مستند factory_inbox ----
   const INBOX='factory_inbox';
+  {const st=document.querySelector('.nav-item[data-view="settings"]');if(st){const a=document.createElement('a');a.className='nav-item';a.style.cursor='pointer';a.innerHTML='<span style="font-size:17px;width:20px;text-align:center">✏️</span> <span>مرسم ديكور</span>';st.parentElement.insertBefore(a,st);a.addEventListener('click',()=>openStudio(null))}}
   // عنصر ثابت بالقائمة الجانبية لصندوق الطلبات (بيبيّن دايماً، حتى لو العدد 0)
   const addNav=(btn,label,ic='📥')=>{const st=document.querySelector('.nav-item[data-view="settings"]');if(!st)return;
     const a=document.createElement('a');a.className='nav-item';a.style.cursor='pointer';a.innerHTML='<span style="font-size:17px;width:20px;text-align:center">'+ic+'</span> <span>'+label+' (<b>0</b>)</span>';
