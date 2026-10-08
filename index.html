@@ -5657,6 +5657,25 @@ if('serviceWorker' in navigator){
         }catch(e){console.error(e);toast('ما انبعت — تأكد من الإنترنت')}
         b.disabled=false};
     }
+    // ---- طلبات عرض السعر من الموقع (مستند site_requests) ----
+    const rb=document.createElement('button');rb.type='button';rb.className='btn btn-primary';
+    rb.style.cssText='position:fixed;bottom:18px;left:18px;z-index:9000;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);';
+    document.body.appendChild(rb);let reqs=[];
+    const rstart=()=>{try{db.collection('cesar_website').doc('site_requests').onSnapshot(d=>{reqs=(d.exists&&d.data().reqs)||[];rb.textContent='📥 طلبات من الموقع ('+reqs.length+')';rb.style.display=reqs.length?'':'none'},e=>console.warn(e))}catch(e){setTimeout(rstart,1500)}};
+    const rw=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(rw);rstart()}},1000);
+    const rdel=r=>db.collection('cesar_website').doc('site_requests').update({reqs:firebase.firestore.FieldValue.arrayRemove(r)}).catch(e=>console.error(e));
+    rb.onclick=()=>{
+      const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+      ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:460px;max-height:80vh;overflow:auto"><div style="font-weight:800;margin-bottom:10px">📥 طلبات عرض سعر من الموقع</div>${reqs.slice().sort((a,b)=>b.at-a.at).map(r=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px"><b>${esc(r.name||'بدون اسم')}</b> <a href="tel:${esc(r.phone)}" dir="ltr">${esc(r.phone)}</a> <span style="color:var(--text-dim);font-size:12px">${new Date(r.at).toLocaleDateString('fr-FR')}</span><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0">${esc([r.type,r.place,r.size,r.msg].filter(Boolean).join(' — '))}</div><button type="button" class="btn btn-sm btn-primary" data-q="${r.id}">فتح كعرض سعر</button> <button type="button" class="btn btn-sm btn-ghost" data-rd="${r.id}">حذف</button></div>`).join('')}<button type="button" class="btn btn-ghost" data-x style="width:100%">إغلاق</button></div>`;
+      document.body.appendChild(ov);
+      ov.addEventListener('click',async e=>{const t=e.target;if(t===ov||t.closest('[data-x]'))return ov.remove();
+        const q=t.closest('[data-q]'),d=t.closest('[data-rd]');
+        if(q){const r=reqs.find(x=>x.id===q.dataset.q);ov.remove();openInvoiceModal();
+          const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v};set('invClientName',r.name);set('invClientPhone',r.phone);set('invClientAddress',r.place);
+          const body=document.getElementById('invItemsBody');body.innerHTML='';newInvoiceItemRow({qty:1,desc:[r.type,r.size,r.msg].filter(Boolean).join(' — '),unit:'',price:''});
+          if(typeof recalcInvoiceTotals==='function')recalcInvoiceTotals();rdel(r);toast('انفتح الطلب كعرض سعر — كمّل واحفظ')}
+        else if(d&&confirm('حذف هالطلب؟')){rdel(reqs.find(x=>x.id===d.dataset.rd));ov.remove()}});
+    };
   } else {
     const badge=document.createElement('button');badge.type='button';badge.className='btn btn-primary';
     badge.style.cssText='position:fixed;bottom:18px;left:18px;z-index:9000;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);';
