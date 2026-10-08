@@ -5710,7 +5710,7 @@ if('serviceWorker' in navigator){
     if(FS_DOC==='factory'){document.body.appendChild(fb)}
     addNav(fb,'طلبات المعمل','🏭');
     let jobs=[];const active=()=>jobs.filter(j=>(j.status||'جديد')!=='تم التسليم');
-    const start=()=>{try{ref().onSnapshot(d=>{jobs=(d.exists&&d.data().jobs)||[];const n=active().length;fb.textContent='🏭 طلبات المعمل ('+n+')';fb.style.display=jobs.some(j=>(j.status||'جديد')==='جديد')?'':'none';if(ov)render()},e=>console.warn(e))}catch(e){setTimeout(start,1500)}};
+    const start=()=>{try{ref().onSnapshot(d=>{jobs=(d.exists&&d.data().jobs)||[];const n=active().length;fb.textContent='🏭 طلبات المعمل ('+n+')';fb.style.display=jobs.some(j=>(j.status||'جديد')==='جديد')?'':'none';if(ov.classList.contains('active'))render()},e=>console.warn(e))}catch(e){setTimeout(start,1500)}};
     const wait=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(wait);start()}},1000);
     async function save(fn){try{const d=await ref().get();let arr=(d.exists&&d.data().jobs)||[];arr=fn(arr);await ref().set({jobs:arr},{merge:true});toast('✓ انحفظ')}catch(e){console.error(e);toast('ما انحفظ — تأكد من الإنترنت')}}
     const lines=j=>j.items.map(x=>(x.qty?x.qty+' × ':'')+x.desc+(x.unit?' ('+x.unit+')':'')).join('\n');
@@ -5742,9 +5742,19 @@ if('serviceWorker' in navigator){
         <div class="sig"><span>المسؤول بالمعمل: ..................</span><span>تاريخ التسليم: ..................</span></div>
         <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close();
     }
-    let ov=null,filter='active';
+    let filter='active',q='';
+    const ov=document.createElement('section');ov.className='view';ov.id='view-fjobs';
+    ov.innerHTML=`<div class="topbar"><h1>🏭 طلبات المعمل</h1></div>
+      <div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+        <input data-q placeholder="بحث بالاسم أو الهاتف أو البند..." style="flex:1;min-width:180px;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:10px">
+        <select data-f style="font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line)"><option value="active">الشغّالة</option><option value="ready">الجاهزة</option><option value="done">المسلّمة</option><option value="all">الكل</option></select></div>
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">مشتركة بين المعرض والمعمل — أي تعديل بيبيّن عند التنين. البنود: كل سطر بند (مثلاً: 2 × نافورة رخام).</div>
+        <div data-list></div></div>`;
+    const lastView=document.getElementById('view-settings');(lastView?lastView.parentElement:document.querySelector('main')||document.body).appendChild(ov);
     function render(){
-      const list=(filter==='all'?jobs:active()).slice().sort((a,b)=>b.at-a.at);
+      const fl=jobs.filter(j=>{const st=j.status||'جديد';return filter==='all'||(filter==='active'&&st!=='تم التسليم')||(filter==='ready'&&st==='جاهز')||(filter==='done'&&st==='تم التسليم')})
+        .filter(j=>!q||(j.cust.name+' '+j.cust.phone+' '+lines(j)+' '+(j.note||'')).toLowerCase().includes(q));
+      const list=fl.slice().sort((a,b)=>b.at-a.at);
       ov.querySelector('[data-list]').innerHTML=list.map(j=>{const st=j.status||'جديد';return `<div style="border:1px solid var(--line);border-inline-start:4px solid ${STC[st]};border-radius:10px;padding:10px;margin-bottom:10px">
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(j.cust.name||'بدون اسم')}</b>${j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}<span style="color:var(--text-dim);font-size:12px">${new Date(j.at).toLocaleDateString('fr-FR')}</span><span style="flex:1"></span>
         <select data-st="${j.id}" style="font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--line);color:${STC[st]};font-weight:700">${ST.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}</select></div>
@@ -5754,18 +5764,18 @@ if('serviceWorker' in navigator){
         <button type="button" class="btn btn-sm" data-pr="${j.id}">🖨 طباعة</button><button type="button" class="btn btn-sm" data-sv="${j.id}">حفظ التعديل</button>${FS_DOC==='factory'?`<button type="button" class="btn btn-sm btn-primary" data-j="${j.id}">فتح كوصل</button>`:''}<button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" style="color:#A6453D">حذف</button></div></div>`}).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات.</div>';
     }
     fb.onclick=()=>{
-      ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
-      ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:560px;max-height:86vh;overflow:auto"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><b style="font-size:16px">🏭 طلبات المعمل</b><span style="flex:1"></span><select data-f style="font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--line)"><option value="active">الشغّالة</option><option value="all">الكل (مع المسلّمة)</option></select></div><div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">مشتركة بين المعرض والمعمل — أي تعديل بيبيّن عند التنين. البنود: كل سطر بند (مثلاً: 2 × نافورة رخام).</div><div data-list></div><button type="button" class="btn btn-ghost" data-x style="width:100%">إغلاق</button></div>`;
-      document.body.appendChild(ov);ov.querySelector('[data-f]').value=filter;render();
-      ov.addEventListener('change',e=>{const t=e.target;if(t.dataset.f!==undefined){filter=t.value;render()}else if(t.dataset.st){const id=t.dataset.st,v=t.value;save(a=>a.map(x=>x.id===id?{...x,status:v}:x))}});
-      ov.addEventListener('click',async e=>{const t=e.target;
-        if(t===ov||t.closest('[data-x]')){ov.remove();ov=null;return}
-        const sv=t.closest('[data-sv]'),o=t.closest('[data-j]'),d=t.closest('[data-del]'),pr=t.closest('[data-pr]');
-        if(pr){printJob(jobs.find(x=>x.id===pr.dataset.pr));return}
-        if(sv){const id=sv.dataset.sv,tx=ov.querySelector(`[data-tx="${id}"]`).value,nt=ov.querySelector(`[data-nt="${id}"]`).value;save(a=>a.map(x=>x.id===id?{...x,items:parse(tx),note:nt}:x))}
-        else if(o){const j=jobs.find(x=>x.id===o.dataset.j);ov.remove();ov=null;await take(j)}
-        else if(d&&confirm('حذف هالطلب من المعرض والمعمل؟')){const id=d.dataset.del;save(a=>a.filter(x=>x.id!==id))}});
+      document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i.textContent.includes('طلبات المعمل')));
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));ov.classList.add('active');render();
+      const sb=document.querySelector('.sidebar');if(sb&&innerWidth<900)sb.classList.remove('open','show');window.scrollTo(0,0);
     };
+    ov.addEventListener('input',e=>{if(e.target.dataset.q!==undefined){q=e.target.value.trim().toLowerCase();render()}});
+    ov.addEventListener('change',e=>{const t=e.target;if(t.dataset.f!==undefined){filter=t.value;render()}else if(t.dataset.st){const id=t.dataset.st,v=t.value;save(a=>a.map(x=>x.id===id?{...x,status:v}:x))}});
+    ov.addEventListener('click',async e=>{const t=e.target;
+      const sv=t.closest('[data-sv]'),o=t.closest('[data-j]'),d=t.closest('[data-del]'),pr=t.closest('[data-pr]');
+      if(pr){printJob(jobs.find(x=>x.id===pr.dataset.pr));return}
+      if(sv){const id=sv.dataset.sv,tx=ov.querySelector(`[data-tx="${id}"]`).value,nt=ov.querySelector(`[data-nt="${id}"]`).value;save(a=>a.map(x=>x.id===id?{...x,items:parse(tx),note:nt}:x))}
+      else if(o){await take(jobs.find(x=>x.id===o.dataset.j))}
+      else if(d&&confirm('حذف هالطلب من المعرض والمعمل؟')){const id=d.dataset.del;save(a=>a.filter(x=>x.id!==id))}});
   }
 
   // ---- رسمة جاية من مرسم ديكور (زر «↗ إلى ميراكوس»): البيانات بالرابط، والصورة بتترسم بمرسم مخفي ----
