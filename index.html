@@ -5638,6 +5638,11 @@ if('serviceWorker' in navigator){
 
   // ---- تحويل من المعرض للمعمل (بدون أسعار) — صندوق مشترك: مستند factory_inbox ----
   const INBOX='factory_inbox';
+  // عنصر ثابت بالقائمة الجانبية لصندوق الطلبات (بيبيّن دايماً، حتى لو العدد 0)
+  const addNav=(btn,label)=>{const st=document.querySelector('.nav-item[data-view="settings"]');if(!st)return;
+    const a=document.createElement('a');a.className='nav-item';a.style.cursor='pointer';a.innerHTML='<span style="font-size:17px;width:20px;text-align:center">📥</span> <span>'+label+' (<b>0</b>)</span>';
+    st.parentElement.insertBefore(a,st);a.addEventListener('click',()=>{const sb=document.querySelector('.sidebar.open,.sidebar.show');btn.onclick&&btn.onclick()});
+    new MutationObserver(()=>{const m=btn.textContent.match(/\((\d+)\)/);a.querySelector('b').textContent=m?m[1]:'0'}).observe(btn,{childList:true,characterData:true,subtree:true});};
   if(FS_DOC!=='factory'){
     for(const k of ['rcp','inv']){const pv=document.querySelector(`[data-mirsam-prev="${k}"]`);if(!pv)continue;
       const b=document.createElement('button');b.type='button';b.className='btn btn-sm';b.textContent='🏭 إرسال للمعمل (بدون سعر)';b.style.marginInlineStart='4px';
@@ -5660,13 +5665,13 @@ if('serviceWorker' in navigator){
     // ---- طلبات عرض السعر من الموقع (مستند site_requests) ----
     const rb=document.createElement('button');rb.type='button';rb.className='btn btn-primary';
     rb.style.cssText='position:fixed;bottom:18px;left:18px;z-index:9000;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);';
-    document.body.appendChild(rb);let reqs=[];
+    document.body.appendChild(rb);let reqs=[];addNav(rb,'طلبات الموقع');
     const rstart=()=>{try{db.collection('cesar_website').doc('site_requests').onSnapshot(d=>{reqs=(d.exists&&d.data().reqs)||[];rb.textContent='📥 طلبات من الموقع ('+reqs.length+')';rb.style.display=reqs.length?'':'none'},e=>console.warn(e))}catch(e){setTimeout(rstart,1500)}};
     const rw=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(rw);rstart()}},1000);
     const rdel=r=>db.collection('cesar_website').doc('site_requests').update({reqs:firebase.firestore.FieldValue.arrayRemove(r)}).catch(e=>console.error(e));
     rb.onclick=()=>{
       const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
-      ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:460px;max-height:80vh;overflow:auto"><div style="font-weight:800;margin-bottom:10px">📥 طلبات عرض سعر من الموقع</div>${reqs.slice().sort((a,b)=>b.at-a.at).map(r=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px"><b>${esc(r.name||'بدون اسم')}</b> <a href="tel:${esc(r.phone)}" dir="ltr">${esc(r.phone)}</a> <span style="color:var(--text-dim);font-size:12px">${new Date(r.at).toLocaleDateString('fr-FR')}</span><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0">${esc([r.type,r.place,r.size,r.msg].filter(Boolean).join(' — '))}</div><button type="button" class="btn btn-sm btn-primary" data-q="${r.id}">فتح كعرض سعر</button> <button type="button" class="btn btn-sm btn-ghost" data-rd="${r.id}">حذف</button></div>`).join('')}<button type="button" class="btn btn-ghost" data-x style="width:100%">إغلاق</button></div>`;
+      ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:460px;max-height:80vh;overflow:auto"><div style="font-weight:800;margin-bottom:10px">📥 طلبات عرض سعر من الموقع</div>${reqs.slice().sort((a,b)=>b.at-a.at).map(r=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px"><b>${esc(r.name||'بدون اسم')}</b> <a href="tel:${esc(r.phone)}" dir="ltr">${esc(r.phone)}</a> <span style="color:var(--text-dim);font-size:12px">${new Date(r.at).toLocaleDateString('fr-FR')}</span><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0">${esc([r.type,r.place,r.size,r.msg].filter(Boolean).join(' — '))}</div><button type="button" class="btn btn-sm btn-primary" data-q="${r.id}">فتح كعرض سعر</button> <button type="button" class="btn btn-sm btn-ghost" data-rd="${r.id}">حذف</button></div>`).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات حاليًا.</div>'}<button type="button" class="btn btn-ghost" data-x style="width:100%">إغلاق</button></div>`;
       document.body.appendChild(ov);
       ov.addEventListener('click',async e=>{const t=e.target;if(t===ov||t.closest('[data-x]'))return ov.remove();
         const q=t.closest('[data-q]'),d=t.closest('[data-rd]');
@@ -5679,7 +5684,7 @@ if('serviceWorker' in navigator){
   } else {
     const badge=document.createElement('button');badge.type='button';badge.className='btn btn-primary';
     badge.style.cssText='position:fixed;bottom:18px;left:18px;z-index:9000;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);';
-    document.body.appendChild(badge);let jobs=[];
+    document.body.appendChild(badge);let jobs=[];addNav(badge,'طلبات من المعرض');
     const fmtD=t=>new Date(t).toLocaleDateString('fr-FR')+' '+new Date(t).toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
     const start=()=>{try{db.collection(FS_COLLECTION).doc(INBOX).onSnapshot(d=>{jobs=(d.exists&&d.data().jobs)||[];badge.textContent='📥 طلبات من المعرض ('+jobs.length+')';badge.style.display=jobs.length?'':'none'})}catch(e){setTimeout(start,1500)}};
     const wait=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(wait);start()}},1000);
@@ -5696,7 +5701,7 @@ if('serviceWorker' in navigator){
     }
     badge.onclick=()=>{
       const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
-      ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:460px;max-height:80vh;overflow:auto"><div style="font-weight:800;margin-bottom:10px">📥 طلبات من المعرض</div>${jobs.slice().sort((a,b)=>b.at-a.at).map(j=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px"><b>${esc(j.cust.name||'بدون اسم')}</b> <span style="color:var(--text-dim);font-size:12px">${fmtD(j.at)}</span><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)).join('<br>')}${j.draw?'<br>📐 مع رسمة':''}</div><button type="button" class="btn btn-sm btn-primary" data-j="${j.id}">فتح كوصل</button> <button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}">حذف</button></div>`).join('')}<button type="button" class="btn btn-ghost" data-x style="width:100%">إغلاق</button></div>`;
+      ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:460px;max-height:80vh;overflow:auto"><div style="font-weight:800;margin-bottom:10px">📥 طلبات من المعرض</div>${jobs.slice().sort((a,b)=>b.at-a.at).map(j=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px"><b>${esc(j.cust.name||'بدون اسم')}</b> <span style="color:var(--text-dim);font-size:12px">${fmtD(j.at)}</span><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)).join('<br>')}${j.draw?'<br>📐 مع رسمة':''}</div><button type="button" class="btn btn-sm btn-primary" data-j="${j.id}">فتح كوصل</button> <button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}">حذف</button></div>`).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات حاليًا.</div>'}<button type="button" class="btn btn-ghost" data-x style="width:100%">إغلاق</button></div>`;
       document.body.appendChild(ov);
       ov.addEventListener('click',async e=>{const t=e.target;
         if(t===ov||t.closest('[data-x]'))return ov.remove();
