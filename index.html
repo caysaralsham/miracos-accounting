@@ -5645,7 +5645,7 @@ if('serviceWorker' in navigator){
     new MutationObserver(()=>{const m=btn.textContent.match(/\((\d+)\)/);a.querySelector('b').textContent=m?m[1]:'0'}).observe(btn,{childList:true,characterData:true,subtree:true});};
   if(FS_DOC!=='factory'){
     for(const k of ['rcp','inv']){const pv=document.querySelector(`[data-mirsam-prev="${k}"]`);if(!pv)continue;
-      const b=document.createElement('button');b.type='button';b.className='btn btn-sm';b.textContent='🏭 إرسال للمعمل (بدون سعر)';b.style.marginInlineStart='4px';
+      const b=document.createElement('button');b.type='button';b.className='btn btn-sm';b.textContent='🏭 إرسال للمعمل';b.style.marginInlineStart='4px';
       pv.parentElement.insertBefore(b,pv);
       b.onclick=async()=>{
         const g=id=>{const el=document.getElementById(id);return el?el.value.trim():''};
@@ -5706,6 +5706,23 @@ if('serviceWorker' in navigator){
       if(job.draw){MD.rcp={...job.draw,dirty:false};renderPrev('rcp')}
       if((job.status||'جديد')==='جديد')save(a=>a.map(x=>x.id===job.id?{...x,status:'قيد التنفيذ'}:x));
     }
+    async function printJob(j){
+      if(!j)return;const w=window.open('','_blank');if(!w){toast('اسمح بالنوافذ المنبثقة للطباعة');return}
+      w.document.write('<p style="font-family:sans-serif">جاري التجهيز...</p>');
+      const img=j.draw?await loadImg(j.draw):null;
+      const rows=j.items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.qty||'')}</td><td style="text-align:right">${esc(x.desc)}${x.unit?' ('+esc(x.unit)+')':''}</td></tr>`).join('');
+      w.document.open();w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>طلب معمل - ${esc(j.cust.name||'')}</title><style>
+        body{font-family:Cairo,Tahoma,Arial,sans-serif;color:#3B2414;margin:24px}h1{margin:0;font-size:22px}.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #9A6A3A;padding-bottom:8px;margin-bottom:14px}
+        .info{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:14px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #CDB894;padding:7px 9px;text-align:center}th{background:#F5ECDD}
+        .note{margin-top:12px;font-size:14px;border:1px dashed #CDB894;padding:8px;border-radius:6px}img{max-width:100%;max-height:520px;display:block;margin:14px auto 0;border:1px solid #E6D6BC}
+        .sig{margin-top:30px;display:flex;justify-content:space-between;font-size:13px}@media print{body{margin:10mm}}</style></head><body>
+        <div class="hd"><div><h1>🏭 طلب تصنيع</h1><div style="font-size:13px">قيصر الشام للحجر والرخام</div></div><div style="font-size:13px;text-align:left">${new Date(j.at).toLocaleDateString('fr-FR')}<br>الحالة: ${esc(j.status||'جديد')}</div></div>
+        <div class="info"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div><div><b>الهاتف:</b> <span dir="ltr">${esc(j.cust.phone||'-')}</span></div><div style="grid-column:1/-1"><b>العنوان:</b> ${esc(j.cust.addr||'-')}</div></div>
+        <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
+        ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?`<img src="${img}">`:''}
+        <div class="sig"><span>المسؤول بالمعمل: ..................</span><span>تاريخ التسليم: ..................</span></div>
+        <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close();
+    }
     let ov=null,filter='active';
     function render(){
       const list=(filter==='all'?jobs:active()).slice().sort((a,b)=>b.at-a.at);
@@ -5715,7 +5732,7 @@ if('serviceWorker' in navigator){
         <textarea data-tx="${j.id}" rows="${Math.min(6,j.items.length+1)}" style="width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">${esc(lines(j))}</textarea>
         <input data-nt="${j.id}" value="${esc(j.note||'')}" placeholder="ملاحظة" style="width:100%;margin-top:6px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${j.draw?'<span style="font-size:12px;color:var(--text-dim);align-self:center">📐 مع رسمة</span>':''}<span style="flex:1"></span>
-        <button type="button" class="btn btn-sm" data-sv="${j.id}">حفظ التعديل</button>${FS_DOC==='factory'?`<button type="button" class="btn btn-sm btn-primary" data-j="${j.id}">فتح كوصل</button>`:''}<button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" style="color:#A6453D">حذف</button></div></div>`}).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات.</div>';
+        <button type="button" class="btn btn-sm" data-pr="${j.id}">🖨 طباعة</button><button type="button" class="btn btn-sm" data-sv="${j.id}">حفظ التعديل</button>${FS_DOC==='factory'?`<button type="button" class="btn btn-sm btn-primary" data-j="${j.id}">فتح كوصل</button>`:''}<button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" style="color:#A6453D">حذف</button></div></div>`}).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات.</div>';
     }
     fb.onclick=()=>{
       ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -5724,7 +5741,8 @@ if('serviceWorker' in navigator){
       ov.addEventListener('change',e=>{const t=e.target;if(t.dataset.f!==undefined){filter=t.value;render()}else if(t.dataset.st){const id=t.dataset.st,v=t.value;save(a=>a.map(x=>x.id===id?{...x,status:v}:x))}});
       ov.addEventListener('click',async e=>{const t=e.target;
         if(t===ov||t.closest('[data-x]')){ov.remove();ov=null;return}
-        const sv=t.closest('[data-sv]'),o=t.closest('[data-j]'),d=t.closest('[data-del]');
+        const sv=t.closest('[data-sv]'),o=t.closest('[data-j]'),d=t.closest('[data-del]'),pr=t.closest('[data-pr]');
+        if(pr){printJob(jobs.find(x=>x.id===pr.dataset.pr));return}
         if(sv){const id=sv.dataset.sv,tx=ov.querySelector(`[data-tx="${id}"]`).value,nt=ov.querySelector(`[data-nt="${id}"]`).value;save(a=>a.map(x=>x.id===id?{...x,items:parse(tx),note:nt}:x))}
         else if(o){const j=jobs.find(x=>x.id===o.dataset.j);ov.remove();ov=null;await take(j)}
         else if(d&&confirm('حذف هالطلب من المعرض والمعمل؟')){const id=d.dataset.del;save(a=>a.filter(x=>x.id!==id))}});
