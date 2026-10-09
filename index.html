@@ -391,17 +391,26 @@
     .stats-grid{grid-template-columns:1fr;}
     .stats-grid.cols-5, .stats-grid.cols-3{grid-template-columns:repeat(2,1fr);}
     .stat-num{font-size:19px;}
-    .meas-row-grid{
-      grid-template-columns:22px 1fr 1fr;
-      grid-auto-flow:row;
-      row-gap:4px;
-      background:var(--marble-2); border-radius:8px; padding:8px; margin-bottom:8px;
+    /* موبايل: سطر أول = الرقم + القياسات + العدد، بعدين التفاصيل بعرض كامل، بعدين النتيجة وزر الحذف، والرسمة بعرض الجدول كله */
+    .meas-row-grid,
+    .meas-table-box.with-note .meas-row-grid,
+    .meas-table-box.with-4 .meas-row-grid{
+      grid-template-columns:repeat(3, minmax(0,1fr));
+      grid-auto-flow:row dense;
+      row-gap:6px;
+      position:relative;
+      background:var(--marble-2); border-radius:8px; padding:8px 28px 8px 8px; margin-bottom:8px;
     }
-    .meas-row-grid > *:nth-child(n+5){ grid-column:span 1; }
     .meas-row-grid input, .meas-row-grid .meas-result{ width:100%; min-width:0; }
-    .meas-table-box.with-note .meas-row-grid{ grid-template-columns:22px 1fr 1fr; }
-    .meas-table-box.with-4 .meas-row-grid{ grid-template-columns:22px 1fr 1fr; }
-    .meas-row-grid .meas-note{ grid-column:2 / -1; }
+    /* رقم القياس برا الأعمدة (عالطرف) حتى ما ياخد عامود ضيّق */
+    .meas-row-grid > span:first-child{ position:absolute; right:8px; top:18px; }
+    .meas-row-grid > span:empty{ display:none; }
+    .meas-row-grid .meas-note{ grid-column:1 / -1; }
+    .meas-row-grid .meas-result{ grid-column:1 / 3; }
+    .meas-row-grid > button{ grid-column:3; justify-self:end; }
+    .meas-row-grid > .piece-draw{ grid-column:1 / -1; overflow-x:auto; margin-right:-20px; }
+    .meas-head-row{ background:none; padding:0 28px 0 8px; margin-bottom:2px; }
+    .meas-head-row .h-note, .meas-head-row .h-res{ display:none; }
   }
   @media (max-width: 420px){
     .stats-grid.cols-5, .stats-grid.cols-3{grid-template-columns:1fr;}
@@ -3925,7 +3934,7 @@ const MEAS_NOTE_TYPES = ['مربع','طول','عامود','دائرة'];
 function measHasNote(type){ return MEAS_NOTE_TYPES.includes(type); }
 function measRowFilled(r){ return !!((r.l!=='' && r.l!=null) || (r.w!=='' && r.w!=null) || (r.h!=='' && r.h!=null) || String(r.note||'').trim()); }
 function measNoteInput(tbl, ti, ri, r){
-  return `<input type="text" class="meas-note" data-t="${ti}" data-r="${ri}" data-f="note" value="${escHtmlText(r.note||'').replace(/"/g,'&quot;')}">`;
+  return `<input type="text" class="meas-note" placeholder="التفاصيل (اختياري)" data-t="${ti}" data-r="${ri}" data-f="note" value="${escHtmlText(r.note||'').replace(/"/g,'&quot;')}">`;
 }
 
 // تنقل بين خانات جدول القياسات بالأسهم متل الإكسل: فوق/تحت = نفس الخانة بالصف
@@ -4548,8 +4557,8 @@ function renderMeasTables(){
         <button type="button" class="btn btn-sm btn-danger" data-deltable="${ti}">حذف الجدول</button>
       </div>
       <div class="meas-body" style="${tbl.open?'':'display:none;'}">
-      <div class="meas-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
-        <span></span>${headCols}${measHasNote(tbl.type)?'<span>التفاصيل</span>':(spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):'')}<span>العدد</span><span>النتيجة</span><span></span>
+      <div class="meas-row-grid meas-head-row" style="font-size:12px; color:var(--text-dim); font-weight:700;">
+        <span></span>${headCols}${measHasNote(tbl.type)?'<span class="h-note">التفاصيل</span>':(spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):'')}<span>العدد</span><span class="h-res">النتيجة</span><span></span>
       </div>
       ${rowsHtml}
       <button type="button" class="btn btn-sm" data-addrow="${ti}" style="margin-top:6px;">+ إضافة قياس</button>
@@ -4664,8 +4673,8 @@ function renderReceiptMeasTables(){
         <button type="button" class="btn btn-sm btn-danger" data-rcp-deltable="${ti}">حذف الجدول</button>
       </div>
       <div class="meas-body" style="${tbl.open?'':'display:none;'}">
-      <div class="meas-row-grid" style="font-size:12px; color:var(--text-dim); font-weight:700;">
-        <span></span>${headCols}${measHasNote(tbl.type)?'<span>التفاصيل</span>':(spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):'')}<span>العدد</span><span>النتيجة</span><span></span>
+      <div class="meas-row-grid meas-head-row" style="font-size:12px; color:var(--text-dim); font-weight:700;">
+        <span></span>${headCols}${measHasNote(tbl.type)?'<span class="h-note">التفاصيل</span>':(spec.cols.length<3?'<span></span>'.repeat(3-spec.cols.length):'')}<span>العدد</span><span class="h-res">النتيجة</span><span></span>
       </div>
       ${rowsHtml}
       <button type="button" class="btn btn-sm" data-rcp-addrow="${ti}" style="margin-top:6px;">+ إضافة قياس</button>
