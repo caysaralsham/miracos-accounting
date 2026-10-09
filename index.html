@@ -3168,13 +3168,13 @@ function shareImageChoice(blob, fileName, title, phone){
     const file = new File([blob], fileName, {type:'image/jpeg'});
     // الجوال: بتفتح قائمة المشاركة وبتختار واتساب، والصورة مرفقة
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      try{ await navigator.share({ files:[file], title, text: 'السلام عليكم، مرفق '+title+' من قيصر الشام للحجر والرخام.\ncesar-alcham.com' }); return; }
+      try{ await navigator.share({ files:[file], title, text: 'السلام عليكم، مرفق '+title+' من '+(settings.companyName||'')+'.\ncesar-alcham.com' }); return; }
       catch(e){ if(e && e.name === 'AbortError') return; }
     }
     // الكمبيوتر: المتصفح ما بيقدر يرفق صورة لواتساب لحاله — بننزّل الصورة وبنفتح محادثة الزبون
     downloadBlob(blob, fileName);
     const p = waPhone(phone);
-    window.open((p ? `https://wa.me/${p}` : 'https://wa.me/')+'?text='+encodeURIComponent('السلام عليكم، مرفق '+title+' من قيصر الشام للحجر والرخام.\ncesar-alcham.com'), '_blank');
+    window.open((p ? `https://wa.me/${p}` : 'https://wa.me/')+'?text='+encodeURIComponent('السلام عليكم، مرفق '+title+' من '+(settings.companyName||'')+'.\ncesar-alcham.com'), '_blank');
     toast('نزلت الصورة — اسحبها على محادثة واتساب');
   });
 }
@@ -5747,7 +5747,7 @@ if('serviceWorker' in navigator){
       .info{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:14px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #CDB894;padding:7px 9px;text-align:center}th{background:#F5ECDD}
       .note{margin-top:12px;font-size:14px;border:1px dashed #CDB894;padding:8px;border-radius:6px}img{max-width:100%;max-height:520px;display:block;margin:14px auto 0;border:1px solid #E6D6BC}
       .sig{margin-top:30px;display:flex;justify-content:space-between;font-size:13px}.item-draws{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.item-draw{text-align:center;font-size:11px}.item-draw svg{max-width:160px;height:auto}@media print{body{margin:10mm}}</style></head><body>
-      <div class="hd"><div><h1>🏭 طلبية ${ordNo(j)}</h1><div style="font-size:13px">قيصر الشام للحجر والرخام</div></div><div style="font-size:13px;text-align:left">${fmtD(j.at)}<br>الحالة: ${esc(j.status)}${j.due?'<br>التسليم المطلوب: '+fmtD(new Date(j.due).getTime()):''}</div></div>
+      <div class="hd"><div><h1>🏭 طلبية ${ordNo(j)}</h1><div style="font-size:13px">${esc(settings.companyName||"")}</div></div><div style="font-size:13px;text-align:left">${fmtD(j.at)}<br>الحالة: ${esc(j.status)}${j.due?'<br>التسليم المطلوب: '+fmtD(new Date(j.due).getTime()):''}</div></div>
       <div class="info"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div><div><b>الهاتف:</b> <span dir="ltr">${esc(j.cust.phone||'-')}</span></div><div style="grid-column:1/-1"><b>العنوان:</b> ${esc(j.cust.addr||'-')}</div></div>
       <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
       ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?`<img src="${img}">`:''}
@@ -5825,7 +5825,7 @@ if('serviceWorker' in navigator){
      mk('btnReceiptToFactory',()=>window.__sendOrderReceipt(currentViewedReceiptId));mk('btnInvoiceToFactory',()=>window.__sendOrderInvoice(currentViewedInvoiceId));
      const rv=document.getElementById('btnReceiptToFactory');if(rv){const b=document.createElement('button');b.type='button';b.className='btn btn-sm';b.textContent='⭐ اطلب تقييم';b.title='رسالة واتساب للزبون فيها رابط التقييم على غوغل';
        b.onclick=()=>{const r=receipts.find(x=>x.id===currentViewedReceiptId);if(!r)return;const p=(typeof waPhone==='function'?waPhone(r.phone):'');
-         window.open((p?'https://wa.me/'+p:'https://wa.me/')+'?text='+encodeURIComponent('السلام عليكم '+(r.name||'')+'،\nشكرًا لثقتكم بقيصر الشام للحجر والرخام 🌹\nيسعدنا تقييمكم لنا على غوغل، ما بياخد غير دقيقة:\nhttps://maps.app.goo.gl/g6wBPVBsZmQipM2j6'),'_blank')};rv.parentElement.insertBefore(b,rv)}}}
+         window.open((p?'https://wa.me/'+p:'https://wa.me/')+'?text='+encodeURIComponent('السلام عليكم '+(r.name||'')+'،\nشكرًا لثقتكم بـ'+(settings.companyName||'')+' 🌹\nيسعدنا تقييمكم لنا على غوغل، ما بياخد غير دقيقة:\nhttps://maps.app.goo.gl/g6wBPVBsZmQipM2j6'),'_blank')};rv.parentElement.insertBefore(b,rv)}}}
   if(typeof renderReceiptsTable==='function'){const _rr=renderReceiptsTable;renderReceiptsTable=function(){const r=_rr.apply(this,arguments);try{markRcpTable()}catch(e){}return r}}
 
   // ================= 📊 تقرير الشهر (بقسم التقارير) =================
