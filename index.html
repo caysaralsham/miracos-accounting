@@ -304,6 +304,11 @@
   .fac-legend.item-legend{ margin-top:2px; font-size:11px; }
   .fac-legend.item-legend i{ width:20px; height:4px; }
   .fac-legend .lg{ display:inline-flex; align-items:center; gap:6px; margin-inline-end:18px; }
+  .fac-legend .lg.prof{ flex-direction:column; gap:2px; margin:4px 8px; }
+  .fac-legend .lg.prof svg{ display:block; max-width:none; margin:0; }
+  .edge-spec{ display:flex; gap:6px 14px; align-items:center; flex-wrap:wrap; margin:-4px 0 12px; font-size:13px; color:var(--text-dim); }
+  .edge-spec label{ display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+  .edge-spec input{ width:58px; padding:5px 6px; font-size:13px; text-align:center; }
   .edge-brush{ display:flex; gap:8px; align-items:center; margin:0 0 12px; font-size:13px; color:var(--text-dim); flex-wrap:wrap; }
   .edge-brush button{ border:1px solid var(--line); background:#fff; border-radius:8px; padding:6px 12px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
   .edge-brush button i{ display:inline-block; width:22px; height:5px; border-radius:3px; }
@@ -668,7 +673,15 @@
           <button type="button" data-brush="a2"><i style="background:#8E1B1B"></i> اروندي فوق وتحت</button>
           <button type="button" data-brush="s2"><i style="background:#1B5E33"></i> شطفة فوق وتحت</button>
           <button type="button" data-brush="as"><i style="background:#E07B00"></i> اروندي فوق + شطفة تحت</button>
+          <button type="button" data-brush="ah"><i style="background:#6A1B9A"></i> اروندي نص دائرة</button>
           <span style="font-size:12px;">— اختار، بعدين اكبس على الأضلاع بالرسمة</span>
+        </div>
+        <div class="edge-spec">
+          <span>مقاسات الحواف:</span>
+          <label>سماكة الحجر <input data-es="th" inputmode="decimal"> سم</label>
+          <label>اروندي (نص القطر) <input data-es="ar" inputmode="decimal"> سم</label>
+          <label>شطفة <input data-es="ch" inputmode="decimal"> سم</label>
+          <label>ميلان الشطفة <input data-es="ang" inputmode="decimal"> °</label>
         </div>
         <div id="measTablesWrap"></div>
         <div id="measTotalsSummary" style="display:flex; gap:14px; flex-wrap:wrap; margin-top:14px;"></div>
@@ -3975,19 +3988,49 @@ function svgLbl(x, y, text, size, bold){ return `<text x="${x}" y="${y}" text-an
 function svgWrap(W, H, inner){ return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="font-family:Arial,sans-serif; direction:ltr;" direction="ltr">${inner}</svg>`; }
 const EDGE_RED = '#D32F2F', EDGE_GREEN = '#2E9E4F', EDGE_INK = '#333';
 // نوع الحافة: 'a' اروندي (أحمر) — 's' شطفة (أخضر) — true من النسخ القديمة = اروندي
-function edgeType(v){ return ['s','a','a2','s2','as'].includes(v) ? v : (v ? 'a' : ''); }
-function edgeColor(v){ const t = edgeType(v); return ({s:EDGE_GREEN,a:EDGE_RED,a2:'#8E1B1B',s2:'#1B5E33',as:'#E07B00'})[t] || EDGE_INK; }
+function edgeType(v){ return ['s','a','a2','s2','as','ah'].includes(v) ? v : (v ? 'a' : ''); }
+function edgeColor(v){ const t = edgeType(v); return ({s:EDGE_GREEN,a:EDGE_RED,a2:'#8E1B1B',s2:'#1B5E33',as:'#E07B00',ah:'#6A1B9A'})[t] || EDGE_INK; }
 function edgeStroke(on){ return `stroke="${edgeColor(on)}" stroke-width="${edgeType(on)?7:2}"`; }
 // الفرشاة المختارة بالحاسبة
 let edgeBrush = 'a';
 function toggleEdge(edges, k){ const e = Object.assign({}, edges||{}); e[k] = edgeType(e[k]) === edgeBrush ? false : edgeBrush; return e; }
+// مقاسات الحواف (بالسنتي): سماكة الحجر، نص قطر الاروندي، قياس الشطفة وميلانها — محفوظة على هالجهاز
+const EDGE_SPEC_DEF = {th:2, ar:0.5, ch:0.5, ang:45};
+let edgeSpec = (()=>{ try{ return Object.assign({}, EDGE_SPEC_DEF, JSON.parse(localStorage.getItem('edgeSpec')||'{}')); }catch(e){ return Object.assign({}, EDGE_SPEC_DEF); } })();
+function saveEdgeSpec(){ try{ localStorage.setItem('edgeSpec', JSON.stringify(edgeSpec)); }catch(e){} }
+const EDGE_NAMES = {a:'اروندي فوق', a2:'اروندي فوق وتحت', ah:'اروندي نص دائرة', s:'شطفة فوق', s2:'شطفة فوق وتحت', as:'اروندي فوق + شطفة تحت'};
+const EDGE_ORDER = ['a','a2','ah','s','s2','as'];
+// رسمة مقطع الحجر من الجنب (الحافة على اليمين) حسب نوعها والمقاسات
+function edgeProfileSvg(code, spec){
+  spec = spec || edgeSpec; const t = edgeType(code); if(!t) return '';
+  const th = Math.max(0.5, +spec.th||2), k = 44/th, H = th*k, W = 96, col = edgeColor(t);
+  const both = t==='a2';
+  const arCm = Math.min(Math.max(+spec.ar||0, 0.05), both ? th/2 : th), r = arCm*k;
+  const angDeg = Math.min(80, Math.max(10, +spec.ang||45)), ang = angDeg*Math.PI/180;
+  let cx = Math.max(+spec.ch||0, 0.05)*k, cy = cx*Math.tan(ang);
+  const lim = t==='s2' ? H/2 : (t==='as' ? H - r : H);
+  if(cy > lim){ cx = cx*lim/cy; cy = lim; }
+  if(cx > W*0.6){ cy = cy*W*0.6/cx; cx = W*0.6; }
+  const upR = t==='a'||t==='a2'||t==='as', upS = t==='s'||t==='s2', dnR = t==='a2', dnS = t==='s2'||t==='as';
+  let d = 'M0 0';
+  if(t==='ah'){ d += ` L${W-H/2} 0 A${H/2} ${H/2} 0 0 1 ${W-H/2} ${H}`; }
+  else {
+    d += upR ? ` L${W-r} 0 A${r} ${r} 0 0 1 ${W} ${r}` : upS ? ` L${W-cx} 0 L${W} ${cy}` : ` L${W} 0`;
+    d += dnR ? ` L${W} ${H-r} A${r} ${r} 0 0 1 ${W-r} ${H}` : dnS ? ` L${W} ${H-cy} L${W-cx} ${H}` : ` L${W} ${H}`;
+  }
+  d += ` L0 ${H} Z`;
+  const f = n=>String(Number((+n).toFixed(2)));
+  const parts = t==='ah' ? [`نص دائرة R ${f(th/2)} سم`] : [(upR||dnR) ? `اروندي R ${f(arCm)} سم` : '', (upS||dnS) ? `شطفة ${f(spec.ch)} سم · ${f(angDeg)}°` : ''].filter(Boolean);
+  const px = 6, py = 6, SW = px + W + 58, SH = py + H + 8 + parts.length*14;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${SW}" height="${SH}" viewBox="0 0 ${SW} ${SH}" style="font-family:Arial,sans-serif;" direction="ltr">
+    <g transform="translate(${px},${py})"><path d="${d}" fill="#EFE6D6" stroke="${col}" stroke-width="2.5" stroke-linejoin="round"/>
+    <line x1="${W+8}" y1="0" x2="${W+8}" y2="${H}" stroke="#666" stroke-width="1"/><line x1="${W+4}" y1="0" x2="${W+12}" y2="0" stroke="#666"/><line x1="${W+4}" y1="${H}" x2="${W+12}" y2="${H}" stroke="#666"/>
+    <text x="${W+32}" y="${H/2+4}" text-anchor="middle" font-size="11" font-weight="700" fill="#222">${f(th)} سم</text></g>
+    ${parts.map((txt,i)=>`<text x="${px+W/2}" y="${py+H+18+i*14}" text-anchor="middle" font-size="11" fill="${col}" direction="rtl">${txt}</text>`).join('')}
+  </svg>`;
+}
 function edgeLegendHtml(types){
-  const parts = [];
-  if(types.a) parts.push('<span class="lg"><i style="background:#D32F2F"></i> أحمر = اروندي</span>');
-  if(types.s) parts.push('<span class="lg"><i style="background:#2E9E4F"></i> أخضر = شطفة</span>');
-  if(types.a2) parts.push('<span class="lg"><i style="background:#8E1B1B"></i> أحمر غامق = اروندي فوق وتحت</span>');
-  if(types.s2) parts.push('<span class="lg"><i style="background:#1B5E33"></i> أخضر غامق = شطفة فوق وتحت</span>');
-  if(types.as) parts.push('<span class="lg"><i style="background:#E07B00"></i> برتقالي = اروندي فوق + شطفة تحت</span>');
+  const parts = EDGE_ORDER.filter(c=>types[c]).map(c=>`<span class="lg prof">${edgeProfileSvg(c)}<span><i style="background:${edgeColor(c)}"></i> ${EDGE_NAMES[c]}</span></span>`);
   return parts.length ? `<div class="fac-legend">${parts.join('')}</div>` : '';
 }
 function edgeTypesOf(pieces){ const t = {}; (pieces||[]).forEach(p=>Object.values(p.edges||{}).forEach(v=>{ const x = edgeType(v); if(x) t[x] = true; })); return t; }
@@ -4095,6 +4138,18 @@ function calcRowDrawHtml(type, r){
   const big = {hit:true, dir:r.dir, c2:p.h2, maxW:300, maxH:170};
   return shapeSvg(p.shape, p.l, p.w, p.h, r.edges, big) + edgeLegendHtml(edgeTypesOf([{edges:r.edges}])) + dirBtn + '<div class="piece-hint">اختار نوع الحافة فوق، وبعدين اكبس على الضلع بالرسمة</div>';
 }
+document.querySelectorAll('.edge-spec input[data-es]').forEach(inp=>{
+  inp.value = edgeSpec[inp.dataset.es];
+  inp.addEventListener('input', ()=>{
+    const v = parseFloat(String(inp.value).replace(',', '.'));
+    if(isNaN(v) || v <= 0) return;
+    edgeSpec[inp.dataset.es] = v; saveEdgeSpec();
+    document.querySelectorAll('#measTablesWrap .piece-draw').forEach(box=>{
+      const tb = measTables[box.dataset.drawT]; if(!tb) return;
+      box.innerHTML = calcRowDrawHtml(tb.type, tb.rows[box.dataset.drawR]);
+    });
+  });
+});
 document.querySelectorAll('.edge-brush button[data-brush]').forEach(b=>b.addEventListener('click', ()=>{
   edgeBrush = b.dataset.brush;
   document.querySelectorAll('.edge-brush button[data-brush]').forEach(x=>x.classList.toggle('active', x===b));
