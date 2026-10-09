@@ -5685,19 +5685,19 @@ if('serviceWorker' in navigator){
     const rb=document.createElement('button');rb.type='button';rb.className='btn btn-primary';
     rb.style.cssText='position:fixed;bottom:18px;left:18px;z-index:9000;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);';
     document.body.appendChild(rb);let reqs=[];addNav(rb,'طلبات الموقع');
-    const rstart=()=>{try{db.collection('cesar_website').doc('site_requests').onSnapshot(d=>{reqs=(d.exists&&d.data().reqs)||[];rb.textContent='📥 طلبات من الموقع ('+reqs.length+')';rb.style.display=reqs.length?'':'none'},e=>console.warn(e))}catch(e){setTimeout(rstart,1500)}};
+    const rstart=()=>{try{db.collection('site_requests').onSnapshot(qs=>{reqs=[];qs.forEach(x=>{const v=x.data();if(!v.done)reqs.push({...v,id:x.id})});rb.textContent='📥 طلبات من الموقع ('+reqs.length+')';rb.style.display=reqs.length?'':'none'},e=>console.warn(e))}catch(e){setTimeout(rstart,1500)}};
     const rw=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(rw);rstart()}},1000);
-    const rdel=r=>db.collection('cesar_website').doc('site_requests').update({reqs:firebase.firestore.FieldValue.arrayRemove(r)}).catch(e=>console.error(e));
+    const rdel=r=>db.collection('site_requests').doc(r.id).delete().catch(e=>console.error(e));const rdone=r=>db.collection('site_requests').doc(r.id).update({done:true,doneAt:Date.now()}).catch(e=>console.error(e));
     rb.onclick=()=>{
       const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
-      ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:460px;max-height:80vh;overflow:auto"><div style="font-weight:800;margin-bottom:10px">📥 طلبات عرض سعر من الموقع</div>${reqs.slice().sort((a,b)=>b.at-a.at).map(r=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px"><b>${esc(r.name||'بدون اسم')}</b> <a href="tel:${esc(r.phone)}" dir="ltr">${esc(r.phone)}</a> <span style="color:var(--text-dim);font-size:12px">${new Date(r.at).toLocaleDateString('fr-FR')}</span><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0">${esc([r.type,r.place,r.size,r.msg].filter(Boolean).join(' — '))}</div><button type="button" class="btn btn-sm btn-primary" data-q="${r.id}">فتح كعرض سعر</button> <button type="button" class="btn btn-sm btn-ghost" data-rd="${r.id}">حذف</button></div>`).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات حاليًا.</div>'}<button type="button" class="btn btn-ghost" data-x style="width:100%">إغلاق</button></div>`;
+      ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:460px;max-height:80vh;overflow:auto"><div style="font-weight:800;margin-bottom:10px">📥 طلبات عرض سعر من الموقع</div>${reqs.slice().sort((a,b)=>b.at-a.at).map(r=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px"><b>${esc(r.name||'بدون اسم')}</b> <a href="tel:${esc(r.phone)}" dir="ltr">${esc(r.phone)}</a> <span style="color:var(--text-dim);font-size:12px">${new Date(r.at).toLocaleDateString('fr-FR')}</span><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0">${esc([r.type,r.place,r.size,r.msg].filter(Boolean).join(' — '))}${r.img?` <a href="${esc(r.img)}" target="_blank">🖼 الصورة</a>`:''}</div><button type="button" class="btn btn-sm btn-primary" data-q="${r.id}">فتح كعرض سعر</button> <button type="button" class="btn btn-sm btn-ghost" data-rd="${r.id}">حذف</button></div>`).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات حاليًا.</div>'}<button type="button" class="btn btn-ghost" data-x style="width:100%">إغلاق</button></div>`;
       document.body.appendChild(ov);
       ov.addEventListener('click',async e=>{const t=e.target;if(t===ov||t.closest('[data-x]'))return ov.remove();
         const q=t.closest('[data-q]'),d=t.closest('[data-rd]');
         if(q){const r=reqs.find(x=>x.id===q.dataset.q);ov.remove();openInvoiceModal();
           const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v};set('invClientName',r.name);set('invClientPhone',r.phone);set('invClientAddress',r.place);
-          const body=document.getElementById('invItemsBody');body.innerHTML='';newInvoiceItemRow({qty:1,desc:[r.type,r.size,r.msg].filter(Boolean).join(' — '),unit:'',price:''});
-          if(typeof recalcInvoiceTotals==='function')recalcInvoiceTotals();rdel(r);toast('انفتح الطلب كعرض سعر — كمّل واحفظ')}
+          const body=document.getElementById('invItemsBody');body.innerHTML='';newInvoiceItemRow({qty:1,desc:[r.type,r.size,r.msg].filter(Boolean).join(' — ')+(r.img?'\n'+r.img:''),unit:'',price:''});
+          if(typeof recalcInvoiceTotals==='function')recalcInvoiceTotals();rdone(r);toast('انفتح الطلب كعرض سعر — كمّل واحفظ')}
         else if(d&&confirm('حذف هالطلب؟')){rdel(reqs.find(x=>x.id===d.dataset.rd));ov.remove()}});
     };
   }
@@ -5742,7 +5742,7 @@ if('serviceWorker' in navigator){
         <div class="sig"><span>المسؤول بالمعمل: ..................</span><span>تاريخ التسليم: ..................</span></div>
         <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close();
     }
-    let filter='active',q='';
+    let filter='active',q='';const openIds=new Set();
     const ov=document.createElement('section');ov.className='view';ov.id='view-fjobs';
     ov.innerHTML=`<div class="topbar"><h1>🏭 طلبات المعمل</h1></div>
       <div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
@@ -5755,13 +5755,17 @@ if('serviceWorker' in navigator){
       const fl=jobs.filter(j=>{const st=j.status||'جديد';return filter==='all'||(filter==='active'&&st!=='تم التسليم')||(filter==='ready'&&st==='جاهز')||(filter==='done'&&st==='تم التسليم')})
         .filter(j=>!q||(j.cust.name+' '+j.cust.phone+' '+lines(j)+' '+(j.note||'')).toLowerCase().includes(q));
       const list=fl.slice().sort((a,b)=>b.at-a.at);
-      ov.querySelector('[data-list]').innerHTML=list.map(j=>{const st=j.status||'جديد';return `<div style="border:1px solid var(--line);border-inline-start:4px solid ${STC[st]};border-radius:10px;padding:10px;margin-bottom:10px">
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(j.cust.name||'بدون اسم')}</b>${j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}<span style="color:var(--text-dim);font-size:12px">${new Date(j.at).toLocaleDateString('fr-FR')}</span><span style="flex:1"></span>
-        <select data-st="${j.id}" style="font:inherit;padding:4px 8px;border-radius:8px;border:1px solid var(--line);color:${STC[st]};font-weight:700">${ST.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}</select></div>
-        <textarea data-tx="${j.id}" rows="${Math.min(6,j.items.length+1)}" style="width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">${esc(lines(j))}</textarea>
-        <input data-nt="${j.id}" value="${esc(j.note||'')}" placeholder="ملاحظة" style="width:100%;margin-top:6px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${j.draw?'<span style="font-size:12px;color:var(--text-dim);align-self:center">📐 مع رسمة</span>':''}<span style="flex:1"></span>
-        <button type="button" class="btn btn-sm" data-pr="${j.id}">🖨 طباعة</button><button type="button" class="btn btn-sm" data-sv="${j.id}">حفظ التعديل</button>${FS_DOC==='factory'?`<button type="button" class="btn btn-sm btn-primary" data-j="${j.id}">فتح كوصل</button>`:''}<button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" style="color:#A6453D">حذف</button></div></div>`}).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات.</div>';
+      ov.querySelector('[data-list]').innerHTML=list.map(j=>{const st=j.status||'جديد',op=openIds.has(j.id);return `<div style="border:1px solid var(--line);border-inline-start:4px solid ${STC[st]};border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--marble,#fff)">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(j.cust.name||'بدون اسم')}</b>${j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}<span style="color:var(--text-dim);font-size:12px">${new Date(j.at).toLocaleDateString('fr-FR')}</span>
+          <span style="background:${STC[st]};color:#fff;border-radius:20px;padding:1px 10px;font-size:12px;font-weight:700">${st}</span><span style="flex:1"></span>
+          <button type="button" class="btn btn-sm" data-ed="${j.id}">${op?'إخفاء':'✏️ تعديل'}</button><button type="button" class="btn btn-sm" data-pr="${j.id}">🖨</button>${FS_DOC==='factory'?`<button type="button" class="btn btn-sm btn-primary" data-j="${j.id}">فتح كوصل</button>`:''}</div>
+        <div style="font-size:13px;color:var(--text-dim);margin-top:4px">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)).join(' · ')}${j.draw?' · 📐 رسمة':''}${j.note?' · 📝 '+esc(j.note):''}</div>
+        ${op?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
+          <select data-st="${j.id}" style="font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);color:${STC[st]};font-weight:700">${ST.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}</select>
+          <textarea data-tx="${j.id}" rows="${Math.min(6,j.items.length+1)}" style="width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">${esc(lines(j))}</textarea>
+          <input data-nt="${j.id}" value="${esc(j.note||'')}" placeholder="ملاحظة" style="width:100%;margin-top:6px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">
+          <div style="display:flex;gap:6px;margin-top:8px"><button type="button" class="btn btn-sm btn-primary" data-sv="${j.id}">حفظ التعديل</button><span style="flex:1"></span><button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" style="color:#A6453D">حذف الطلب</button></div></div>`:''}
+        </div>`}).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات.</div>';
     }
     fb.onclick=()=>{
       document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i.textContent.includes('طلبات المعمل')));
@@ -5773,7 +5777,8 @@ if('serviceWorker' in navigator){
     ov.addEventListener('click',async e=>{const t=e.target;
       const sv=t.closest('[data-sv]'),o=t.closest('[data-j]'),d=t.closest('[data-del]'),pr=t.closest('[data-pr]');
       if(pr){printJob(jobs.find(x=>x.id===pr.dataset.pr));return}
-      if(sv){const id=sv.dataset.sv,tx=ov.querySelector(`[data-tx="${id}"]`).value,nt=ov.querySelector(`[data-nt="${id}"]`).value;save(a=>a.map(x=>x.id===id?{...x,items:parse(tx),note:nt}:x))}
+      const ed=t.closest('[data-ed]');if(ed){const id=ed.dataset.ed;openIds.has(id)?openIds.delete(id):openIds.add(id);render();return}
+      if(sv){const id=sv.dataset.sv,tx=ov.querySelector(`[data-tx="${id}"]`).value,nt=ov.querySelector(`[data-nt="${id}"]`).value;openIds.delete(id);save(a=>a.map(x=>x.id===id?{...x,items:parse(tx),note:nt}:x))}
       else if(o){await take(jobs.find(x=>x.id===o.dataset.j))}
       else if(d&&confirm('حذف هالطلب من المعرض والمعمل؟')){const id=d.dataset.del;save(a=>a.filter(x=>x.id!==id))}});
   }
