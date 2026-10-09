@@ -259,6 +259,7 @@
   .piece-draw:empty{ display:none; }
   .piece-draw svg{ display:block; margin:0 auto; max-width:100%; }
   .piece-edge{ cursor:pointer; }
+  .piece-draw .fac-legend{ margin-top:4px; justify-content:center; flex-wrap:wrap; font-size:12px; }
   .piece-hint{ text-align:center; font-size:11px; color:var(--text-dim); margin-top:2px; }
   .fac-row-grid{ display:grid; grid-template-columns:26px 100px 1fr 1fr 1fr 64px 2fr 30px; gap:6px; align-items:center; margin-bottom:5px; }
   .fac-row-grid .piece-draw{ grid-column:1 / -1; }
@@ -664,6 +665,9 @@
           <span>علامة الحافة:</span>
           <button type="button" class="active" data-brush="a"><i style="background:#D32F2F"></i> اروندي</button>
           <button type="button" data-brush="s"><i style="background:#2E9E4F"></i> شطفة</button>
+          <button type="button" data-brush="a2"><i style="background:#8E1B1B"></i> اروندي فوق وتحت</button>
+          <button type="button" data-brush="s2"><i style="background:#1B5E33"></i> شطفة فوق وتحت</button>
+          <button type="button" data-brush="as"><i style="background:#E07B00"></i> اروندي فوق + شطفة تحت</button>
           <span style="font-size:12px;">— اختار، بعدين اكبس على الأضلاع بالرسمة</span>
         </div>
         <div id="measTablesWrap"></div>
@@ -4088,7 +4092,8 @@ function calcRowDrawHtml(type, r){
   if(!shapeHasDims(p)) return '';
   const cur = cornerDir(r.dir);
   const dirBtn = p.shape==='corner' ? `<div class="corner-dirs"><span>رأس الزاوية:</span>${['tl','tr','bl','br'].map(k=>`<button type="button" class="btn btn-sm corner-dir ${k===cur?'active':''}" data-dir="${k}" title="${CORNER_DIR_TXT[k]}">${CORNER_DIR_ARROW[k]} ${CORNER_DIR_TXT[k]}</button>`).join('')}</div>` : '';
-  return shapeSvg(p.shape, p.l, p.w, p.h, r.edges, {hit:true, dir:r.dir, c2:p.h2}) + dirBtn + '<div class="piece-hint">اكبس على الضلع لتعلّمه (حسب الاختيار فوق: اروندي أو شطفة)</div>';
+  const big = {hit:true, dir:r.dir, c2:p.h2, maxW:300, maxH:170};
+  return shapeSvg(p.shape, p.l, p.w, p.h, r.edges, big) + edgeLegendHtml(edgeTypesOf([{edges:r.edges}])) + dirBtn + '<div class="piece-hint">اختار نوع الحافة فوق، وبعدين اكبس على الضلع بالرسمة</div>';
 }
 document.querySelectorAll('.edge-brush button[data-brush]').forEach(b=>b.addEventListener('click', ()=>{
   edgeBrush = b.dataset.brush;
