@@ -3962,8 +3962,8 @@ function svgLbl(x, y, text, size, bold){ return `<text x="${x}" y="${y}" text-an
 function svgWrap(W, H, inner){ return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="font-family:Arial,sans-serif; direction:ltr;" direction="ltr">${inner}</svg>`; }
 const EDGE_RED = '#D32F2F', EDGE_GREEN = '#2E9E4F', EDGE_INK = '#333';
 // نوع الحافة: 'a' اروندي (أحمر) — 's' شطفة (أخضر) — true من النسخ القديمة = اروندي
-function edgeType(v){ return v === 's' ? 's' : (v ? 'a' : ''); }
-function edgeColor(v){ const t = edgeType(v); return t==='s' ? EDGE_GREEN : t==='a' ? EDGE_RED : EDGE_INK; }
+function edgeType(v){ return ['s','a','a2','s2','as'].includes(v) ? v : (v ? 'a' : ''); }
+function edgeColor(v){ const t = edgeType(v); return ({s:EDGE_GREEN,a:EDGE_RED,a2:'#8E1B1B',s2:'#1B5E33',as:'#E07B00'})[t] || EDGE_INK; }
 function edgeStroke(on){ return `stroke="${edgeColor(on)}" stroke-width="${edgeType(on)?7:2}"`; }
 // الفرشاة المختارة بالحاسبة
 let edgeBrush = 'a';
@@ -3972,6 +3972,9 @@ function edgeLegendHtml(types){
   const parts = [];
   if(types.a) parts.push('<span class="lg"><i style="background:#D32F2F"></i> أحمر = اروندي</span>');
   if(types.s) parts.push('<span class="lg"><i style="background:#2E9E4F"></i> أخضر = شطفة</span>');
+  if(types.a2) parts.push('<span class="lg"><i style="background:#8E1B1B"></i> أحمر غامق = اروندي فوق وتحت</span>');
+  if(types.s2) parts.push('<span class="lg"><i style="background:#1B5E33"></i> أخضر غامق = شطفة فوق وتحت</span>');
+  if(types.as) parts.push('<span class="lg"><i style="background:#E07B00"></i> برتقالي = اروندي فوق + شطفة تحت</span>');
   return parts.length ? `<div class="fac-legend">${parts.join('')}</div>` : '';
 }
 function edgeTypesOf(pieces){ const t = {}; (pieces||[]).forEach(p=>Object.values(p.edges||{}).forEach(v=>{ const x = edgeType(v); if(x) t[x] = true; })); return t; }
@@ -5522,8 +5525,8 @@ if('serviceWorker' in navigator){
     if(rows.length===1&&isEmpty(rows[0]))rows[0].remove();
     const items=q.length?q:(d.lines&&d.lines.length?d.lines:[{desc:d.title||d.name||'',qty:1,unit:'',price:''}]);
     for(const r of items){
-      if(k==='rcp')newItemRow({qty:r.qty||1,desc:(r.desc||'')+(r.unit?` (${r.unit})`:''),price:r.price||''});
-      else newInvoiceItemRow({qty:r.qty||1,desc:r.desc||'',unit:r.unit||'',price:r.price||''});
+      if(k==='rcp')newItemRow({qty:r.qty||1,desc:(r.desc||'')+(r.unit?` (${r.unit})`:''),price:r.price||'',...(r.draws?{draws:r.draws}:{})});
+      else newInvoiceItemRow({qty:r.qty||1,desc:r.desc||'',unit:r.unit||'',price:r.price||'',...(r.draws?{draws:r.draws}:{})});
     }
     if(k==='rcp'){if(typeof recalcTotals==='function')recalcTotals()}else{if(typeof recalcInvoiceTotals==='function')recalcInvoiceTotals()}
     MD[k]={id:null,kind:v,title:d.title||'',name:d.name||'',img,dirty:true};renderPrev(k);
@@ -5564,7 +5567,7 @@ if('serviceWorker' in navigator){
         const name=prompt('اسم الزبون للطلبية:',(d.customer&&d.customer.name)||'');if(name===null)return;
         try{const img=await compress(d.images.pure);const id='mirsam_drw_'+uid();await db.collection(FS_COLLECTION).doc(id).set({img,kind:'pure',title:d.title||'',name:d.name||'',createdAt:new Date().toISOString()});
           await window.__mirsamCreateOrder({cust:{name:name.trim(),phone:(d.customer&&d.customer.phone)||'',addr:(d.customer&&d.customer.addr)||''},
-            items:(d.lines||[]).map(l=>({qty:String(l.qty||''),desc:l.desc||'',unit:l.unit||''})),draw:{id,kind:'pure',title:d.title||'',name:d.name||'',...(d.mstate?{mstate:d.mstate}:{})},note:''})}
+            items:(d.lines||[]).map(l=>({qty:String(l.qty||''),desc:l.desc||'',unit:l.unit||'',...(l.draws?{draws:l.draws}:{})})),draw:{id,kind:'pure',title:d.title||'',name:d.name||'',...(d.mstate?{mstate:d.mstate}:{})},note:''})}
         catch(err){console.error(err);toast('ما انبعتت — تأكد من الإنترنت')}
         return}
       const kk=b.dataset.k==='rcp'?'rcp':'inv';if(kk==='rcp')openReceiptModal();else{openInvoiceModal();if(b.dataset.k==='devis'){const dt=document.getElementById('invDocType');dt.value='devis';dt.dispatchEvent(new Event('change'))}}
@@ -5576,7 +5579,7 @@ if('serviceWorker' in navigator){
     const old=MD[k];
     {const c=d.customer||{},set=(id,v)=>{const el=document.getElementById(id);if(el&&!el.value.trim()&&v)el.value=v};
      if(k==='rcp'){set('rcpName',c.name);set('rcpPhone',c.phone);set('rcpAddress',c.addr)}else{set('invClientName',c.name);set('invClientPhone',c.phone);set('invClientAddress',c.addr)}}
-    const lines=(d.lines&&d.lines.length?d.lines:[{desc:d.title||'',qty:1,unit:''}]).map(l=>({desc:String(l.desc||''),qty:l.qty||1,unit:l.unit||''}));
+    const lines=(d.lines&&d.lines.length?d.lines:[{desc:d.title||'',qty:1,unit:''}]).map(l=>({desc:String(l.desc||''),qty:l.qty||1,unit:l.unit||'',...(l.draws?{draws:l.draws}:{})}));
     const rcp=k==='rcp',mk=l=>rcp?(l.desc+(l.unit?` (${l.unit})`:'')):l.desc;
     MD[k]={id:old&&old.id||null,kind:'pure',title:d.title||'',name:d.name||'',img,dirty:true,mstate:d.mstate||null,lines:lines.map(mk)};renderPrev(k);
     // البنود: بنود الرسمة القديمة اللي ما انعدلت بتنشال (وسعرها بينحفظ)، والفاضية بتنشال، وبعدين بتنضاف البنود الجديدة
@@ -5587,7 +5590,7 @@ if('serviceWorker' in navigator){
     for(const r of [...body.querySelectorAll('tr')]){const n=oldL.indexOf(dsc(r).trim());if(n>=0){const key=oldL[n].split(' — ')[0];if(!(key in keep))keep[key]=prc(r);r.remove()}else if(empty(r))r.remove()}
     let first=null;
     lines.forEach(l=>{const price=keep[mk(l).split(' — ')[0]]||'';
-      if(rcp)newItemRow({qty:l.qty,desc:mk(l),price});else newInvoiceItemRow({qty:l.qty,desc:l.desc,unit:l.unit,price});
+      if(rcp)newItemRow({qty:l.qty,desc:mk(l),price,...(l.draws?{draws:l.draws}:{})});else newInvoiceItemRow({qty:l.qty,desc:l.desc,unit:l.unit,price,...(l.draws?{draws:l.draws}:{})});
       if(!first)first=body.lastElementChild});
     if(rcp){if(typeof recalcTotals==='function')recalcTotals()}else{if(typeof recalcInvoiceTotals==='function')recalcInvoiceTotals()}
     const pi=first&&first.querySelector(rcp?'.it-price':'.inv-it-price');
