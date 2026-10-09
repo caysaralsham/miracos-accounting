@@ -5745,11 +5745,11 @@ if('serviceWorker' in navigator){
     w.document.write('<p style="font-family:sans-serif">جاري التجهيز...</p>');
     const img=j.draw?await loadImg(j.draw):null;
     const rows=j.items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.qty||'')}</td><td style="text-align:right">${esc(x.desc)}${x.unit?' ('+esc(x.unit)+')':''}${x.draws&&typeof drawsHtml==='function'?drawsHtml(x.draws):''}</td></tr>`).join('');
-    w.document.open();w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>طلبية ${ordNo(j)} - ${esc(j.cust.name||'')}</title><style>
+    w.document.open();w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>طلبية ${ordNo(j)} - ${esc(j.cust.name||'')}</title><style>
       body{font-family:Cairo,Tahoma,Arial,sans-serif;color:#3B2414;margin:24px}h1{margin:0;font-size:22px}.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #9A6A3A;padding-bottom:8px;margin-bottom:14px}
       .info{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:14px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #CDB894;padding:7px 9px;text-align:center}th{background:#F5ECDD}
       .note{margin-top:12px;font-size:14px;border:1px dashed #CDB894;padding:8px;border-radius:6px}img{max-width:100%;max-height:520px;display:block;margin:14px auto 0;border:1px solid #E6D6BC}
-      .sig{margin-top:30px;display:flex;justify-content:space-between;font-size:13px}.item-draws{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.item-draw{text-align:center;font-size:11px}.item-draw svg{max-width:160px;height:auto}@media print{body{margin:10mm}}</style></head><body>
+      .sig{margin-top:30px;display:flex;justify-content:space-between;font-size:13px}.item-draws{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.item-draw{text-align:center;font-size:11px}.item-draw svg{max-width:160px;height:auto}@media print{body{margin:10mm}}</style></head><body>${window.popBar()}
       <div class="hd"><div><h1>🏭 طلبية ${ordNo(j)}</h1><div style="font-size:13px">${esc(settings.companyName||"")}</div></div><div style="font-size:13px;text-align:left">${fmtD(j.at)}<br>الحالة: ${esc(j.status)}${j.due?'<br>التسليم المطلوب: '+fmtD(new Date(j.due).getTime()):''}</div></div>
       <div class="info"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div><div><b>الهاتف:</b> <span dir="ltr">${esc(j.cust.phone||'-')}</span></div><div style="grid-column:1/-1"><b>العنوان:</b> ${esc(j.cust.addr||'-')}</div></div>
       <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
@@ -5807,7 +5807,7 @@ if('serviceWorker' in navigator){
     const g=s=>t.closest(s);let b;
     if(b=g('[data-pr]'))return printJob(jobs.find(x=>x.id===b.dataset.pr));
     if(b=g('[data-ed]')){const id=b.dataset.ed;if(openIds.has(id))openIds.delete(id);else{openIds.add(id);markSeen(id)}render();return}
-    if(b=g('img[data-pid]')){const w=window.open('');if(w)w.document.write(`<img src="${b.src}" style="max-width:100%">`);return}
+    if(b=g('img[data-pid]')){const w=window.open('');if(w)w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:Cairo,Tahoma,sans-serif;margin:16px">${window.popBar(false)}<img src="${b.src}" style="max-width:100%"></body></html>`);return}
     if(b=g('[data-drw]')){const j=jobs.find(x=>x.id===b.dataset.drw);if(!j)return;
       openStudio(null,{customer:j.cust,mstate:j.draw&&j.draw.mstate||null,onResult:async d=>{
         try{const img=await compress(d.images.pure);if(!img){toast('تعذر قراءة الرسمة');return}const pid='mirsam_drw_'+uid();
@@ -5864,7 +5864,7 @@ if('serviceWorker' in navigator){
           ${card('عدد الوصولات',rs.length)}${card('مجموع الشغل',F(tot))}${card('المقبوض بالشهر',F(paid),'#1F8F55')}${card('الباقي على وصولات الشهر',F(rem),'#A6453D')}${card('المصاريف',F(ex),'#A6453D')}${card('الصافي (المقبوض − المصاريف)',F(paid-ex))}${card('طلبيات الشهر',jm.length+' (منفّذة '+done+')')}${card('طلبيات متأخرة الآن',late,late?'#C0392B':'')}</div>
           ${top.length?`<div style="margin-top:10px;font-size:13px"><b>أكتر الأشغال:</b> ${top.map(([k,v])=>esc(k)+' ('+v+')').join(' · ')}</div>`:''}`;};
       mi.addEventListener('change',build);
-      pn.querySelector('[data-p]').onclick=()=>{build();const w=window.open('','_blank');if(!w)return;w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>تقرير ${mi.value}</title><style>body{font-family:Cairo,Tahoma,sans-serif;color:#3B2414;margin:24px}</style></head><body><h2>📊 تقرير شهر ${mi.value} — ${FS_DOC==='factory'?'المعمل':'المعرض'}</h2>${pn.querySelector('[data-o]').innerHTML}<script>setTimeout(()=>print(),300)<\/script></body></html>`);w.document.close()};
+      pn.querySelector('[data-p]').onclick=()=>{build();const w=window.open('','_blank');if(!w)return;w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تقرير ${mi.value}</title><style>body{font-family:Cairo,Tahoma,sans-serif;color:#3B2414;margin:24px}</style></head><body>${window.popBar()}<h2>📊 تقرير شهر ${mi.value} — ${FS_DOC==='factory'?'المعمل':'المعرض'}</h2>${pn.querySelector('[data-o]').innerHTML}<script>setTimeout(()=>print(),300)<\/script></body></html>`);w.document.close()};
       const nv=document.querySelector('.nav-item[data-view="reports"]');if(nv)nv.addEventListener('click',()=>setTimeout(build,50));
       setTimeout(build,3000);
     }
@@ -5894,6 +5894,14 @@ if('serviceWorker' in navigator){
   }
 })();
 
+</script>
+<script>
+// شريط "رجوع / طباعة" لصفحات الطباعة اللي بتفتح بنافذة جديدة (ما بيطلع على الورق)
+window.popBar=function(withPrint){
+  const home=location.href.split('#')[0];
+  return `<style>.pop-bar{position:sticky;top:0;z-index:99;display:flex;gap:8px;justify-content:space-between;padding:10px 0;margin:-14px 0 14px;background:#fff;border-bottom:1px solid #E6D6BC}.pop-bar button{font:inherit;font-size:16px;font-weight:700;padding:10px 18px;border-radius:10px;border:1px solid #CDB894;background:#F5ECDD;color:#3B2414;cursor:pointer}.pop-bar .pb-back{background:#9A6A3A;color:#fff;border-color:#9A6A3A}@media print{.pop-bar{display:none!important}}</style>
+  <div class="pop-bar"><button type="button" class="pb-back" onclick="try{window.close()}catch(e){};setTimeout(function(){if(!window.closed)location.replace(${JSON.stringify(home).replace(/"/g,'&quot;')})},300)">→ رجوع</button>${withPrint===false?'':'<button type="button" onclick="window.print()">🖨 طباعة</button>'}</div>`;
+};
 </script>
 </body>
 </html>
