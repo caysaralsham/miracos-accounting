@@ -5557,16 +5557,15 @@ if('serviceWorker' in navigator){
   function pickDoc(d){
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
     ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:340px;text-align:center"><b>وين بدك تحط الرسمة؟</b><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0 14px">${esc(d.name||d.title||'')}</div>
-      <button type="button" class="btn btn-primary" data-k="rcp" style="width:100%;margin-bottom:8px">🧾 وصل دفع جديد</button><button type="button" class="btn btn-primary" data-k="inv" style="width:100%;margin-bottom:8px">📄 عرض سعر جديد</button><button type="button" class="btn btn-primary" data-k="devis" style="width:100%;margin-bottom:8px">📑 Devis جديد</button>${FS_DOC!=='factory'?'<button type="button" class="btn" data-k="job" style="width:100%;margin-bottom:8px">🏭 طلب للمعمل</button>':''}<button type="button" class="btn btn-ghost" data-k="" style="width:100%">إلغاء</button></div>`;
+      <button type="button" class="btn btn-primary" data-k="rcp" style="width:100%;margin-bottom:8px">🧾 وصل دفع جديد</button><button type="button" class="btn btn-primary" data-k="inv" style="width:100%;margin-bottom:8px">📄 عرض سعر جديد</button><button type="button" class="btn btn-primary" data-k="devis" style="width:100%;margin-bottom:8px">📑 Devis جديد</button>${FS_DOC!=='factory'?'<button type="button" class="btn" data-k="job" style="width:100%;margin-bottom:8px">🏭 طلبية للمعمل</button>':''}<button type="button" class="btn btn-ghost" data-k="" style="width:100%">إلغاء</button></div>`;
     document.body.appendChild(ov);
     ov.addEventListener('click',async e=>{const b=e.target.closest('[data-k]');if(e.target!==ov&&!b)return;ov.remove();if(!b||!b.dataset.k)return;
       if(b.dataset.k==='job'){
-        const name=prompt('اسم الزبون للطلب:',(d.customer&&d.customer.name)||'');if(name===null)return;
+        const name=prompt('اسم الزبون للطلبية:',(d.customer&&d.customer.name)||'');if(name===null)return;
         try{const img=await compress(d.images.pure);const id='mirsam_drw_'+uid();await db.collection(FS_COLLECTION).doc(id).set({img,kind:'pure',title:d.title||'',name:d.name||'',createdAt:new Date().toISOString()});
-          const job={id:'job_'+Date.now().toString(36),at:Date.now(),status:'جديد',cust:{name:name.trim(),phone:(d.customer&&d.customer.phone)||'',addr:(d.customer&&d.customer.addr)||''},
-            items:(d.lines||[]).map(l=>({qty:String(l.qty||''),desc:l.desc||'',unit:l.unit||''})),draw:{id,kind:'pure',title:d.title||'',name:d.name||''},note:''};
-          await db.collection(FS_COLLECTION).doc('factory_inbox').set({jobs:firebase.firestore.FieldValue.arrayUnion(job)},{merge:true});toast('✓ انبعت للمعمل — بتلاقيه بـ «🏭 طلبات المعمل»')}
-        catch(err){console.error(err);toast('ما انبعت — تأكد من الإنترنت')}
+          await window.__mirsamCreateOrder({cust:{name:name.trim(),phone:(d.customer&&d.customer.phone)||'',addr:(d.customer&&d.customer.addr)||''},
+            items:(d.lines||[]).map(l=>({qty:String(l.qty||''),desc:l.desc||'',unit:l.unit||''})),draw:{id,kind:'pure',title:d.title||'',name:d.name||''},note:''})}
+        catch(err){console.error(err);toast('ما انبعتت — تأكد من الإنترنت')}
         return}
       const kk=b.dataset.k==='rcp'?'rcp':'inv';if(kk==='rcp')openReceiptModal();else{openInvoiceModal();if(b.dataset.k==='devis'){const dt=document.getElementById('invDocType');dt.value='devis';dt.dispatchEvent(new Event('change'))}}
       await applyDrawing(kk,d)});
@@ -5657,12 +5656,33 @@ if('serviceWorker' in navigator){
   // ---- تحويل من المعرض للمعمل (بدون أسعار) — صندوق مشترك: مستند factory_inbox ----
   const INBOX='factory_inbox';
   {const st=document.querySelector('.nav-item[data-view="settings"]');if(st){const a=document.createElement('a');a.className='nav-item';a.style.cursor='pointer';a.innerHTML='<span style="font-size:17px;width:20px;text-align:center">✏️</span> <span>مرسم ديكور</span>';st.parentElement.insertBefore(a,st);a.addEventListener('click',()=>openStudio(null))}}
-  // عنصر ثابت بالقائمة الجانبية لصندوق الطلبات (بيبيّن دايماً، حتى لو العدد 0)
-  const addNav=(btn,label,ic='📥')=>{const st=document.querySelector('.nav-item[data-view="settings"]');if(!st)return;
-    const a=document.createElement('a');a.className='nav-item';a.style.cursor='pointer';a.innerHTML='<span style="font-size:17px;width:20px;text-align:center">'+ic+'</span> <span>'+label+' (<b>0</b>)</span>';
-    st.parentElement.insertBefore(a,st);a.addEventListener('click',()=>{const sb=document.querySelector('.sidebar.open,.sidebar.show');btn.onclick&&btn.onclick()});
-    new MutationObserver(()=>{const m=btn.textContent.match(/\((\d+)\)/);a.querySelector('b').textContent=m?m[1]:'0'}).observe(btn,{childList:true,characterData:true,subtree:true});};
-  if(FS_DOC!=='factory'){
+  // ================= 🏭 الطلبيات: مشتركة بين المعرض والمعمل (بلا أسعار ولا دفعات) =================
+  const ME=FS_DOC==='factory'?'factory':'main',OTHER_NAME=ME==='factory'?'المعرض':'المعمل',ME_NAME=ME==='factory'?'المعمل':'المعرض';
+  const ST=['بدون تنفيذ','قيد التنفيذ','تم التنفيذ'],STC={'بدون تنفيذ':'#8A8A8A','قيد التنفيذ':'#C27C0E','تم التنفيذ':'#1F8F55'},STI={'بدون تنفيذ':'⚪','قيد التنفيذ':'🟠','تم التنفيذ':'🟢'};
+  const normSt=s=>s==='قيد التنفيذ'?s:(s==='جاهز'||s==='تم التسليم'||s==='تم التنفيذ')?'تم التنفيذ':'بدون تنفيذ';
+  const oref=()=>db.collection(FS_COLLECTION).doc(INBOX);
+  const fmtD=t=>t?new Date(t).toLocaleDateString('fr-FR'):'';const fmtT=t=>new Date(t).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  const ordNo=j=>j.no?('ط-'+String(j.no).padStart(3,'0')):'';
+  // كتابة مع رقم تسلسلي وسجل وإشعار للطرف التاني
+  async function osave(fn,txt){try{const d=await oref().get();const data=d.exists?d.data():{};let arr=data.jobs||[];const r=fn(arr,data.seq||0);
+      await oref().set({jobs:r.jobs||r,...(r.seq!=null?{seq:r.seq}:{})},{merge:true});if(txt!==false)toast('✓ انحفظ');return true}
+    catch(e){console.error(e);toast('ما انحفظ — تأكد من الإنترنت');return false}}
+  const stamp=(x,txt)=>({...x,upd:{by:ME,at:Date.now(),txt},log:[...(x.log||[]),{by:ME,at:Date.now(),txt}].slice(-30)});
+  async function createOrder(o){
+    let no=0;const ok=await osave((arr,seq)=>{no=seq+1;const job={id:'job_'+Date.now().toString(36),no,at:Date.now(),status:'بدون تنفيذ',photos:[],...o};
+      return{jobs:[...arr,stamp(job,'أُرسلت الطلبية')],seq:no}},false);
+    if(ok)toast('✓ انبعتت الطلبية '+('ط-'+String(no).padStart(3,'0'))+' للمعمل');return ok;
+  }
+  function askDue(name,count,cb){
+    const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:360px"><b>🏭 إرسال طلبية للمعمل</b><div style="font-size:13px;color:var(--text-dim);margin:4px 0 12px">${esc(name||'بدون اسم')} — ${count} بند، بلا أسعار</div>
+      <label style="font-size:13px;font-weight:700">تاريخ التسليم المطلوب (اختياري)</label><input type="date" data-due style="width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;margin:4px 0 14px;box-sizing:border-box">
+      <button type="button" class="btn btn-primary" data-ok style="width:100%;margin-bottom:8px">إرسال</button><button type="button" class="btn btn-ghost" data-x style="width:100%">إلغاء</button></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{if(e.target===ov||e.target.closest('[data-x]'))return ov.remove();if(e.target.closest('[data-ok]')){const v=ov.querySelector('[data-due]').value;ov.remove();cb(v)}});
+  }
+  window.__mirsamCreateOrder=(o)=>new Promise(res=>askDue(o.cust.name,o.items.length,async due=>res(await createOrder({...o,due}))));
+  if(ME==='main'){
     for(const k of ['rcp','inv']){const pv=document.querySelector(`[data-mirsam-prev="${k}"]`);if(!pv)continue;
       const b=document.createElement('button');b.type='button';b.className='btn btn-sm';b.textContent='🏭 إرسال للمعمل';b.style.marginInlineStart='4px';
       pv.parentElement.insertBefore(b,pv);
@@ -5672,116 +5692,117 @@ if('serviceWorker' in navigator){
         const body=document.getElementById(k==='rcp'?'itemsBody':'invItemsBody');
         const items=[...body.querySelectorAll('tr')].map(r=>({qty:(r.querySelector('input[type=number]')||{}).value||'',desc:((r.querySelector('textarea')||{}).value||'').trim(),unit:(r.querySelector('.inv-it-unit')||{}).value||''})).filter(x=>x.desc);
         if(!cust.name&&!items.length){toast('اكتب الزبون والبنود أول');return}
-        if(!confirm(`إرسال طلب «${cust.name||'بدون اسم'}» للمعمل؟ (${items.length} بند، بدون أسعار)`))return;
-        b.disabled=true;
-        try{const draw=await persist(k);
-          const job={id:'job_'+Date.now().toString(36),at:Date.now(),cust,items,draw:draw||null,status:'جديد',note:g(k==='rcp'?'rcpNote':'invNote')};
-          await db.collection(FS_COLLECTION).doc(INBOX).set({jobs:firebase.firestore.FieldValue.arrayUnion(job)},{merge:true});
-          toast('✓ انبعت للمعمل');
-        }catch(e){console.error(e);toast('ما انبعت — تأكد من الإنترنت')}
-        b.disabled=false};
+        askDue(cust.name,items.length,async due=>{b.disabled=true;
+          try{const draw=await persist(k);
+            await createOrder({cust,items,draw:draw||null,note:g(k==='rcp'?'rcpNote':'invNote'),due,rcpId:k==='rcp'?g('rcpId'):'',rcpNo:k==='rcp'?g('rcpNo'):'',invId:k==='inv'?g('invId'):''});
+          }catch(e){console.error(e);toast('ما انبعتت — تأكد من الإنترنت')}
+          b.disabled=false});
+      };
     }
-    // ---- طلبات عرض السعر من الموقع (مستند site_requests) ----
-    const rb=document.createElement('button');rb.type='button';rb.className='btn btn-primary';
-    rb.style.cssText='position:fixed;bottom:18px;left:18px;z-index:9000;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);';
-    document.body.appendChild(rb);let reqs=[];addNav(rb,'طلبات الموقع');
-    const rstart=()=>{try{db.collection('site_requests').onSnapshot(qs=>{reqs=[];qs.forEach(x=>{const v=x.data();if(!v.done)reqs.push({...v,id:x.id})});rb.textContent='📥 طلبات من الموقع ('+reqs.length+')';rb.style.display=reqs.length?'':'none'},e=>console.warn(e))}catch(e){setTimeout(rstart,1500)}};
-    const rw=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(rw);rstart()}},1000);
-    const rdel=r=>db.collection('site_requests').doc(r.id).delete().catch(e=>console.error(e));const rdone=r=>db.collection('site_requests').doc(r.id).update({done:true,doneAt:Date.now()}).catch(e=>console.error(e));
-    rb.onclick=()=>{
-      const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
-      ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:460px;max-height:80vh;overflow:auto"><div style="font-weight:800;margin-bottom:10px">📥 طلبات عرض سعر من الموقع</div>${reqs.slice().sort((a,b)=>b.at-a.at).map(r=>`<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px"><b>${esc(r.name||'بدون اسم')}</b> <a href="tel:${esc(r.phone)}" dir="ltr">${esc(r.phone)}</a> <span style="color:var(--text-dim);font-size:12px">${new Date(r.at).toLocaleDateString('fr-FR')}</span><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0">${esc([r.type,r.place,r.size,r.msg].filter(Boolean).join(' — '))}${r.img?` <a href="${esc(r.img)}" target="_blank">🖼 الصورة</a>`:''}</div><button type="button" class="btn btn-sm btn-primary" data-q="${r.id}">فتح كعرض سعر</button> <button type="button" class="btn btn-sm btn-ghost" data-rd="${r.id}">حذف</button></div>`).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات حاليًا.</div>'}<button type="button" class="btn btn-ghost" data-x style="width:100%">إغلاق</button></div>`;
-      document.body.appendChild(ov);
-      ov.addEventListener('click',async e=>{const t=e.target;if(t===ov||t.closest('[data-x]'))return ov.remove();
-        const q=t.closest('[data-q]'),d=t.closest('[data-rd]');
-        if(q){const r=reqs.find(x=>x.id===q.dataset.q);ov.remove();openInvoiceModal();
-          const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v};set('invClientName',r.name);set('invClientPhone',r.phone);set('invClientAddress',r.place);
-          const body=document.getElementById('invItemsBody');body.innerHTML='';newInvoiceItemRow({qty:1,desc:[r.type,r.size,r.msg].filter(Boolean).join(' — ')+(r.img?'\n'+r.img:''),unit:'',price:''});
-          if(typeof recalcInvoiceTotals==='function')recalcInvoiceTotals();rdone(r);toast('انفتح الطلب كعرض سعر — كمّل واحفظ')}
-        else if(d&&confirm('حذف هالطلب؟')){rdel(reqs.find(x=>x.id===d.dataset.rd));ov.remove()}});
-    };
   }
-  // ---- 🏭 طلبات المعمل: خانة مشتركة بين المعرض والمعمل (تعديل، حالة، حذف) ----
-  {
-    const ST=['جديد','قيد التنفيذ','جاهز','تم التسليم'],STC={'جديد':'#9A6A3A','قيد التنفيذ':'#B07A1E','جاهز':'#1F8F55','تم التسليم':'#7A7A7A'};
-    const ref=()=>db.collection(FS_COLLECTION).doc(INBOX);
-    const fb=document.createElement('button');fb.type='button';fb.className='btn btn-primary';
-    fb.style.cssText='position:fixed;bottom:18px;left:18px;z-index:9000;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);';
-    if(FS_DOC==='factory'){document.body.appendChild(fb)}
-    addNav(fb,'طلبات المعمل','🏭');
-    let jobs=[];const active=()=>jobs.filter(j=>(j.status||'جديد')!=='تم التسليم');
-    const start=()=>{try{ref().onSnapshot(d=>{jobs=(d.exists&&d.data().jobs)||[];const n=active().length;fb.textContent='🏭 طلبات المعمل ('+n+')';fb.style.display=jobs.some(j=>(j.status||'جديد')==='جديد')?'':'none';if(ov.classList.contains('active'))render()},e=>console.warn(e))}catch(e){setTimeout(start,1500)}};
-    const wait=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(wait);start()}},1000);
-    async function save(fn){try{const d=await ref().get();let arr=(d.exists&&d.data().jobs)||[];arr=fn(arr);await ref().set({jobs:arr},{merge:true});toast('✓ انحفظ')}catch(e){console.error(e);toast('ما انحفظ — تأكد من الإنترنت')}}
-    const lines=j=>j.items.map(x=>(x.qty?x.qty+' × ':'')+x.desc+(x.unit?' ('+x.unit+')':'')).join('\n');
-    const parse=t=>t.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const m=l.match(/^([\d.,]+)\s*[×x\*]\s*(.+)$/);return m?{qty:m[1],desc:m[2],unit:''}:{qty:'',desc:l,unit:''}});
-    async function take(job){
-      openReceiptModal();
-      const set=(id,v)=>{const el=document.getElementById(id);if(el&&v)el.value=v};
-      set('rcpName',job.cust.name);set('rcpPhone',job.cust.phone);set('rcpAddress',job.cust.addr);set('rcpNote',job.note);
-      const body=document.getElementById('itemsBody');body.innerHTML='';
-      (job.items.length?job.items:[{qty:'',desc:''}]).forEach(x=>newItemRow({qty:x.qty,desc:x.desc+(x.unit?` (${x.unit})`:''),price:''}));
-      if(typeof recalcTotals==='function')recalcTotals();
-      if(job.draw){MD.rcp={...job.draw,dirty:false};renderPrev('rcp')}
-      if((job.status||'جديد')==='جديد')save(a=>a.map(x=>x.id===job.id?{...x,status:'قيد التنفيذ'}:x));
-    }
-    async function printJob(j){
-      if(!j)return;const w=window.open('','_blank');if(!w){toast('اسمح بالنوافذ المنبثقة للطباعة');return}
-      w.document.write('<p style="font-family:sans-serif">جاري التجهيز...</p>');
-      const img=j.draw?await loadImg(j.draw):null;
-      const rows=j.items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.qty||'')}</td><td style="text-align:right">${esc(x.desc)}${x.unit?' ('+esc(x.unit)+')':''}</td></tr>`).join('');
-      w.document.open();w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>طلب معمل - ${esc(j.cust.name||'')}</title><style>
-        body{font-family:Cairo,Tahoma,Arial,sans-serif;color:#3B2414;margin:24px}h1{margin:0;font-size:22px}.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #9A6A3A;padding-bottom:8px;margin-bottom:14px}
-        .info{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:14px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #CDB894;padding:7px 9px;text-align:center}th{background:#F5ECDD}
-        .note{margin-top:12px;font-size:14px;border:1px dashed #CDB894;padding:8px;border-radius:6px}img{max-width:100%;max-height:520px;display:block;margin:14px auto 0;border:1px solid #E6D6BC}
-        .sig{margin-top:30px;display:flex;justify-content:space-between;font-size:13px}@media print{body{margin:10mm}}</style></head><body>
-        <div class="hd"><div><h1>🏭 طلب تصنيع</h1><div style="font-size:13px">قيصر الشام للحجر والرخام</div></div><div style="font-size:13px;text-align:left">${new Date(j.at).toLocaleDateString('fr-FR')}<br>الحالة: ${esc(j.status||'جديد')}</div></div>
-        <div class="info"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div><div><b>الهاتف:</b> <span dir="ltr">${esc(j.cust.phone||'-')}</span></div><div style="grid-column:1/-1"><b>العنوان:</b> ${esc(j.cust.addr||'-')}</div></div>
-        <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
-        ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?`<img src="${img}">`:''}
-        <div class="sig"><span>المسؤول بالمعمل: ..................</span><span>تاريخ التسليم: ..................</span></div>
-        <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close();
-    }
-    let filter='active',q='';const openIds=new Set();
-    const ov=document.createElement('section');ov.className='view';ov.id='view-fjobs';
-    ov.innerHTML=`<div class="topbar"><h1>🏭 طلبات المعمل</h1></div>
-      <div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-        <input data-q placeholder="بحث بالاسم أو الهاتف أو البند..." style="flex:1;min-width:180px;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:10px">
-        <select data-f style="font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line)"><option value="active">الشغّالة</option><option value="ready">الجاهزة</option><option value="done">المسلّمة</option><option value="all">الكل</option></select></div>
-        <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">مشتركة بين المعرض والمعمل — أي تعديل بيبيّن عند التنين. البنود: كل سطر بند (مثلاً: 2 × نافورة رخام).</div>
-        <div data-list></div></div>`;
-    const lastView=document.getElementById('view-settings');(lastView?lastView.parentElement:document.querySelector('main')||document.body).appendChild(ov);
-    function render(){
-      const fl=jobs.filter(j=>{const st=j.status||'جديد';return filter==='all'||(filter==='active'&&st!=='تم التسليم')||(filter==='ready'&&st==='جاهز')||(filter==='done'&&st==='تم التسليم')})
-        .filter(j=>!q||(j.cust.name+' '+j.cust.phone+' '+lines(j)+' '+(j.note||'')).toLowerCase().includes(q));
-      const list=fl.slice().sort((a,b)=>b.at-a.at);
-      ov.querySelector('[data-list]').innerHTML=list.map(j=>{const st=j.status||'جديد',op=openIds.has(j.id);return `<div style="border:1px solid var(--line);border-inline-start:4px solid ${STC[st]};border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--marble,#fff)">
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>${esc(j.cust.name||'بدون اسم')}</b>${j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}<span style="color:var(--text-dim);font-size:12px">${new Date(j.at).toLocaleDateString('fr-FR')}</span>
-          <span style="background:${STC[st]};color:#fff;border-radius:20px;padding:1px 10px;font-size:12px;font-weight:700">${st}</span><span style="flex:1"></span>
-          <button type="button" class="btn btn-sm" data-ed="${j.id}">${op?'إخفاء':'✏️ تعديل'}</button><button type="button" class="btn btn-sm" data-pr="${j.id}">🖨</button>${FS_DOC==='factory'?`<button type="button" class="btn btn-sm btn-primary" data-j="${j.id}">فتح كوصل</button>`:''}</div>
-        <div style="font-size:13px;color:var(--text-dim);margin-top:4px">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)).join(' · ')}${j.draw?' · 📐 رسمة':''}${j.note?' · 📝 '+esc(j.note):''}</div>
-        ${op?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
-          <select data-st="${j.id}" style="font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);color:${STC[st]};font-weight:700">${ST.map(s=>`<option ${s===st?'selected':''}>${s}</option>`).join('')}</select>
-          <textarea data-tx="${j.id}" rows="${Math.min(6,j.items.length+1)}" style="width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">${esc(lines(j))}</textarea>
-          <input data-nt="${j.id}" value="${esc(j.note||'')}" placeholder="ملاحظة" style="width:100%;margin-top:6px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">
-          <div style="display:flex;gap:6px;margin-top:8px"><button type="button" class="btn btn-sm btn-primary" data-sv="${j.id}">حفظ التعديل</button><span style="flex:1"></span><button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" style="color:#A6453D">حذف الطلب</button></div></div>`:''}
-        </div>`}).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبات.</div>';
-    }
-    fb.onclick=()=>{
-      document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i.textContent.includes('طلبات المعمل')));
-      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));ov.classList.add('active');render();
-      const sb=document.querySelector('.sidebar');if(sb&&innerWidth<900)sb.classList.remove('open','show');window.scrollTo(0,0);
-    };
-    ov.addEventListener('input',e=>{if(e.target.dataset.q!==undefined){q=e.target.value.trim().toLowerCase();render()}});
-    ov.addEventListener('change',e=>{const t=e.target;if(t.dataset.f!==undefined){filter=t.value;render()}else if(t.dataset.st){const id=t.dataset.st,v=t.value;save(a=>a.map(x=>x.id===id?{...x,status:v}:x))}});
-    ov.addEventListener('click',async e=>{const t=e.target;
-      const sv=t.closest('[data-sv]'),o=t.closest('[data-j]'),d=t.closest('[data-del]'),pr=t.closest('[data-pr]');
-      if(pr){printJob(jobs.find(x=>x.id===pr.dataset.pr));return}
-      const ed=t.closest('[data-ed]');if(ed){const id=ed.dataset.ed;openIds.has(id)?openIds.delete(id):openIds.add(id);render();return}
-      if(sv){const id=sv.dataset.sv,tx=ov.querySelector(`[data-tx="${id}"]`).value,nt=ov.querySelector(`[data-nt="${id}"]`).value;openIds.delete(id);save(a=>a.map(x=>x.id===id?{...x,items:parse(tx),note:nt}:x))}
-      else if(o){await take(jobs.find(x=>x.id===o.dataset.j))}
-      else if(d&&confirm('حذف هالطلب من المعرض والمعمل؟')){const id=d.dataset.del;save(a=>a.filter(x=>x.id!==id))}});
+  // ---- القسم بالقائمة ----
+  const navA=document.createElement('a');navA.className='nav-item';navA.style.cursor='pointer';
+  navA.innerHTML='<span style="font-size:17px;width:20px;text-align:center">🏭</span> <span>الطلبيات <span data-n style="font-size:12px;opacity:.8"></span> <b data-u style="display:none;background:#C0392B;color:#fff;border-radius:10px;padding:0 7px;font-size:12px;margin-inline-start:4px"></b></span>';
+  {const st=document.querySelector('.nav-item[data-view="settings"]');if(st)st.parentElement.insertBefore(navA,st)}
+  const fb=document.createElement('button');fb.type='button';fb.className='btn btn-primary';fb.style.cssText='position:fixed;bottom:18px;left:18px;z-index:9000;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);';document.body.appendChild(fb);
+  let jobs=[],seenMap={},known=null;
+  const isUnseen=j=>j.upd&&j.upd.by!==ME&&j.upd.at>((j.seen&&j.seen[ME])||0);
+  const dueInfo=j=>{if(!j.due||j.status==='تم التنفيذ')return null;const d=Math.ceil((new Date(j.due+'T23:59')-Date.now())/864e5);return d<0?{c:'#C0392B',t:'متأخرة '+(-d)+' يوم'}:d<=2?{c:'#C27C0E',t:d===0?'التسليم اليوم':'باقي '+d+' يوم'}:{c:'var(--text-dim)',t:'التسليم '+fmtD(new Date(j.due).getTime())}};
+  function notify(j){const txt='🔔 '+OTHER_NAME+': '+(j.upd.txt||'تعديل')+' — '+ordNo(j)+' '+(j.cust.name||'');toast(txt);
+    try{if(window.Notification&&Notification.permission==='granted'&&document.hidden)new Notification('الطلبيات',{body:txt,icon:'icon-192.png'})}catch(e){}}
+  function updBadges(){const u=jobs.filter(isUnseen).length,act=jobs.filter(j=>j.status!=='تم التنفيذ').length;
+    navA.querySelector('[data-n]').textContent='('+act+')';const ub=navA.querySelector('[data-u]');ub.style.display=u?'':'none';ub.textContent=u;
+    fb.textContent='🔔 '+u+' تعديل على الطلبيات';fb.style.display=u&&!ov.classList.contains('active')?'':'none';}
+  const ostart=()=>{try{oref().onSnapshot(d=>{
+      jobs=((d.exists&&d.data().jobs)||[]).map(j=>({...j,status:normSt(j.status),items:j.items||[],cust:j.cust||{},photos:j.photos||[]}));
+      if(known)jobs.forEach(j=>{if(isUnseen(j)&&(!known[j.id]||known[j.id]<j.upd.at))notify(j)});
+      known={};jobs.forEach(j=>known[j.id]=j.upd?j.upd.at:0);
+      updBadges();if(ov.classList.contains('active'))render();markRcpTable();},e=>console.warn(e))}catch(e){setTimeout(ostart,1500)}};
+  const ow=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(ow);ostart()}},1000);
+  const lines=j=>j.items.map(x=>(x.qty?x.qty+' × ':'')+x.desc+(x.unit?' ('+x.unit+')':'')).join('\n');
+  const parse=t=>t.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const m=l.match(/^([\d.,]+)\s*[×x\*]\s*(.+)$/);return m?{qty:m[1],desc:m[2],unit:''}:{qty:'',desc:l,unit:''}});
+  async function printJob(j){
+    if(!j)return;const w=window.open('','_blank');if(!w){toast('اسمح بالنوافذ المنبثقة للطباعة');return}
+    w.document.write('<p style="font-family:sans-serif">جاري التجهيز...</p>');
+    const img=j.draw?await loadImg(j.draw):null;
+    const rows=j.items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.qty||'')}</td><td style="text-align:right">${esc(x.desc)}${x.unit?' ('+esc(x.unit)+')':''}</td></tr>`).join('');
+    w.document.open();w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>طلبية ${ordNo(j)} - ${esc(j.cust.name||'')}</title><style>
+      body{font-family:Cairo,Tahoma,Arial,sans-serif;color:#3B2414;margin:24px}h1{margin:0;font-size:22px}.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #9A6A3A;padding-bottom:8px;margin-bottom:14px}
+      .info{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:14px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #CDB894;padding:7px 9px;text-align:center}th{background:#F5ECDD}
+      .note{margin-top:12px;font-size:14px;border:1px dashed #CDB894;padding:8px;border-radius:6px}img{max-width:100%;max-height:520px;display:block;margin:14px auto 0;border:1px solid #E6D6BC}
+      .sig{margin-top:30px;display:flex;justify-content:space-between;font-size:13px}@media print{body{margin:10mm}}</style></head><body>
+      <div class="hd"><div><h1>🏭 طلبية ${ordNo(j)}</h1><div style="font-size:13px">قيصر الشام للحجر والرخام</div></div><div style="font-size:13px;text-align:left">${fmtD(j.at)}<br>الحالة: ${esc(j.status)}${j.due?'<br>التسليم المطلوب: '+fmtD(new Date(j.due).getTime()):''}</div></div>
+      <div class="info"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div><div><b>الهاتف:</b> <span dir="ltr">${esc(j.cust.phone||'-')}</span></div><div style="grid-column:1/-1"><b>العنوان:</b> ${esc(j.cust.addr||'-')}</div></div>
+      <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
+      ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?`<img src="${img}">`:''}
+      <div class="sig"><span>المسؤول بالمعمل: ..................</span><span>تاريخ التنفيذ: ..................</span></div>
+      <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close();
   }
+  // ---- صفحة الطلبيات ----
+  let filter='open',q='';const openIds=new Set();
+  const ov=document.createElement('section');ov.className='view';ov.id='view-fjobs';
+  ov.innerHTML=`<div class="topbar"><h1>🏭 الطلبيات</h1></div>
+    <div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <input data-q placeholder="بحث بالاسم أو الرقم أو البند..." style="flex:1;min-width:180px;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:10px">
+      <select data-f style="font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);width:auto"><option value="open">الشغّالة</option><option value="بدون تنفيذ">⚪ بدون تنفيذ</option><option value="قيد التنفيذ">🟠 قيد التنفيذ</option><option value="تم التنفيذ">🟢 تم التنفيذ</option><option value="all">الكل</option></select></div>
+      <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">مشتركة بين المعرض والمعمل، بلا أسعار ولا دفعات. أي تعديل بيوصل إشعار للطرف التاني.</div>
+      <div data-list></div><input type="file" accept="image/*" data-photo hidden></div>`;
+  {const lv=document.getElementById('view-settings');(lv?lv.parentElement:document.body).appendChild(ov)}
+  function render(){
+    const fl=jobs.filter(j=>filter==='all'||(filter==='open'&&j.status!=='تم التنفيذ')||j.status===filter)
+      .filter(j=>!q||(ordNo(j)+' '+j.cust.name+' '+j.cust.phone+' '+lines(j)+' '+(j.note||'')).toLowerCase().includes(q));
+    const list=fl.slice().sort((a,b)=>(isUnseen(b)-isUnseen(a))||b.at-a.at);
+    ov.querySelector('[data-list]').innerHTML=list.map(j=>{const st=j.status,op=openIds.has(j.id),un=isUnseen(j),du=dueInfo(j);return `<div style="border:1px solid ${un?'#C0392B':'var(--line)'};border-inline-start:5px solid ${STC[st]};border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--marble,#fff)">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:var(--brass-deep)">${ordNo(j)}</b><b>${esc(j.cust.name||'بدون اسم')}</b>${j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}
+        <span style="background:${STC[st]};color:#fff;border-radius:20px;padding:1px 10px;font-size:12px;font-weight:700">${STI[st]} ${st}</span>${du?`<span style="color:${du.c};font-size:12px;font-weight:700">📅 ${du.t}</span>`:''}${un?'<span style="background:#C0392B;color:#fff;border-radius:20px;padding:1px 8px;font-size:11.5px">🔔 جديد</span>':''}<span style="flex:1"></span>
+        <button type="button" class="btn btn-sm" data-ed="${j.id}">${op?'إخفاء':'✏️ تعديل'}</button><button type="button" class="btn btn-sm" data-pr="${j.id}">🖨</button></div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:4px">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)).join(' · ')}${j.draw?' · 📐 رسمة':''}${j.photos.length?' · 📷 '+j.photos.length:''}${j.note?' · 📝 '+esc(j.note):''}</div>
+      ${j.upd?`<div style="font-size:11.5px;color:${un?'#C0392B':'var(--text-dim)'};margin-top:3px">آخر تعديل: ${j.upd.by==='factory'?'المعمل':'المعرض'} — ${esc(j.upd.txt||'')} — ${fmtT(j.upd.at)}</div>`:''}
+      ${op?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${ST.map(s=>`<button type="button" class="btn btn-sm${s===st?' btn-primary':''}" data-st="${j.id}" data-v="${s}">${STI[s]} ${s}</button>`).join('')}</div>
+        <textarea data-tx="${j.id}" rows="${Math.min(6,j.items.length+1)}" style="width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">${esc(lines(j))}</textarea>
+        <input data-nt="${j.id}" value="${esc(j.note||'')}" placeholder="ملاحظة" style="width:100%;margin-top:6px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px">📅 تاريخ التسليم <input type="date" data-du="${j.id}" value="${esc(j.due||'')}" style="font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:8px;width:auto"></label>
+        <div data-ph="${j.id}" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${j.photos.map(p=>`<img data-pid="${p.id}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer">`).join('')}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn btn-sm btn-primary" data-sv="${j.id}">حفظ التعديل</button><button type="button" class="btn btn-sm" data-addph="${j.id}">📷 صورة الشغل</button><span style="flex:1"></span><button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" style="color:#A6453D">حذف الطلبية</button></div>
+        <details style="margin-top:8px;font-size:12px;color:var(--text-dim)"><summary style="cursor:pointer">سجل التعديلات (${(j.log||[]).length})</summary>${(j.log||[]).slice().reverse().map(l=>`<div>• ${l.by==='factory'?'المعمل':'المعرض'}: ${esc(l.txt)} — ${fmtT(l.at)}</div>`).join('')}</details></div>`:''}
+    </div>`}).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبيات.</div>';
+    ov.querySelectorAll('img[data-pid]').forEach(async im=>{const src=await loadImg({id:im.dataset.pid});if(src)im.src=src});
+  }
+  async function markSeen(id){const j=jobs.find(x=>x.id===id);if(!j||!isUnseen(j))return;
+    await osave(a=>a.map(x=>x.id===id?{...x,seen:{...(x.seen||{}),[ME]:Date.now()}}:x),false)}
+  const showOrders=()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i===navA));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));ov.classList.add('active');render();updBadges();window.scrollTo(0,0);
+    try{if(window.Notification&&Notification.permission==='default')Notification.requestPermission()}catch(e){}};
+  navA.addEventListener('click',showOrders);fb.onclick=showOrders;
+  ov.addEventListener('input',e=>{if(e.target.dataset.q!==undefined){q=e.target.value.trim().toLowerCase();render()}});
+  ov.addEventListener('change',async e=>{const t=e.target;
+    if(t.dataset.f!==undefined){filter=t.value;render()}
+    else if(t.dataset.photo!==undefined){const id=t.dataset.for,f=t.files[0];t.value='';if(!f||!id)return;toast('عم ترفع الصورة...');
+      const img=await compress(URL.createObjectURL(f));if(!img){toast('تعذر قراءة الصورة');return}
+      const pid='mirsam_drw_'+uid();try{await db.collection(FS_COLLECTION).doc(pid).set({img,kind:'photo',createdAt:new Date().toISOString()});drwCache[pid]=img;
+        await osave(a=>a.map(x=>x.id===id?stamp({...x,photos:[...(x.photos||[]),{id:pid}]},'أضاف صورة للشغل'):x))}catch(err){console.error(err);toast('ما انرفعت الصورة')}}});
+  ov.addEventListener('click',async e=>{const t=e.target;
+    const g=s=>t.closest(s);let b;
+    if(b=g('[data-pr]'))return printJob(jobs.find(x=>x.id===b.dataset.pr));
+    if(b=g('[data-ed]')){const id=b.dataset.ed;if(openIds.has(id))openIds.delete(id);else{openIds.add(id);markSeen(id)}render();return}
+    if(b=g('img[data-pid]')){const w=window.open('');if(w)w.document.write(`<img src="${b.src}" style="max-width:100%">`);return}
+    if(b=g('[data-addph]')){const fi=ov.querySelector('[data-photo]');fi.dataset.for=b.dataset.addph;fi.click();return}
+    if(b=g('[data-st]')){const id=b.dataset.st,v=b.dataset.v;const j=jobs.find(x=>x.id===id);if(!j||j.status===v)return;
+      await osave(a=>a.map(x=>x.id===id?stamp({...x,status:v,seen:{...(x.seen||{}),[ME]:Date.now()}},'الحالة: '+v):x));return}
+    if(b=g('[data-sv]')){const id=b.dataset.sv,tx=ov.querySelector(`[data-tx="${id}"]`).value,nt=ov.querySelector(`[data-nt="${id}"]`).value,du=ov.querySelector(`[data-du="${id}"]`).value;
+      openIds.delete(id);await osave(a=>a.map(x=>x.id===id?stamp({...x,items:parse(tx),note:nt,due:du,seen:{...(x.seen||{}),[ME]:Date.now()}},'عدّل البنود/الملاحظة/التسليم'):x));return}
+    if(b=g('[data-del]')){if(!confirm('حذف هالطلبية من المعرض والمعمل؟'))return;const id=b.dataset.del;await osave(a=>a.filter(x=>x.id!==id))}
+  });
+  // ---- حالة الطلبية جنب الوصل بصفحة الزبائن (المعرض) ----
+  function markRcpTable(){if(ME!=='main')return;
+    document.querySelectorAll('button[onclick^="editReceipt("]').forEach(btn=>{const id=(btn.getAttribute('onclick').match(/'([^']+)'/)||[])[1];const tr=btn.closest('tr');if(!tr)return;
+      const no=tr.cells[0]&&tr.cells[0].textContent.replace(/[⚪🟠🟢].*$/,'').trim();
+      const j=jobs.find(x=>x.rcpId&&x.rcpId===id)||jobs.find(x=>x.rcpNo&&x.rcpNo===no&&tr.textContent.includes(x.cust.name||'@@'));
+      let chip=tr.cells[0].querySelector('.ord-chip');if(!j){if(chip)chip.remove();return}
+      if(!chip){chip=document.createElement('span');chip.className='ord-chip';chip.style.cssText='display:inline-block;margin-inline-start:6px;font-size:11px;border-radius:10px;padding:0 6px;color:#fff;cursor:pointer';chip.onclick=showOrders;tr.cells[0].appendChild(chip)}
+      chip.style.background=STC[j.status];chip.textContent=STI[j.status]+' '+ordNo(j);chip.title='الطلبية بالمعمل: '+j.status});}
+  if(typeof renderReceiptsTable==='function'){const _rr=renderReceiptsTable;renderReceiptsTable=function(){const r=_rr.apply(this,arguments);try{markRcpTable()}catch(e){}return r}}
 
   // ---- رسمة جاية من مرسم ديكور (زر «↗ إلى ميراكوس»): البيانات بالرابط، والصورة بتترسم بمرسم مخفي ----
   let MQ=new URLSearchParams(location.search).get('mirsam');
