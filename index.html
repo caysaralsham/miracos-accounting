@@ -382,7 +382,6 @@
        الهامش بنعمله نحنا جوّا الورقة (padding) */
     @page{ size:A4 portrait; margin:0; }
     html, body{ background:#fff !important; }
-    .mirsam-print{ break-inside:avoid !important; page-break-inside:avoid !important; }
     .mirsam-print img{ max-height:120mm !important; }
     .mirsam-stats{ font-size:15px !important; }
     .mirsam-stats td{ padding:5px 8px !important; }
@@ -5730,6 +5729,8 @@ if('serviceWorker' in navigator){
   const _viewI=viewInvoice;viewInvoice=function(id){_viewI(id);const v=invoices.find(x=>x.id===id);attach('invoicePrintArea',v&&v.mirsamDrawing)};
   const _cap=captureAsPage;captureAsPage=async function(area){try{await lastLoad}catch(e){}return _cap(area)};
   window.addEventListener('beforeprint',()=>{});
+  // الطباعة بتستنى الرسمة تخلص تحميل (من السحابة) حتى ما تطلع الورقة بلا رسمة
+  {const _pr=window.print.bind(window);window.print=function(){Promise.race([lastLoad,new Promise(r=>setTimeout(r,8000))]).catch(()=>{}).then(()=>setTimeout(_pr,150))}}
 
   addUI('rcp','rcpItemsCount');
   addUI('inv','invItemsCount');
