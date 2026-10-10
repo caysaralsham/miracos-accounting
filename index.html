@@ -5986,6 +5986,13 @@ if('serviceWorker' in navigator){
 
 </script>
 <script>
+// بلا اقتراحات المتصفح («المعلومات المحفوظة») على خانات السعر والعدد والبنود
+(function(){const off=el=>{if(el.matches&&el.matches('input:not([type=password]):not([type=email]):not([autocomplete]),textarea:not([autocomplete])'))el.setAttribute('autocomplete','off')};
+  document.addEventListener('focusin',e=>off(e.target),true);document.addEventListener('pointerdown',e=>off(e.target),true);
+  const scan=r=>r.querySelectorAll&&r.querySelectorAll('input,textarea').forEach(off);scan(document);
+  new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1){off(n);scan(n)}}))).observe(document.documentElement,{childList:true,subtree:true});})();
+</script>
+<script>
 // شريط "رجوع / طباعة" لصفحات الطباعة اللي بتفتح بنافذة جديدة (ما بيطلع على الورق)
 window.popBar=function(withPrint){
   const home=location.href.split('#')[0];
