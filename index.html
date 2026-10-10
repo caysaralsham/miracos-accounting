@@ -345,7 +345,7 @@
 
     /* طباعة متعددة الصفحات: الحجم الافتراضي مريح للقراءة عند قلة البيانات،
        وينضغط تلقائيًا (عبر كلاس print-compact يضيفه الجافاسكربت) فقط لما البيانات كتيرة */
-    table{ page-break-inside:auto; border-collapse:collapse; width:100%; font-size:16px; }
+    table{ page-break-inside:auto; border-collapse:collapse; width:100%; font-size:18px; }
     th, td{ padding:8px 8px !important; }
     thead{ display:table-header-group; }
     tfoot{ display:table-footer-group; }
@@ -357,10 +357,10 @@
 
     .receipt-view .receipt-top{ padding-bottom:12px !important; margin-bottom:12px !important; }
     .receipt-brand img{ width:80px !important; height:80px !important; }
-    .receipt-brand .name{ font-size:24px !important; }
-    .receipt-info-grid{ font-size:16px !important; margin-bottom:12px !important; gap:6px 20px !important; }
+    .receipt-brand .name{ font-size:26px !important; }
+    .receipt-info-grid{ font-size:18px !important; margin-bottom:12px !important; gap:6px 20px !important; }
     .totals-box{ padding:12px 14px !important; margin-top:12px !important; }
-    .totals-row{ padding:4px 0 !important; font-size:16px !important; }
+    .totals-row{ padding:4px 0 !important; font-size:18px !important; }
 
     /* الوضع المضغوط: يتفعّل تلقائيًا فقط لما عدد الصفوف كبير (راجع beforeprint بالجافاسكربت) */
     body.print-compact table{ font-size:10.5px; }
@@ -383,8 +383,8 @@
     @page{ size:A4 portrait; margin:0; }
     .mirsam-missing{ display:none !important; }
     html, body{ background:#fff !important; }
-    .mirsam-print img{ max-height:120mm !important; }
-    .mirsam-stats{ font-size:15px !important; }
+    .mirsam-print img{ max-height:105mm !important; }
+    .mirsam-stats{ font-size:17px !important; }
     .mirsam-stats td{ padding:5px 8px !important; }
     body:not(.print-multipage) .overlay.show .modal{ padding:10mm 10mm 8mm !important; box-sizing:border-box !important; }
     .mirsam-print[style*="break-before: page"]{ padding-top:10mm !important; }
@@ -447,7 +447,7 @@
 
   /* شريط التمرير على اليمين دايماً */
   html{direction:ltr} body{direction:rtl}
-  .modal-body,.overlay{direction:ltr} .modal-body>*,.overlay>*{direction:rtl}
+  .modal-body,.overlay{direction:ltr} .overlay>*,.modal-body>.mb-in{direction:rtl}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -5175,7 +5175,7 @@ renderMeasTables();
 // الطباعة: الحجم العادي (خط ولوغو كبار) دايماً، وإذا التفاصيل كتيرة وما بتساع بورقة وحدة
 // بيصغّر الصفحة كلها بالنسبة المطلوبة بالضبط لحتى تبقى بصفحة وحدة.
 const PRINT_PAGE_W = 718;   // عرض A4 بعد هوامش 10mm (px)
-const PRINT_PAGE_H = 1000;  // ارتفاع A4 بعد الهوامش مع شوية أمان (px)
+const PRINT_PAGE_H = 1040;  // ارتفاع A4 بعد الهوامش مع شوية أمان (px)
 let printZoomEls = [];
 window.addEventListener('beforeprint', ()=>{
   document.body.classList.remove('print-compact');
@@ -5741,7 +5741,7 @@ if('serviceWorker' in navigator){
   // الرسمة: بنفس ورقة الوصل إذا وسعت (المتصفح بيقرر وقت الطباعة)، وإلا بتنتقل لحالها للورقة الجاية — بلا ما تصغر كتير
   function fitBox(area,box,im){
     const img=box.querySelector('img');box.style.pageBreakBefore='';box.style.breakBefore='';
-    img.style.maxHeight='520px';img.style.width='auto';img.style.maxWidth=box.querySelector('.mirsam-stats')?'50%':'100%';
+    img.style.maxHeight='400px';img.style.width='auto';img.style.maxWidth=box.querySelector('.mirsam-stats')?'50%':'100%';
   }
 
   const st=document.createElement('style');st.textContent='.mirsam-on .item-draws,.mirsam-on .item-legend{display:none!important}';document.head.appendChild(st);
@@ -6017,6 +6017,10 @@ if('serviceWorker' in navigator){
 // يفتح تطبيق واتساب مباشرة (بلا ما يمرق على المتصفح)
 window.openWA=function(phone,text){const d=String(phone||'').replace(/\D/g,'');
   location.href='whatsapp://send?'+(d?'phone='+d+'&':'')+'text='+encodeURIComponent(text||'');};
+</script>
+<script>
+// محتوى النوافذ جوّا غلاف عربي (حتى يضل شريط التمرير يمين والأزرار متل «إضافة سطر» يمين)
+document.querySelectorAll('.modal-body').forEach(mb=>{if(mb.querySelector(':scope>.mb-in'))return;const w=document.createElement('div');w.className='mb-in';w.dir='rtl';while(mb.firstChild)w.appendChild(mb.firstChild);mb.appendChild(w)});
 </script>
 <script>
 // بلا اقتراحات المتصفح («المعلومات المحفوظة») على خانات السعر والعدد والبنود
