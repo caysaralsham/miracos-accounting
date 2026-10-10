@@ -378,8 +378,12 @@
       print-color-adjust:exact !important;
       color-adjust:exact !important;
     }
-    @page{ margin:10mm; size:auto; }
-    @page multi{ margin:10mm 10mm 14mm; @bottom-center{ content: "صفحة " counter(page) " من " counter(pages); font-family: Arial, sans-serif; font-size:11px; color:#555; } }
+    /* ورقة A4 عمودي دايماً، وبلا هامش للصفحة حتى ما يطبع المتصفح التاريخ والرابط فوق وتحت —
+       الهامش بنعمله نحنا جوّا الورقة (padding) */
+    @page{ size:A4 portrait; margin:0; }
+    body:not(.print-multipage) .overlay.show .modal{ padding:10mm 10mm 8mm !important; box-sizing:border-box !important; }
+    .mirsam-print[style*="break-before: page"]{ padding-top:10mm !important; }
+    @page multi{ size:A4 portrait; margin:10mm 10mm 14mm; @bottom-center{ content: "صفحة " counter(page) " من " counter(pages); font-family: Arial, sans-serif; font-size:11px; color:#555; } }
   }
 
   @media (max-width: 900px){
@@ -5836,7 +5840,7 @@ if('serviceWorker' in navigator){
       body{font-family:Cairo,Tahoma,Arial,sans-serif;color:#3B2414;margin:24px}h1{margin:0;font-size:22px}.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #9A6A3A;padding-bottom:8px;margin-bottom:14px}
       .info{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:14px;margin-bottom:14px}table{width:100%;border-collapse:collapse;font-size:14px}th,td{border:1px solid #CDB894;padding:7px 9px;text-align:center}th{background:#F5ECDD}
       .note{margin-top:12px;font-size:14px;border:1px dashed #CDB894;padding:8px;border-radius:6px}img{max-width:100%;max-height:520px;display:block;margin:14px auto 0;border:1px solid #E6D6BC}
-      .sig{margin-top:30px;display:flex;justify-content:space-between;font-size:13px}.item-draws{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.item-draw{text-align:center;font-size:11px}.item-draw svg{max-width:160px;height:auto}@media print{body{margin:10mm}}</style></head><body>${window.popBar()}
+      .sig{margin-top:30px;display:flex;justify-content:space-between;font-size:13px}.item-draws{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.item-draw{text-align:center;font-size:11px}.item-draw svg{max-width:160px;height:auto}@page{size:A4 portrait;margin:0}@media print{body{margin:10mm}}</style></head><body>${window.popBar()}
       <div class="hd"><div><h1>🏭 طلبية ${ordNo(j)}</h1><div style="font-size:13px">${esc(settings.companyName||"")}</div></div><div style="font-size:13px;text-align:left">${fmtD(j.at)}<br>الحالة: ${esc(j.status)}${j.due?'<br>التسليم المطلوب: '+fmtD(new Date(j.due).getTime()):''}</div></div>
       <div class="info"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div><div><b>الهاتف:</b> <span dir="ltr">${esc(j.cust.phone||'-')}</span></div><div style="grid-column:1/-1"><b>العنوان:</b> ${esc(j.cust.addr||'-')}</div></div>
       <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
