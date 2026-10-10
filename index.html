@@ -5872,7 +5872,7 @@ if('serviceWorker' in navigator){
         <input data-nt="${j.id}" value="${esc(j.note||'')}" placeholder="ملاحظة" style="width:100%;margin-top:6px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">
         <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px">📅 تاريخ التسليم <input type="date" data-du="${j.id}" value="${esc(j.due||'')}" style="font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:8px;width:auto"></label>
         <div data-ph="${j.id}" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${j.photos.map(p=>`<img data-pid="${p.id}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer">`).join('')}</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn btn-sm btn-primary" data-sv="${j.id}">حفظ التعديل</button><button type="button" class="btn btn-sm" data-addph="${j.id}">📷 صورة الشغل</button><span style="flex:1"></span><button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" style="color:#A6453D">حذف الطلبية</button></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn btn-sm btn-primary" data-sv="${j.id}">حفظ التعديل</button><button type="button" class="btn btn-sm" data-cx="${j.id}">إلغاء</button><button type="button" class="btn btn-sm" data-addph="${j.id}">📷 صورة الشغل</button><span style="flex:1"></span><button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" style="color:#A6453D">حذف الطلبية</button></div>
         <details style="margin-top:8px;font-size:12px;color:var(--text-dim)"><summary style="cursor:pointer">سجل التعديلات (${(j.log||[]).length})</summary>${(j.log||[]).slice().reverse().map(l=>`<div>• ${l.by==='factory'?'المعمل':'المعرض'}: ${esc(l.txt)} — ${fmtT(l.at)}</div>`).join('')}</details></div>`:''}
     </div>`}).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبيات.</div>';
     ov.querySelectorAll('img[data-pid]').forEach(async im=>{const src=await loadImg({id:im.dataset.pid});if(src)im.src=src});
@@ -5904,9 +5904,12 @@ if('serviceWorker' in navigator){
     if(b=g('[data-addph]')){const fi=ov.querySelector('[data-photo]');fi.dataset.for=b.dataset.addph;fi.click();return}
     if(b=g('[data-st]')){const id=b.dataset.st,v=b.dataset.v;const j=jobs.find(x=>x.id===id);if(!j||j.status===v)return;
       await osave(a=>a.map(x=>x.id===id?stamp({...x,status:v,seen:{...(x.seen||{}),[ME]:Date.now()}},'الحالة: '+v):x));return}
+    if(b=g('[data-cx]')){openIds.delete(b.dataset.cx);render();return} // سكّر بلا حفظ ولا إشعار
     if(b=g('[data-sv]')){const id=b.dataset.sv,tx=ov.querySelector(`[data-tx="${id}"]`).value,nt=ov.querySelector(`[data-nt="${id}"]`).value,du=ov.querySelector(`[data-du="${id}"]`).value;
       const pcs=[...ov.querySelectorAll(`[data-pc^="${id}|"]`)].map(inp=>{const [,ii,pi,f]=inp.dataset.pc.split('|');return{ii:+ii,pi:+pi,f,v:inp.value.trim()}});
       const withDraws=(it,i,x)=>{const src=x.items[i]&&x.items[i].draws;if(!src)return it;const dr=src.map(pc=>({...pc}));pcs.filter(q=>q.ii===i).forEach(q=>{if(dr[q.pi])dr[q.pi][q.f]=q.f==='note'?q.v:(q.v.replace(',','.')===''?dr[q.pi][q.f]:+q.v.replace(',','.')||q.v)});return{...it,draws:dr}};
+      {const j=jobs.find(x=>x.id===id);const same=j&&tx.trim()===lines(j).trim()&&nt===(j.note||'')&&du===(j.due||'')&&!pcs.some(q=>{const o=j.items[q.ii]&&j.items[q.ii].draws&&j.items[q.ii].draws[q.pi];return String(o&&o[q.f]!=null?o[q.f]:'')!==q.v});
+       if(same){openIds.delete(id);render();toast('ما في تعديل — ما انبعت إشعار');return}}
       openIds.delete(id);await osave(a=>a.map(x=>x.id===id?stamp({...x,items:parse(tx).map((it,i)=>withDraws(it,i,x)),note:nt,due:du,seen:{...(x.seen||{}),[ME]:Date.now()}},'عدّل البنود/الملاحظة/التسليم'):x));return}
     if(b=g('[data-del]')){if(!confirm('حذف هالطلبية من المعرض والمعمل؟'))return;const id=b.dataset.del;await osave(a=>a.filter(x=>x.id!==id))}
   });
