@@ -5746,7 +5746,23 @@ if('serviceWorker' in navigator){
   async function createOrder(o){
     let no=0;const ok=await osave((arr,seq)=>{no=seq+1;const job={id:'job_'+Date.now().toString(36),no,at:Date.now(),status:'بدون تنفيذ',photos:[],...o};
       return{jobs:[...arr,stamp(job,'أُرسلت الطلبية')],seq:no}},false);
-    if(ok)toast('✓ انبعتت الطلبية '+('ط-'+String(no).padStart(3,'0'))+' للمعمل');return ok;
+    if(ok){toast('✓ انبعتت الطلبية '+('ط-'+String(no).padStart(3,'0'))+' للمعمل');waNotify({...o,no})}return ok;
+  }
+  // ---- تبليغ المعمل على واتساب (لأنو الإشعار ما بيوصل إذا برنامجه مسكّر) ----
+  const waNum=v=>{let d=String(v||'').replace(/\D/g,'');if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('0'))d='213'+d.slice(1);return d};
+  function waNotify(o){
+    const key=ME==='main'?'waFactory':'waShowroom',url=ME==='main'?'https://caysaralsham.github.io/miracos-factory/':'https://caysaralsham.github.io/miracos-accounting/';
+    const items=(o.items||[]).slice(0,15).map(x=>'• '+(x.qty?x.qty+' × ':'')+(x.desc||'')+(x.unit?' ('+x.unit+')':'')).join('\n');
+    const msg='🏭 طلبية جديدة '+ordNo(o)+' من '+ME_NAME+'\nالزبون: '+((o.cust&&o.cust.name)||'-')+(o.due?'\nالتسليم المطلوب: '+fmtD(new Date(o.due).getTime()):'')+(items?'\n\n'+items:'')+((o.items||[]).length>15?'\n…':'')+'\n\nافتح برنامج '+OTHER_NAME+': '+url;
+    const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:340px;text-align:center"><b>📲 بلّغ ${OTHER_NAME} على واتساب؟</b><div style="font-size:12.5px;color:var(--text-dim);margin:6px 0 10px">إذا برنامج ${OTHER_NAME} مسكّر ما بيوصله إشعار، فابعتله رسالة.</div>
+      <input type="tel" dir="ltr" data-n placeholder="رقم واتساب ${OTHER_NAME}" value="${esc(settings[key]||'')}" style="width:100%;margin-bottom:10px;text-align:center">
+      <button type="button" class="btn btn-primary" data-s style="width:100%;margin-bottom:8px;background:#25D366;border-color:#25D366">ابعت على واتساب</button><button type="button" class="btn btn-ghost" data-c style="width:100%">لا، شكراً</button></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{if(e.target===ov||e.target.closest('[data-c]')){ov.remove();return}
+      if(!e.target.closest('[data-s]'))return;const n=waNum(ov.querySelector('[data-n]').value);if(n.length<9){toast('اكتب رقم واتساب صحيح');return}
+      if(settings[key]!==n){settings[key]=n;try{saveSettings()}catch(_){}}
+      window.open('https://wa.me/'+n+'?text='+encodeURIComponent(msg),'_blank');ov.remove()});
   }
   function askDue(name,count,cb){
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
