@@ -345,7 +345,7 @@
 
     /* طباعة متعددة الصفحات: الحجم الافتراضي مريح للقراءة عند قلة البيانات،
        وينضغط تلقائيًا (عبر كلاس print-compact يضيفه الجافاسكربت) فقط لما البيانات كتيرة */
-    table{ page-break-inside:auto; border-collapse:collapse; width:100%; font-size:14.5px; }
+    table{ page-break-inside:auto; border-collapse:collapse; width:100%; font-size:16px; }
     th, td{ padding:8px 8px !important; }
     thead{ display:table-header-group; }
     tfoot{ display:table-footer-group; }
@@ -357,10 +357,10 @@
 
     .receipt-view .receipt-top{ padding-bottom:12px !important; margin-bottom:12px !important; }
     .receipt-brand img{ width:80px !important; height:80px !important; }
-    .receipt-brand .name{ font-size:21px !important; }
-    .receipt-info-grid{ font-size:14.5px !important; margin-bottom:12px !important; gap:6px 20px !important; }
+    .receipt-brand .name{ font-size:24px !important; }
+    .receipt-info-grid{ font-size:16px !important; margin-bottom:12px !important; gap:6px 20px !important; }
     .totals-box{ padding:12px 14px !important; margin-top:12px !important; }
-    .totals-row{ padding:4px 0 !important; font-size:14px !important; }
+    .totals-row{ padding:4px 0 !important; font-size:16px !important; }
 
     /* الوضع المضغوط: يتفعّل تلقائيًا فقط لما عدد الصفوف كبير (راجع beforeprint بالجافاسكربت) */
     body.print-compact table{ font-size:10.5px; }
@@ -381,6 +381,11 @@
     /* ورقة A4 عمودي دايماً، وبلا هامش للصفحة حتى ما يطبع المتصفح التاريخ والرابط فوق وتحت —
        الهامش بنعمله نحنا جوّا الورقة (padding) */
     @page{ size:A4 portrait; margin:0; }
+    html, body{ background:#fff !important; }
+    .mirsam-print{ break-inside:avoid !important; page-break-inside:avoid !important; }
+    .mirsam-print img{ max-height:120mm !important; }
+    .mirsam-stats{ font-size:15px !important; }
+    .mirsam-stats td{ padding:5px 8px !important; }
     body:not(.print-multipage) .overlay.show .modal{ padding:10mm 10mm 8mm !important; box-sizing:border-box !important; }
     .mirsam-print[style*="break-before: page"]{ padding-top:10mm !important; }
     @page multi{ size:A4 portrait; margin:10mm 10mm 14mm; @bottom-center{ content: "صفحة " counter(page) " من " counter(pages); font-family: Arial, sans-serif; font-size:11px; color:#555; } }
@@ -5708,20 +5713,18 @@ if('serviceWorker' in navigator){
     if(!meta)return;
     const box=document.createElement('div');box.className='mirsam-print';const pure=meta.kind==='pure';
     box.style.cssText='margin-top:12px;text-align:center;page-break-inside:avoid;break-inside:avoid;';
-    const stT=pure&&Array.isArray(meta.stats)&&meta.stats.length?`<table class="mirsam-stats" style="flex:0 0 42%;max-width:42%;border-collapse:collapse;font-size:12.5px;text-align:right;align-self:center">${meta.stats.map(r=>`<tr><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap;vertical-align:top">${esc(r[0])}</td><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:'';
-    box.innerHTML=pure?`<div style="font-weight:700;font-size:13px;margin-bottom:4px;">${esc(meta.title||'الرسمة')}</div><div style="display:flex;gap:14px;align-items:flex-start;justify-content:center;direction:rtl">${stT}<img style="max-width:${stT?'56%':'100%'};width:auto;height:auto;object-fit:contain;border:1px solid #e5e0d6;border-radius:6px;"></div>`:`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
+    const stT=pure&&Array.isArray(meta.stats)&&meta.stats.length?`<table class="mirsam-stats" style="flex:1 1 46%;max-width:48%;border-collapse:collapse;font-size:15px;text-align:right;align-self:center">${meta.stats.map(r=>`<tr><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap;vertical-align:top">${esc(r[0])}</td><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:'';
+    box.innerHTML=pure?`<div style="font-weight:700;font-size:13px;margin-bottom:4px;">${esc(meta.title||'الرسمة')}</div><div style="display:flex;gap:14px;align-items:flex-start;justify-content:center;direction:rtl">${stT}<img style="max-width:${stT?'50%':'100%'};width:auto;height:auto;object-fit:contain;border:1px solid #e5e0d6;border-radius:6px;"></div>`:`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
     area.appendChild(box);
     lastLoad=loadImg(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.remove();return res()}im.onload=()=>{fitBox(area,box,im);res()};im.onerror=()=>res();im.src=src}));
   }
   // يختار حجم الرسمة لحاله: بنفس الورقة إذا في محل وبتنقرا منيح، وإلا بورقة لحالها بحجم كبير
+  // الرسمة: بنفس ورقة الوصل إذا وسعت (المتصفح بيقرر وقت الطباعة)، وإلا بتنتقل لحالها للورقة الجاية — بلا ما تصغر كتير
   function fitBox(area,box,im){
-    const PAGE=1040,img=box.querySelector('img');box.style.pageBreakBefore='';box.style.breakBefore='';
-    const stEl=box.querySelector('.mirsam-stats'),hasSt=!!stEl,MINR=Math.max(320,hasSt?stEl.rows.length*24+30:0); // أقل ارتفاع للرسمة بالوصل (حوالي 8.5 سم) حتى ما تصغر كتيرimg.style.maxHeight='none';img.style.width='auto';img.style.maxWidth=hasSt?'56%':'100%';
-    const w=Math.min(area.clientWidth||720,720)*(hasSt?.56:1),nat=w*im.naturalHeight/Math.max(1,im.naturalWidth);
-    const before=(box.getBoundingClientRect().top-area.getBoundingClientRect().top)*.92,used=before%PAGE,remain=PAGE-used-60;
-    if(remain>=Math.min(nat,MINR)){img.style.maxHeight=Math.round(Math.min(nat,remain))+'px'}
-    else{box.style.pageBreakBefore='always';box.style.breakBefore='page';img.style.maxHeight=Math.round(Math.min(nat,PAGE-70))+'px'}
+    const img=box.querySelector('img');box.style.pageBreakBefore='';box.style.breakBefore='';
+    img.style.maxHeight='520px';img.style.width='auto';img.style.maxWidth=box.querySelector('.mirsam-stats')?'50%':'100%';
   }
+
   const st=document.createElement('style');st.textContent='.mirsam-on .item-draws,.mirsam-on .item-legend{display:none!important}';document.head.appendChild(st);
   const _viewR=viewReceipt;viewReceipt=function(id){_viewR(id);const r=receipts.find(x=>x.id===id);attach('receiptPrintArea',r&&r.mirsamDrawing)};
   const _viewI=viewInvoice;viewInvoice=function(id){_viewI(id);const v=invoices.find(x=>x.id===id);attach('invoicePrintArea',v&&v.mirsamDrawing)};
@@ -5844,7 +5847,7 @@ if('serviceWorker' in navigator){
       <div class="hd"><div><h1>🏭 طلبية ${ordNo(j)}</h1><div style="font-size:13px">${esc(settings.companyName||"")}</div></div><div style="font-size:13px;text-align:left">${fmtD(j.at)}<br>الحالة: ${esc(j.status)}${j.due?'<br>التسليم المطلوب: '+fmtD(new Date(j.due).getTime()):''}</div></div>
       <div class="info"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div><div><b>الهاتف:</b> <span dir="ltr">${esc(j.cust.phone||'-')}</span></div><div style="grid-column:1/-1"><b>العنوان:</b> ${esc(j.cust.addr||'-')}</div></div>
       <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
-      ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?(j.draw&&Array.isArray(j.draw.stats)&&j.draw.stats.length?`<div style="display:flex;gap:14px;align-items:center;direction:rtl;margin-top:14px"><table style="flex:0 0 42%;width:42%;font-size:12.5px">${j.draw.stats.map(r=>`<tr><td style="text-align:right;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="text-align:right;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table><img src="${img}" style="max-width:56%;margin:0"></div>`:`<img src="${img}">`):''}
+      ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?(j.draw&&Array.isArray(j.draw.stats)&&j.draw.stats.length?`<div style="display:flex;gap:14px;align-items:center;direction:rtl;margin-top:14px"><table style="flex:1 1 46%;width:48%;font-size:15px">${j.draw.stats.map(r=>`<tr><td style="text-align:right;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="text-align:right;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table><img src="${img}" style="max-width:56%;margin:0"></div>`:`<img src="${img}">`):''}
       <div class="sig"><span>المسؤول بالمعمل: ..................</span><span>تاريخ التنفيذ: ..................</span></div>
       <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close();
   }
