@@ -5716,7 +5716,7 @@ if('serviceWorker' in navigator){
   // يختار حجم الرسمة لحاله: بنفس الورقة إذا في محل وبتنقرا منيح، وإلا بورقة لحالها بحجم كبير
   function fitBox(area,box,im){
     const PAGE=1040,img=box.querySelector('img');box.style.pageBreakBefore='';box.style.breakBefore='';
-    const stEl=box.querySelector('.mirsam-stats'),hasSt=!!stEl,MINR=hasSt?Math.max(230,stEl.rows.length*24+30):300;img.style.maxHeight='none';img.style.width='auto';img.style.maxWidth=hasSt?'56%':'100%';
+    const stEl=box.querySelector('.mirsam-stats'),hasSt=!!stEl,MINR=Math.max(320,hasSt?stEl.rows.length*24+30:0); // أقل ارتفاع للرسمة بالوصل (حوالي 8.5 سم) حتى ما تصغر كتيرimg.style.maxHeight='none';img.style.width='auto';img.style.maxWidth=hasSt?'56%':'100%';
     const w=Math.min(area.clientWidth||720,720)*(hasSt?.56:1),nat=w*im.naturalHeight/Math.max(1,im.naturalWidth);
     const before=(box.getBoundingClientRect().top-area.getBoundingClientRect().top)*.92,used=before%PAGE,remain=PAGE-used-60;
     if(remain>=Math.min(nat,MINR)){img.style.maxHeight=Math.round(Math.min(nat,remain))+'px'}
