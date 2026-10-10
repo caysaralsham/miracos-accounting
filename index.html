@@ -381,6 +381,7 @@
     /* ورقة A4 عمودي دايماً، وبلا هامش للصفحة حتى ما يطبع المتصفح التاريخ والرابط فوق وتحت —
        الهامش بنعمله نحنا جوّا الورقة (padding) */
     @page{ size:A4 portrait; margin:0; }
+    .mirsam-missing{ display:none !important; }
     html, body{ background:#fff !important; }
     .mirsam-print img{ max-height:120mm !important; }
     .mirsam-stats{ font-size:15px !important; }
@@ -443,6 +444,10 @@
   .row-actions{display:flex; gap:6px; justify-content:flex-start;}
 
   #btnLogoutApp:hover{ background:rgba(166,69,61,.15) !important; color:#F0C4BE !important; }
+
+  /* شريط التمرير على اليمين دايماً */
+  html{direction:ltr} body{direction:rtl}
+  .modal-body,.overlay{direction:ltr} .modal-body>*,.overlay>*{direction:rtl}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -5562,7 +5567,7 @@ if('serviceWorker' in navigator){
   const KIND={pure:'الرسمة صافية (بتساع مع الوصل)',withDetails:'الرسمة مع التفاصيل (ورقة كاملة)',drawingOnly:'الرسمة بس (ورقة كاملة)',workshop:'نسخة المعمل (ورقة كاملة)'};
   const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   function compress(src){return new Promise(res=>{const im=new Image();im.onload=()=>{let w=Math.min(1500,im.width),q=.85,out=null;
-    for(let i=0;i<7;i++){const h=Math.round(im.height*w/im.width),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);out=c.toDataURL('image/jpeg',q);if(out.length<850000)break;w=Math.round(w*.82);q=Math.max(.6,q-.05)}
+    for(let i=0;i<7;i++){const h=Math.round(im.height*w/im.width),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);out=c.toDataURL('image/jpeg',q);if(out.length<700000)break;w=Math.round(w*.82);q=Math.max(.6,q-.05)}
     res(out)};im.onerror=()=>res(null);im.src=src})}
   async function loadImg(meta){if(!meta||!meta.id)return null;if(drwCache[meta.id])return drwCache[meta.id];
     try{const d=await db.collection(FS_COLLECTION).doc(meta.id).get();if(d.exists&&d.data().img){drwCache[meta.id]=d.data().img;return drwCache[meta.id]}}catch(e){console.error(e)}return null}
@@ -5664,12 +5669,19 @@ if('serviceWorker' in navigator){
     const body=document.getElementById(rcp?'itemsBody':'invItemsBody');if(!body)return;
     const dsc=r=>(r.querySelector('textarea')||{}).value||'',prc=r=>(r.querySelector(rcp?'.it-price':'.inv-it-price')||{}).value||'';
     const empty=r=>[...r.querySelectorAll('input,textarea')].every(i=>!String(i.value||'').trim());
-    const oldL=(old&&old.lines)||[],keep={};
-    for(const r of [...body.querySelectorAll('tr')]){const n=oldL.indexOf(dsc(r).trim());if(n>=0){const key=oldL[n].split(' — ')[0];if(!(key in keep))keep[key]=prc(r);r.remove()}else if(empty(r))r.remove()}
+    // عند تعديل رسمة موجودة: بنود الرسمة القديمة (نفس أول كلمة قبل «—»، متل «عامود مدور» أو «قاعدة عامود») بتتبدّل بالبنود الجديدة بنفس مكانها وبنفس السعر — ما بتتكرر
+    const oldL=(old&&old.lines)||[],keep={},keyOf=t=>String(t||'').split(' — ')[0].replace(/\s*\([^)]*\)\s*$/,'').trim();
+    const keys=new Set(old?[...oldL.map(keyOf),...lines.map(l=>keyOf(mk(l)))]:[]);
+    let mark=null;
+    for(const r of [...body.querySelectorAll('tr')]){const d=dsc(r).trim();
+      if(d&&(oldL.includes(d)||keys.has(keyOf(d)))){const key=keyOf(d);if(!(key in keep))keep[key]=prc(r);if(!mark){mark=document.createComment('mirsam');body.insertBefore(mark,r)}r.remove()}
+      else if(empty(r))r.remove()}
     let first=null;
-    lines.forEach(l=>{const price=keep[mk(l).split(' — ')[0]]||'';
+    lines.forEach(l=>{const price=keep[keyOf(mk(l))]||'';
       if(rcp)newItemRow({qty:l.qty,desc:mk(l),price,...(l.draws?{draws:l.draws}:{})});else newInvoiceItemRow({qty:l.qty,desc:l.desc,unit:l.unit,price,...(l.draws?{draws:l.draws}:{})});
-      if(!first)first=body.lastElementChild});
+      const row=body.lastElementChild;if(mark&&row)body.insertBefore(row,mark);
+      if(!first)first=row});
+    if(mark)mark.remove();
     if(rcp){if(typeof recalcTotals==='function')recalcTotals()}else{if(typeof recalcInvoiceTotals==='function')recalcInvoiceTotals()}
     const pi=first&&first.querySelector(rcp?'.it-price':'.inv-it-price');
     if(pi)setTimeout(()=>{pi.scrollIntoView({block:'center',behavior:'smooth'});pi.focus()},150);
@@ -5689,7 +5701,9 @@ if('serviceWorker' in navigator){
     if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})};
     const id=m.id||('mirsam_drw_'+uid());
     try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})}}
-    catch(e){console.error(e);toast('تعذر حفظ الرسمة على السحابة');return null}
+    catch(e){console.error(e);toast('تعذر حفظ الرسمة على السحابة — جرّب احفظ مرة تانية');
+      // ما منشيل الرسمة القديمة من المستند إذا الحفظ فشل
+      return m.id?{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})}:null}
   }
 
   // ---- ربط مع الحفظ والفتح والتحويل ----
@@ -5715,7 +5729,7 @@ if('serviceWorker' in navigator){
     const stT=pure&&Array.isArray(meta.stats)&&meta.stats.length?`<table class="mirsam-stats" style="flex:1 1 46%;max-width:48%;border-collapse:collapse;font-size:15px;text-align:right;align-self:center">${meta.stats.map(r=>`<tr><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap;vertical-align:top">${esc(r[0])}</td><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:'';
     box.innerHTML=pure?`<div style="font-weight:700;font-size:13px;margin-bottom:4px;">${esc(meta.title||'الرسمة')}</div><div style="display:flex;gap:14px;align-items:flex-start;justify-content:center;direction:rtl">${stT}<img style="max-width:${stT?'50%':'100%'};width:auto;height:auto;object-fit:contain;border:1px solid #e5e0d6;border-radius:6px;"></div>`:`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
     area.appendChild(box);
-    lastLoad=loadImg(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.remove();return res()}im.onload=()=>{fitBox(area,box,im);res()};im.onerror=()=>res();im.src=src}));
+    lastLoad=loadImg(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.innerHTML='<div class="mirsam-missing" style="color:#A6453D;font-size:13px;padding:8px;border:1px dashed #e0c9a8;border-radius:8px">⚠️ الرسمة ما تحمّلت — تأكد من الإنترنت وافتح الوصل من جديد</div>';return res()}im.onload=()=>{fitBox(area,box,im);res()};im.onerror=()=>res();im.src=src}));
   }
   // يختار حجم الرسمة لحاله: بنفس الورقة إذا في محل وبتنقرا منيح، وإلا بورقة لحالها بحجم كبير
   // الرسمة: بنفس ورقة الوصل إذا وسعت (المتصفح بيقرر وقت الطباعة)، وإلا بتنتقل لحالها للورقة الجاية — بلا ما تصغر كتير
