@@ -5569,10 +5569,15 @@ if('serviceWorker' in navigator){
   function compress(src){return new Promise(res=>{const im=new Image();im.onload=()=>{let w=Math.min(1400,im.width),q=.82,out=null;
     for(let i=0;i<7;i++){const h=Math.round(im.height*w/im.width),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);out=c.toDataURL('image/jpeg',q);if(out.length<380000)break;w=Math.round(w*.82);q=Math.max(.6,q-.05)}
     res(out)};im.onerror=()=>res(null);im.src=src})}
+  // نسخة ثابتة من كل رسمة على الجهاز (ما بتنمسح متل نسخة السحابة المؤقتة)
+  const IDB=(()=>{let p=null;const open=()=>p||(p=new Promise((res,rej)=>{try{const r=indexedDB.open('mirsam-drawings',1);r.onupgradeneeded=()=>r.result.createObjectStore('img');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}catch(e){rej(e)}}));
+    return{get:async k=>{try{const d=await open();return await new Promise(r=>{const q=d.transaction('img').objectStore('img').get(k);q.onsuccess=()=>r(q.result||null);q.onerror=()=>r(null)})}catch(e){return null}},
+      set:async(k,v)=>{try{if(!k||!v)return;const d=await open();d.transaction('img','readwrite').objectStore('img').put(v,k)}catch(e){}}}})();
   let lastImgErr='';
   async function loadImg(meta){if(!meta||!meta.id)return null;if(drwCache[meta.id])return drwCache[meta.id];
+    {const iv=await IDB.get(meta.id);if(iv){drwCache[meta.id]=iv;return iv}}
     const ref=db.collection(FS_COLLECTION).doc(meta.id);lastImgErr='';
-    const fromDoc=d=>{if(d&&d.exists&&d.data().img){drwCache[meta.id]=d.data().img;return drwCache[meta.id]}return null};
+    const fromDoc=d=>{if(d&&d.exists&&d.data().img){drwCache[meta.id]=d.data().img;IDB.set(meta.id,drwCache[meta.id]);return drwCache[meta.id]}return null};
     // أول شي من الجهاز (فوري)، وإذا مش موجودة منجيبها من السحابة ومنستنى لحد 30 ثانية (الإنترنت البطيء كان سبب إنها أحياناً ما تطلع)
     try{const v=fromDoc(await ref.get({source:'cache'}));if(v)return v}catch(_){}
     const tt=setTimeout(()=>{try{toast('جاري تحميل الرسمة من السحابة...')}catch(_){}},1500);
@@ -5703,13 +5708,13 @@ if('serviceWorker' in navigator){
     box.innerHTML=`<div style="display:flex;gap:10px;align-items:center;border:1px dashed var(--line);border-radius:10px;padding:8px;"><img data-mirsam-thumb style="width:110px;height:80px;object-fit:contain;background:#fff;border-radius:6px;border:1px solid var(--line);"><div style="flex:1;font-size:13px;"><b>📐 ${esc(m.name||m.title)}</b><br><span style="color:var(--text-dim);">بتطلع مع الطباعة والمشاركة، ورسمات حاسبة القياسات بتختفي من الطباعة طول ما هي موجودة (بياناتها بتضل محفوظة)</span></div><button type="button" class="btn btn-ghost btn-sm" data-mirsam-del>إزالة</button></div>`;
     box.querySelector('[data-mirsam-del]').onclick=()=>{MD[k]=null;renderPrev(k)};
     if(m.mstate){const eb=document.createElement('button');eb.type='button';eb.className='btn btn-sm';eb.textContent='✏️ عدّل الرسمة';eb.onclick=()=>openStudio(k);box.firstElementChild.appendChild(eb)}
-    const src=m.img||await loadImg(m);const t=box.querySelector('[data-mirsam-thumb]');if(t&&src)t.src=src;
+    const src=m.img||await drawingSrc(m);const t=box.querySelector('[data-mirsam-thumb]');if(t&&src)t.src=src;
   }
   async function persist(k){
     const m=MD[k];if(!m)return null;
     if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})};
     const id='mirsam_drw_'+uid(); // كل رسمة جديدة/معدّلة بعنوان جديد
-    try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})}}
+    try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;IDB.set(id,m.img);m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})}}
     catch(e){console.error(e);toast('تعذر حفظ الرسمة على السحابة ('+(e&&(e.code||e.message)||'')+') — جرّب احفظ مرة تانية');
       // ما منشيل الرسمة القديمة من المستند إذا الحفظ فشل
       return m.id?{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})}:null}
@@ -5728,6 +5733,20 @@ if('serviceWorker' in navigator){
   const rtq=document.getElementById('btnReceiptToQuote');if(rtq)rtq.addEventListener('click',()=>{carry=MD.rcp?{...MD.rcp}:null},true);
 
   // ---- العرض والطباعة والمشاركة ----
+  // محرك الرسم المشترك: المرسم (من الموقع، محفوظ على الجهاز) بيرسم الرسمة من قياساتها — متل حاسبة القياسات، بلا ما تنزل صورة
+  const RENDER_URL='https://cesar-alcham.com/studio-q7m4/?render=1';let rReady=null,rSeq=0;const rWait={};
+  window.addEventListener('message',e=>{if(e.origin!=='https://cesar-alcham.com'||!e.data||e.data.type!=='mirsam-rendered')return;const f=rWait[e.data.id];if(f){delete rWait[e.data.id];f(e.data)}});
+  function renderer(){if(rReady)return rReady;rReady=new Promise((res,rej)=>{const f=document.createElement('iframe');f.setAttribute('aria-hidden','true');f.tabIndex=-1;
+      f.style.cssText='position:fixed;left:-10000px;top:0;width:1200px;height:900px;border:0;visibility:hidden;pointer-events:none';
+      const to=setTimeout(()=>{rReady=null;f.remove();rej(new Error('engine timeout'))},20000);
+      const onR=e=>{if(e.source===f.contentWindow&&e.data&&e.data.type==='mirsam-render-ready'){clearTimeout(to);removeEventListener('message',onR);res(f)}};addEventListener('message',onR);
+      f.src=RENDER_URL;document.body.appendChild(f)});return rReady}
+  const rendered={};
+  async function renderFromState(ms){if(!ms||!ms.tab)return null;const key=JSON.stringify(ms);if(rendered[key])return rendered[key];
+    try{const f=await renderer();const id=++rSeq;const d=await new Promise(res=>{rWait[id]=res;f.contentWindow.postMessage({type:'mirsam-render',id,mstate:ms},'https://cesar-alcham.com');setTimeout(()=>{if(rWait[id]){delete rWait[id];res({})}},12000)});
+      if(d.img){rendered[key]=d.img;return d.img}}catch(e){console.warn('engine',e)}return null}
+  // الرسمة للعرض والطباعة: أول شي من القياسات (المحرك)، وإذا ما زبط: من الجهاز، وبعدين من السحابة
+  async function drawingSrc(meta){return (meta.mstate&&await renderFromState(meta.mstate))||await loadImg(meta)}
   function attach(areaId,meta){
     const area=document.getElementById(areaId);if(!area)return;
     const old=area.querySelector('.mirsam-print');if(old)old.remove();
@@ -5738,7 +5757,7 @@ if('serviceWorker' in navigator){
     const stT=pure&&Array.isArray(meta.stats)&&meta.stats.length?`<table class="mirsam-stats" style="flex:1 1 46%;max-width:48%;border-collapse:collapse;font-size:15px;text-align:right;align-self:center">${meta.stats.map(r=>`<tr><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap;vertical-align:top">${esc(r[0])}</td><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:'';
     box.innerHTML=pure?`<div style="font-weight:700;font-size:13px;margin-bottom:4px;">${esc(meta.title||'الرسمة')}</div><div style="display:flex;gap:14px;align-items:flex-start;justify-content:center;direction:rtl">${stT}<img style="max-width:${stT?'50%':'100%'};width:auto;height:auto;object-fit:contain;border:1px solid #e5e0d6;border-radius:6px;"></div>`:`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
     area.appendChild(box);
-    lastLoad=loadImg(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.innerHTML='<div class="mirsam-missing" style="color:#A6453D;font-size:13px;padding:8px;border:1px dashed #e0c9a8;border-radius:8px">⚠️ الرسمة ما تحمّلت ('+esc(lastImgErr)+') — تأكد من الإنترنت وافتح الوصل من جديد، أو اكبس «ارسم الآن» وحوّل الرسمة واحفظ</div>';return res()}im.onload=()=>{fitBox(area,box,im);res()};im.onerror=()=>res();im.src=src}));
+    lastLoad=drawingSrc(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.innerHTML='<div class="mirsam-missing" style="color:#A6453D;font-size:13px;padding:8px;border:1px dashed #e0c9a8;border-radius:8px">⚠️ الرسمة ما تحمّلت ('+esc(lastImgErr)+') — تأكد من الإنترنت وافتح الوصل من جديد، أو اكبس «ارسم الآن» وحوّل الرسمة واحفظ</div>';return res()}im.onload=()=>{fitBox(area,box,im);res()};im.onerror=()=>res();im.src=src}));
   }
   // يختار حجم الرسمة لحاله: بنفس الورقة إذا في محل وبتنقرا منيح، وإلا بورقة لحالها بحجم كبير
   // الرسمة: بنفس ورقة الوصل إذا وسعت (المتصفح بيقرر وقت الطباعة)، وإلا بتنتقل لحالها للورقة الجاية — بلا ما تصغر كتير
@@ -5861,7 +5880,7 @@ if('serviceWorker' in navigator){
   async function printJob(j){
     if(!j)return;const w=window.open('','_blank');if(!w){toast('اسمح بالنوافذ المنبثقة للطباعة');return}
     w.document.write('<p style="font-family:sans-serif">جاري التجهيز...</p>');
-    const img=j.draw?await loadImg(j.draw):null;
+    const img=j.draw?await drawingSrc(j.draw):null;
     const rows=j.items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.qty||'')}</td><td style="text-align:right">${esc(x.desc)}${x.unit?' ('+esc(x.unit)+')':''}${x.draws&&typeof drawsHtml==='function'?drawsHtml(x.draws):''}</td></tr>`).join('');
     w.document.open();w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>طلبية ${ordNo(j)} - ${esc(j.cust.name||'')}</title><style>
       body{font-family:Cairo,Tahoma,Arial,sans-serif;color:#3B2414;margin:24px}h1{margin:0;font-size:22px}.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #9A6A3A;padding-bottom:8px;margin-bottom:14px}
