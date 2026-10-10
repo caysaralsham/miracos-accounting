@@ -5569,8 +5569,14 @@ if('serviceWorker' in navigator){
   function compress(src){return new Promise(res=>{const im=new Image();im.onload=()=>{let w=Math.min(1500,im.width),q=.85,out=null;
     for(let i=0;i<7;i++){const h=Math.round(im.height*w/im.width),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);out=c.toDataURL('image/jpeg',q);if(out.length<700000)break;w=Math.round(w*.82);q=Math.max(.6,q-.05)}
     res(out)};im.onerror=()=>res(null);im.src=src})}
+  let lastImgErr='';
   async function loadImg(meta){if(!meta||!meta.id)return null;if(drwCache[meta.id])return drwCache[meta.id];
-    try{const d=await db.collection(FS_COLLECTION).doc(meta.id).get();if(d.exists&&d.data().img){drwCache[meta.id]=d.data().img;return drwCache[meta.id]}}catch(e){console.error(e)}return null}
+    const ref=db.collection(FS_COLLECTION).doc(meta.id);lastImgErr='';
+    const fromDoc=d=>{if(d&&d.exists&&d.data().img){drwCache[meta.id]=d.data().img;return drwCache[meta.id]}return null};
+    try{const d=await Promise.race([ref.get(),new Promise((_,rj)=>setTimeout(()=>rj({code:'بطء بالإنترنت'}),7000))]);const v=fromDoc(d);if(v)return v;lastImgErr='الرسمة مش موجودة بالسحابة'}
+    catch(e){console.error(e);lastImgErr=e&&(e.code||e.message)||'خطأ'}
+    try{const v=fromDoc(await ref.get({source:'cache'}));if(v)return v}catch(_){}
+    return null}
 
   // ---- واجهة داخل نافذة الوصل/عرض السعر ----
   function addUI(k,afterId){
@@ -5671,7 +5677,7 @@ if('serviceWorker' in navigator){
     const empty=r=>[...r.querySelectorAll('input,textarea')].every(i=>!String(i.value||'').trim());
     // عند تعديل رسمة موجودة: بنود الرسمة القديمة (نفس أول كلمة قبل «—»، متل «عامود مدور» أو «قاعدة عامود») بتتبدّل بالبنود الجديدة بنفس مكانها وبنفس السعر — ما بتتكرر
     const oldL=(old&&old.lines)||[],keep={},keyOf=t=>String(t||'').split(' — ')[0].replace(/\s*\([^)]*\)\s*$/,'').trim();
-    const keys=new Set(old?[...oldL.map(keyOf),...lines.map(l=>keyOf(mk(l)))]:[]);
+    const keys=new Set([...oldL.map(keyOf),...lines.map(l=>keyOf(mk(l)))].filter(k=>k&&k.length>2));
     let mark=null;
     for(const r of [...body.querySelectorAll('tr')]){const d=dsc(r).trim();
       if(d&&(oldL.includes(d)||keys.has(keyOf(d)))){const key=keyOf(d);if(!(key in keep))keep[key]=prc(r);if(!mark){mark=document.createComment('mirsam');body.insertBefore(mark,r)}r.remove()}
@@ -5701,7 +5707,7 @@ if('serviceWorker' in navigator){
     if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})};
     const id=m.id||('mirsam_drw_'+uid());
     try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})}}
-    catch(e){console.error(e);toast('تعذر حفظ الرسمة على السحابة — جرّب احفظ مرة تانية');
+    catch(e){console.error(e);toast('تعذر حفظ الرسمة على السحابة ('+(e&&(e.code||e.message)||'')+') — جرّب احفظ مرة تانية');
       // ما منشيل الرسمة القديمة من المستند إذا الحفظ فشل
       return m.id?{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})}:null}
   }
@@ -5729,7 +5735,7 @@ if('serviceWorker' in navigator){
     const stT=pure&&Array.isArray(meta.stats)&&meta.stats.length?`<table class="mirsam-stats" style="flex:1 1 46%;max-width:48%;border-collapse:collapse;font-size:15px;text-align:right;align-self:center">${meta.stats.map(r=>`<tr><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap;vertical-align:top">${esc(r[0])}</td><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:'';
     box.innerHTML=pure?`<div style="font-weight:700;font-size:13px;margin-bottom:4px;">${esc(meta.title||'الرسمة')}</div><div style="display:flex;gap:14px;align-items:flex-start;justify-content:center;direction:rtl">${stT}<img style="max-width:${stT?'50%':'100%'};width:auto;height:auto;object-fit:contain;border:1px solid #e5e0d6;border-radius:6px;"></div>`:`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
     area.appendChild(box);
-    lastLoad=loadImg(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.innerHTML='<div class="mirsam-missing" style="color:#A6453D;font-size:13px;padding:8px;border:1px dashed #e0c9a8;border-radius:8px">⚠️ الرسمة ما تحمّلت — تأكد من الإنترنت وافتح الوصل من جديد</div>';return res()}im.onload=()=>{fitBox(area,box,im);res()};im.onerror=()=>res();im.src=src}));
+    lastLoad=loadImg(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.innerHTML='<div class="mirsam-missing" style="color:#A6453D;font-size:13px;padding:8px;border:1px dashed #e0c9a8;border-radius:8px">⚠️ الرسمة ما تحمّلت ('+esc(lastImgErr)+') — تأكد من الإنترنت وافتح الوصل من جديد، أو اكبس «ارسم الآن» وحوّل الرسمة واحفظ</div>';return res()}im.onload=()=>{fitBox(area,box,im);res()};im.onerror=()=>res();im.src=src}));
   }
   // يختار حجم الرسمة لحاله: بنفس الورقة إذا في محل وبتنقرا منيح، وإلا بورقة لحالها بحجم كبير
   // الرسمة: بنفس ورقة الوصل إذا وسعت (المتصفح بيقرر وقت الطباعة)، وإلا بتنتقل لحالها للورقة الجاية — بلا ما تصغر كتير
