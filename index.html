@@ -446,8 +446,8 @@
   #btnLogoutApp:hover{ background:rgba(166,69,61,.15) !important; color:#F0C4BE !important; }
 
   /* شريط التمرير على اليمين دايماً */
-  html{direction:ltr} body{direction:rtl}
-  .modal-body,.overlay{direction:ltr} .overlay>*,.modal-body>.mb-in{direction:rtl}
+  @media (min-width:900px) and (hover:hover){ html{direction:ltr} body{direction:rtl} }
+  @media (min-width:900px) and (hover:hover){ .modal-body,.overlay{direction:ltr} .overlay>*,.modal-body>.mb-in{direction:rtl} }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
