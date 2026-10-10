@@ -3209,7 +3209,7 @@ function shareImageChoice(blob, fileName, title, phone){
     // الكمبيوتر: المتصفح ما بيقدر يرفق صورة لواتساب لحاله — بننزّل الصورة وبنفتح محادثة الزبون
     downloadBlob(blob, fileName);
     const p = waPhone(phone);
-    window.open((p ? `https://wa.me/${p}` : 'https://wa.me/')+'?text='+encodeURIComponent('السلام عليكم، مرفق '+title+' من '+(settings.companyName||'')+'.\ncesar-alcham.com'), '_blank');
+    openWA(p,('السلام عليكم، مرفق '+title+' من '+(settings.companyName||'')+'.\ncesar-alcham.com'));
     toast('نزلت الصورة — اسحبها على محادثة واتساب');
   });
 }
@@ -5768,7 +5768,7 @@ if('serviceWorker' in navigator){
     ov.addEventListener('click',e=>{if(e.target===ov||e.target.closest('[data-c]')){ov.remove();return}
       if(!e.target.closest('[data-s]'))return;const n=waNum(ov.querySelector('[data-n]').value);if(n.length<9){toast('اكتب رقم واتساب صحيح');return}
       if(settings[key]!==n){settings[key]=n;try{saveSettings()}catch(_){}}
-      window.open('https://wa.me/'+n+'?text='+encodeURIComponent(msg),'_blank');ov.remove()});
+      openWA(n,msg);ov.remove()});
   }
   function askDue(name,count,cb){
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
@@ -5934,7 +5934,7 @@ if('serviceWorker' in navigator){
      mk('btnReceiptToFactory',()=>window.__sendOrderReceipt(currentViewedReceiptId));mk('btnInvoiceToFactory',()=>window.__sendOrderInvoice(currentViewedInvoiceId));
      const rv=document.getElementById('btnReceiptToFactory');if(rv){const b=document.createElement('button');b.type='button';b.className='btn btn-sm';b.textContent='⭐ اطلب تقييم';b.title='رسالة واتساب للزبون فيها رابط التقييم على غوغل';
        b.onclick=()=>{const r=receipts.find(x=>x.id===currentViewedReceiptId);if(!r)return;const p=(typeof waPhone==='function'?waPhone(r.phone):'');
-         window.open((p?'https://wa.me/'+p:'https://wa.me/')+'?text='+encodeURIComponent('السلام عليكم '+(r.name||'')+'،\nشكرًا لثقتكم بـ'+(settings.companyName||'')+' 🌹\nيسعدنا تقييمكم لنا على غوغل، ما بياخد غير دقيقة:\nhttps://maps.app.goo.gl/g6wBPVBsZmQipM2j6'),'_blank')};rv.parentElement.insertBefore(b,rv)}}}
+         openWA(p,('السلام عليكم '+(r.name||'')+'،\nشكرًا لثقتكم بـ'+(settings.companyName||'')+' 🌹\nيسعدنا تقييمكم لنا على غوغل، ما بياخد غير دقيقة:\nhttps://maps.app.goo.gl/g6wBPVBsZmQipM2j6'))};rv.parentElement.insertBefore(b,rv)}}}
   if(typeof renderReceiptsTable==='function'){const _rr=renderReceiptsTable;renderReceiptsTable=function(){const r=_rr.apply(this,arguments);try{markRcpTable()}catch(e){}return r}}
 
   // ================= 📊 تقرير الشهر (بقسم التقارير) =================
@@ -5991,6 +5991,11 @@ if('serviceWorker' in navigator){
   }
 })();
 
+</script>
+<script>
+// يفتح تطبيق واتساب مباشرة (بلا ما يمرق على المتصفح)
+window.openWA=function(phone,text){const d=String(phone||'').replace(/\D/g,'');
+  location.href='whatsapp://send?'+(d?'phone='+d+'&':'')+'text='+encodeURIComponent(text||'');};
 </script>
 <script>
 // بلا اقتراحات المتصفح («المعلومات المحفوظة») على خانات السعر والعدد والبنود
