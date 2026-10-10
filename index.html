@@ -5566,16 +5566,19 @@ if('serviceWorker' in navigator){
   const MD={rcp:null,inv:null},drwCache={};let carry=null,lastLoad=Promise.resolve();
   const KIND={pure:'الرسمة صافية (بتساع مع الوصل)',withDetails:'الرسمة مع التفاصيل (ورقة كاملة)',drawingOnly:'الرسمة بس (ورقة كاملة)',workshop:'نسخة المعمل (ورقة كاملة)'};
   const esc=s=>String(s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  function compress(src){return new Promise(res=>{const im=new Image();im.onload=()=>{let w=Math.min(1500,im.width),q=.85,out=null;
-    for(let i=0;i<7;i++){const h=Math.round(im.height*w/im.width),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);out=c.toDataURL('image/jpeg',q);if(out.length<700000)break;w=Math.round(w*.82);q=Math.max(.6,q-.05)}
+  function compress(src){return new Promise(res=>{const im=new Image();im.onload=()=>{let w=Math.min(1400,im.width),q=.82,out=null;
+    for(let i=0;i<7;i++){const h=Math.round(im.height*w/im.width),c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(im,0,0,w,h);out=c.toDataURL('image/jpeg',q);if(out.length<380000)break;w=Math.round(w*.82);q=Math.max(.6,q-.05)}
     res(out)};im.onerror=()=>res(null);im.src=src})}
   let lastImgErr='';
   async function loadImg(meta){if(!meta||!meta.id)return null;if(drwCache[meta.id])return drwCache[meta.id];
     const ref=db.collection(FS_COLLECTION).doc(meta.id);lastImgErr='';
     const fromDoc=d=>{if(d&&d.exists&&d.data().img){drwCache[meta.id]=d.data().img;return drwCache[meta.id]}return null};
-    try{const d=await Promise.race([ref.get(),new Promise((_,rj)=>setTimeout(()=>rj({code:'بطء بالإنترنت'}),7000))]);const v=fromDoc(d);if(v)return v;lastImgErr='الرسمة مش موجودة بالسحابة'}
-    catch(e){console.error(e);lastImgErr=e&&(e.code||e.message)||'خطأ'}
+    // أول شي من الجهاز (فوري)، وإذا مش موجودة منجيبها من السحابة ومنستنى لحد 30 ثانية (الإنترنت البطيء كان سبب إنها أحياناً ما تطلع)
     try{const v=fromDoc(await ref.get({source:'cache'}));if(v)return v}catch(_){}
+    const tt=setTimeout(()=>{try{toast('جاري تحميل الرسمة من السحابة...')}catch(_){}},1500);
+    try{const d=await Promise.race([ref.get({source:'server'}),new Promise((_,rj)=>setTimeout(()=>rj({code:'الإنترنت بطيء'}),30000))]);const v=fromDoc(d);if(v)return v;lastImgErr='الرسمة مش موجودة بالسحابة'}
+    catch(e){console.error(e);lastImgErr=e&&(e.code||e.message)||'خطأ'}
+    finally{clearTimeout(tt)}
     return null}
 
   // ---- واجهة داخل نافذة الوصل/عرض السعر ----
@@ -5705,7 +5708,7 @@ if('serviceWorker' in navigator){
   async function persist(k){
     const m=MD[k];if(!m)return null;
     if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})};
-    const id=m.id||('mirsam_drw_'+uid());
+    const id='mirsam_drw_'+uid(); // كل رسمة جديدة/معدّلة بعنوان جديد
     try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})}}
     catch(e){console.error(e);toast('تعذر حفظ الرسمة على السحابة ('+(e&&(e.code||e.message)||'')+') — جرّب احفظ مرة تانية');
       // ما منشيل الرسمة القديمة من المستند إذا الحفظ فشل
@@ -5750,7 +5753,7 @@ if('serviceWorker' in navigator){
   const _cap=captureAsPage;captureAsPage=async function(area){try{await lastLoad}catch(e){}return _cap(area)};
   window.addEventListener('beforeprint',()=>{});
   // الطباعة بتستنى الرسمة تخلص تحميل (من السحابة) حتى ما تطلع الورقة بلا رسمة
-  {const _pr=window.print.bind(window);window.print=function(){Promise.race([lastLoad,new Promise(r=>setTimeout(r,8000))]).catch(()=>{}).then(()=>setTimeout(_pr,150))}}
+  {const _pr=window.print.bind(window);window.print=function(){Promise.race([lastLoad,new Promise(r=>setTimeout(r,32000))]).catch(()=>{}).then(()=>setTimeout(_pr,150))}}
 
   addUI('rcp','rcpItemsCount');
   addUI('inv','invItemsCount');
