@@ -5750,10 +5750,10 @@ if('serviceWorker' in navigator){
   }
   // ---- تبليغ المعمل على واتساب (لأنو الإشعار ما بيوصل إذا برنامجه مسكّر) ----
   const waNum=v=>{let d=String(v||'').replace(/\D/g,'');if(d.startsWith('00'))d=d.slice(2);if(d.startsWith('0'))d='213'+d.slice(1);return d};
-  function waNotify(o){
+  function waNotify(o,upd){
     const key=ME==='main'?'waFactory':'waShowroom',url=ME==='main'?'https://caysaralsham.github.io/miracos-factory/':'https://caysaralsham.github.io/miracos-accounting/';
     const items=(o.items||[]).slice(0,15).map(x=>'• '+(x.qty?x.qty+' × ':'')+(x.desc||'')+(x.unit?' ('+x.unit+')':'')).join('\n');
-    const msg='🏭 طلبية جديدة '+ordNo(o)+' من '+ME_NAME+'\nالزبون: '+((o.cust&&o.cust.name)||'-')+(o.due?'\nالتسليم المطلوب: '+fmtD(new Date(o.due).getTime()):'')+(items?'\n\n'+items:'')+((o.items||[]).length>15?'\n…':'')+'\n\nافتح برنامج '+OTHER_NAME+': '+url;
+    const msg='🏭 '+(upd?'تحديث طلبية ':'طلبية جديدة ')+ordNo(o)+' من '+ME_NAME+'\nالزبون: '+((o.cust&&o.cust.name)||'-')+(o.due?'\nالتسليم المطلوب: '+fmtD(new Date(o.due).getTime()):'')+(items?'\n\n'+items:'')+((o.items||[]).length>15?'\n…':'')+'\n\nافتح برنامج '+OTHER_NAME+': '+url;
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
     ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:340px;text-align:center"><b>📲 بلّغ ${OTHER_NAME} على واتساب؟</b><div style="font-size:12.5px;color:var(--text-dim);margin:6px 0 10px">إذا برنامج ${OTHER_NAME} مسكّر ما بيوصله إشعار، فابعتله رسالة.</div>
       <input type="tel" dir="ltr" data-n placeholder="رقم واتساب ${OTHER_NAME}" value="${esc(settings[key]||'')}" style="width:100%;margin-bottom:10px;text-align:center">
@@ -5781,7 +5781,7 @@ if('serviceWorker' in navigator){
     const ex=jobs.find(j=>(o.rcpId&&j.rcpId===o.rcpId)||(o.invId&&j.invId===o.invId));
     const dueTxt=o.due?' — التسليم: '+fmtD(new Date(o.due).getTime()):'';
     if(ex){if(!confirm(`هالوصل إله طلبية ${ordNo(ex)} بالمعمل. بدك تحدّثها بالبنود الجديدة؟${dueTxt}`))return;
-      await osave(a=>a.map(x=>x.id===ex.id?stamp({...x,cust:o.cust,items:o.items,draw:o.draw||x.draw||null,note:o.note,due:o.due||x.due||'',seen:{...(x.seen||{}),[ME]:Date.now()}},'حدّث المعرض الطلبية'):x));return}
+      await osave(a=>a.map(x=>x.id===ex.id?stamp({...x,cust:o.cust,items:o.items,draw:o.draw||x.draw||null,note:o.note,due:o.due||x.due||'',seen:{...(x.seen||{}),[ME]:Date.now()}},'حدّث المعرض الطلبية'):x));waNotify({...o,no:ex.no},true);return}
     if(!confirm(`إرسال طلبية «${o.cust.name||'بدون اسم'}» للمعمل؟ (${o.items.length} بند، بلا أسعار)${dueTxt}`))return;
     await createOrder(o);
   }
