@@ -5915,7 +5915,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   // ---- القسم بالقائمة ----
   const navA=document.createElement('a');navA.className='nav-item';navA.style.cursor='pointer';
   navA.innerHTML='<span style="font-size:17px;width:20px;text-align:center">🏭</span> <span>الطلبيات <span data-n style="font-size:12px;opacity:.8"></span> <b data-u style="display:none;background:#C0392B;color:#fff;border-radius:10px;padding:0 7px;font-size:12px;margin-inline-start:4px"></b></span>';
-  {const st=document.querySelector('.nav-item[data-view="settings"]');if(st)st.parentElement.insertBefore(navA,st)}
+  {const ex=document.querySelector('.nav-item[data-view="expenses"]'),st=document.querySelector('.nav-item[data-view="settings"]');if(ex)ex.insertAdjacentElement('afterend',navA);else if(st)st.parentElement.insertBefore(navA,st)}
   const fb=document.createElement('button');fb.type='button';fb.className='btn btn-primary';fb.style.cssText='position:fixed;bottom:18px;left:18px;z-index:9000;display:none;box-shadow:0 6px 20px rgba(0,0,0,.25);';document.body.appendChild(fb);
   let jobs=[],seenMap={},known=null;
   const isUnseen=j=>j.upd&&j.upd.by!==ME&&j.upd.at>((j.seen&&j.seen[ME])||0);
