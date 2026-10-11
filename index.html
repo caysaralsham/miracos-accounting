@@ -5992,9 +5992,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   {const hs=document.createElement('style');hs.textContent='#btnReceiptToFactory,#btnInvoiceToFactory,#btnReceiptEditToFactory{display:none!important}';document.head.appendChild(hs);
    if(ME==='main'){const mk=(after,fn)=>{const a=document.getElementById(after);if(!a)return;const b=document.createElement('button');b.type='button';b.className='btn btn-sm';b.textContent='🏭 إرسال للمعمل';b.onclick=fn;a.insertAdjacentElement('afterend',b)};
      mk('btnReceiptToFactory',()=>window.__sendOrderReceipt(currentViewedReceiptId));mk('btnInvoiceToFactory',()=>window.__sendOrderInvoice(currentViewedInvoiceId));
-     const rv=document.getElementById('btnReceiptToFactory');if(rv){const b=document.createElement('button');b.type='button';b.className='btn btn-sm';b.textContent='⭐ اطلب تقييم';b.title='رسالة واتساب للزبون فيها رابط التقييم على غوغل';
-       b.onclick=()=>{const r=receipts.find(x=>x.id===currentViewedReceiptId);if(!r)return;const p=(typeof waPhone==='function'?waPhone(r.phone):'');
-         openWA(p,('السلام عليكم '+(r.name||'')+'،\nشكرًا لثقتكم بـ'+(settings.companyName||'')+' 🌹\nيسعدنا تقييمكم لنا على غوغل، ما بياخد غير دقيقة:\nhttps://maps.app.goo.gl/g6wBPVBsZmQipM2j6'))};rv.parentElement.insertBefore(b,rv)}}}
+     /* زر «اطلب تقييم» انشال — رابط التقييم صار بيروح مع الوصل بالمشاركة */}}
   if(typeof renderReceiptsTable==='function'){const _rr=renderReceiptsTable;renderReceiptsTable=function(){const r=_rr.apply(this,arguments);try{markRcpTable()}catch(e){}return r}}
 
   // ================= 📊 تقرير الشهر (بقسم التقارير) =================
