@@ -113,6 +113,11 @@
   }
   .panel-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; gap:10px; flex-wrap:wrap;}
   .panel-head h2{font-size:16.5px; font-weight:700; margin:0;}
+  .collapsible > .panel-head{cursor:pointer; user-select:none;}
+  .collapsible > .panel-head h2::before{content:'▾'; display:inline-block; margin-inline-end:8px; transition:transform .2s; color:var(--text-dim);}
+  .collapsible.collapsed > .panel-head h2::before{transform:rotate(90deg);}
+  .collapsible.collapsed > .panel-head{margin-bottom:0;}
+  .collapsible.collapsed > :not(.panel-head){display:none !important;}
 
   .btn{
     display:inline-flex; align-items:center; gap:8px;
@@ -822,7 +827,7 @@
     <section class="view" id="view-settings">
       <div class="topbar"><h1>الإعدادات</h1></div>
 
-      <div class="panel" style="max-width:560px;">
+      <div class="panel collapsible collapsed" style="max-width:560px;">
         <div class="panel-head">
           <h2>الربط بالتخزين السحابي (Firebase)</h2>
           <span id="fbStatusBadge" class="tag tag-due">غير متصل</span>
@@ -846,7 +851,7 @@
         <button class="btn btn-danger btn-sm" id="btnDisconnectFirebase" style="margin-inline-start:8px;">قطع الاتصال</button>
       </div>
 
-      <div class="panel" style="max-width:520px;">
+      <div class="panel collapsible collapsed" style="max-width:520px;">
         <div class="panel-head"><h2>معلومات الشركة</h2></div>
         <div class="field">
           <label>اسم الشركة</label>
@@ -6058,6 +6063,9 @@ window.popBar=function(withPrint){
   return `<style>.pop-bar{position:sticky;top:0;z-index:99;display:flex;gap:8px;justify-content:space-between;padding:10px 0;margin:-14px 0 14px;background:#fff;border-bottom:1px solid #E6D6BC}.pop-bar button{font:inherit;font-size:16px;font-weight:700;padding:10px 18px;border-radius:10px;border:1px solid #CDB894;background:#F5ECDD;color:#3B2414;cursor:pointer}.pop-bar .pb-back{background:#9A6A3A;color:#fff;border-color:#9A6A3A}@media print{.pop-bar{display:none!important}}</style>
   <div class="pop-bar"><button type="button" class="pb-back" onclick="try{window.close()}catch(e){};setTimeout(function(){if(!window.closed)location.replace(${JSON.stringify(home).replace(/"/g,'&quot;')})},300)">→ رجوع</button>${withPrint===false?'':'<button type="button" onclick="window.print()">🖨 طباعة</button>'}</div>`;
 };
+</script>
+<script>
+document.addEventListener('click',function(e){var h=e.target.closest&&e.target.closest('.collapsible > .panel-head');if(!h||e.target.closest('button,input,a,select'))return;h.parentElement.classList.toggle('collapsed');});
 </script>
 </body>
 </html>
