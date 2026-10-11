@@ -5933,7 +5933,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   const ow=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(ow);ostart()}},1000);
   const lines=j=>j.items.map(x=>(x.qty?x.qty+' × ':'')+x.desc+(x.unit?' ('+x.unit+')':'')).join('\n');
   const parse=t=>t.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const m=l.match(/^([\d.,]+)\s*[×x\*]\s*(.+)$/);return m?{qty:m[1],desc:m[2],unit:''}:{qty:'',desc:l,unit:''}});
-  async function printJob(j){
+  async function printJob(j,viewOnly){
     if(!j)return;const w=window.open('','_blank');if(!w){toast('اسمح بالنوافذ المنبثقة للطباعة');return}
     w.document.write('<p style="font-family:sans-serif">جاري التجهيز...</p>');
     const img=j.draw?await drawingSrc(j.draw):null;
@@ -5948,7 +5948,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
       ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?(j.draw&&Array.isArray(j.draw.stats)&&j.draw.stats.length?`<div style="display:flex;gap:14px;align-items:center;direction:rtl;margin-top:14px"><table style="flex:1 1 46%;width:48%;font-size:15px">${__stIn(j.draw.stats).map(r=>`<tr><td style="text-align:right;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="text-align:right;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table><img src="${img}" style="max-width:56%;margin:0"></div>`:`<img src="${img}">`):''}
       <div class="sig"><span>المسؤول بالمعمل: ..................</span><span>تاريخ التنفيذ: ..................</span></div>
-      <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close();
+      ${viewOnly?'':'<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>'}</body></html>`);w.document.close();
   }
   // ---- صفحة الطلبيات ----
   let filter='open',q='';const openIds=new Set();
@@ -5967,7 +5967,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     ov.querySelector('[data-list]').innerHTML=list.map(j=>{const st=j.status,op=openIds.has(j.id),un=isUnseen(j),du=dueInfo(j);return `<div style="border:1px solid ${un?'#C0392B':'var(--line)'};border-inline-start:5px solid ${STC[st]};border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--marble,#fff)">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:var(--brass-deep)">${ordNo(j)}</b><b>${esc(j.cust.name||'بدون اسم')}</b>${j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}
         <span style="background:${STC[st]};color:#fff;border-radius:20px;padding:1px 10px;font-size:12px;font-weight:700">${STI[st]} ${st}</span>${du?`<span style="color:${du.c};font-size:12px;font-weight:700">📅 ${du.t}</span>`:''}${un?'<span style="background:#C0392B;color:#fff;border-radius:20px;padding:1px 8px;font-size:11.5px">🔔 جديد</span>':''}<span style="flex:1"></span>
-        <button type="button" class="btn btn-sm" data-ed="${j.id}">${op?'إخفاء':'✏️ تعديل'}</button><button type="button" class="btn btn-sm" data-pr="${j.id}">🖨</button><button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" title="حذف الطلبية" style="color:#A6453D">🗑</button></div>
+        <button type="button" class="btn btn-sm" data-ed="${j.id}">${op?'إخفاء':'✏️ تعديل'}</button><button type="button" class="btn btn-sm" data-vw="${j.id}">👁 إظهار الوصل</button>${ME==='main'&&j.rcpId&&receipts.some(x=>x.id===j.rcpId)?`<button type="button" class="btn btn-sm" data-rv="${j.rcpId}" title="وصل الزبون الأصلي (مع الأسعار)">🧾 وصل الزبون</button>`:''}<button type="button" class="btn btn-sm" data-pr="${j.id}">🖨</button><button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" title="حذف الطلبية" style="color:#A6453D">🗑</button></div>
       <div style="font-size:13px;color:var(--text-dim);margin-top:4px">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)+(x.draws?' 📏':'')).join(' · ')}${j.draw?' · 📐 رسمة':''}${j.photos.length?' · 📷 '+j.photos.length:''}${j.note?' · 📝 '+esc(j.note):''}</div>
       ${j.upd?`<div style="font-size:11.5px;color:${un?'#C0392B':'var(--text-dim)'};margin-top:3px">آخر تعديل: ${j.upd.by==='factory'?'المعمل':'المعرض'} — ${esc(j.upd.txt||'')} — ${fmtT(j.upd.at)}</div>`:''}
       ${op?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
@@ -5999,6 +5999,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   ov.addEventListener('click',async e=>{const t=e.target;
     const g=s=>t.closest(s);let b;
     if(b=g('[data-pr]'))return printJob(jobs.find(x=>x.id===b.dataset.pr));
+    if(b=g('[data-vw]'))return printJob(jobs.find(x=>x.id===b.dataset.vw),true);
+    if(b=g('[data-rv]'))return viewReceipt(b.dataset.rv);
     if(b=g('[data-ed]')){const id=b.dataset.ed;if(openIds.has(id))openIds.delete(id);else{openIds.add(id);markSeen(id)}render();return}
     if(b=g('img[data-pid]')){const w=window.open('');if(w)w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:Cairo,Tahoma,sans-serif;margin:16px">${window.popBar(false)}<img src="${b.src}" style="max-width:100%"></body></html>`);return}
     if(b=g('[data-drw]')){const j=jobs.find(x=>x.id===b.dataset.drw);if(!j)return;
