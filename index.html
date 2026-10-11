@@ -5569,6 +5569,9 @@ if('serviceWorker' in navigator){
 })();
 
 /* ================= مرسم ديكور: استيراد رسمة لوصل الدفع وعرض السعر ================= */
+// Firestore ما بيقبل مصفوفة جوّا مصفوفة — جدول الرسمة بينحفظ كـ {k,v} وبيرجع يتقرا بالشكلين
+window.__stOut=st=>(st||[]).map(r=>Array.isArray(r)?{k:String(r[0]),v:String(r[1])}:r);
+window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&&r.v]);
 (function(){
   const MD={rcp:null,inv:null},drwCache={};let carry=null,lastLoad=Promise.resolve();
   const KIND={pure:'الرسمة صافية (بتساع مع الوصل)',withDetails:'الرسمة مع التفاصيل (ورقة كاملة)',drawingOnly:'الرسمة بس (ورقة كاملة)',workshop:'نسخة المعمل (ورقة كاملة)'};
@@ -5670,7 +5673,7 @@ if('serviceWorker' in navigator){
         const name=prompt('اسم الزبون للطلبية:',(d.customer&&d.customer.name)||'');if(name===null)return;
         try{const img=await compress(d.images.pure);const id='mirsam_drw_'+uid();await db.collection(FS_COLLECTION).doc(id).set({img,kind:'pure',title:d.title||'',name:d.name||'',createdAt:new Date().toISOString()});
           await window.__mirsamCreateOrder({cust:{name:name.trim(),phone:(d.customer&&d.customer.phone)||'',addr:(d.customer&&d.customer.addr)||''},
-            items:(d.lines||[]).map(l=>({qty:String(l.qty||''),desc:l.desc||'',unit:l.unit||'',...(l.draws?{draws:l.draws}:{})})),draw:{id,kind:'pure',title:d.title||'',name:d.name||'',...(d.mstate?{mstate:d.mstate}:{}),...(Array.isArray(d.stats)&&d.stats.length?{stats:d.stats.slice(0,14).map(r=>[String(r[0]),String(r[1])])}:{})},note:''})}
+            items:(d.lines||[]).map(l=>({qty:String(l.qty||''),desc:l.desc||'',unit:l.unit||'',...(l.draws?{draws:l.draws}:{})})),draw:{id,kind:'pure',title:d.title||'',name:d.name||'',...(d.mstate?{mstate:d.mstate}:{}),...(Array.isArray(d.stats)&&d.stats.length?{stats:d.stats.slice(0,14).map(r=>({k:String(r[0]),v:String(r[1])}))}:{})},note:''})}
         catch(err){console.error(err);toast('ما انبعتت — تأكد من الإنترنت')}
         return}
       const kk=b.dataset.k==='rcp'?'rcp':'inv';if(kk==='rcp')openReceiptModal();else{openInvoiceModal();if(b.dataset.k==='devis'){const dt=document.getElementById('invDocType');dt.value='devis';dt.dispatchEvent(new Event('change'))}}
@@ -5719,12 +5722,12 @@ if('serviceWorker' in navigator){
   }
   async function persist(k){
     const m=MD[k];if(!m)return null;
-    if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})};
+    if(!m.dirty)return{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:__stOut(m.stats)}:{})};
     const id='mirsam_drw_'+uid(); // كل رسمة جديدة/معدّلة بعنوان جديد
-    try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;IDB.set(id,m.img);m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})}}
+    try{await db.collection(FS_COLLECTION).doc(id).set({img:m.img,kind:m.kind,title:m.title,name:m.name,createdAt:new Date().toISOString()});drwCache[id]=m.img;IDB.set(id,m.img);m.id=id;m.dirty=false;return{id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:__stOut(m.stats)}:{})}}
     catch(e){console.error(e);toast('تعذر حفظ الرسمة على السحابة ('+(e&&(e.code||e.message)||'')+') — جرّب احفظ مرة تانية');
       // ما منشيل الرسمة القديمة من المستند إذا الحفظ فشل
-      return m.id?{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:m.stats}:{})}:null}
+      return m.id?{id:m.id,kind:m.kind,title:m.title,name:m.name,...(m.mstate?{mstate:m.mstate}:{}),...(m.lines?{lines:m.lines}:{}),...(m.stats?{stats:__stOut(m.stats)}:{})}:null}
   }
 
   // ---- ربط مع الحفظ والفتح والتحويل ----
@@ -5761,7 +5764,7 @@ if('serviceWorker' in navigator){
     if(!meta)return;
     const box=document.createElement('div');box.className='mirsam-print';const pure=meta.kind==='pure';
     box.style.cssText='margin-top:12px;text-align:center;page-break-inside:avoid;break-inside:avoid;';
-    const stT=pure&&Array.isArray(meta.stats)&&meta.stats.length?`<table class="mirsam-stats" style="flex:1 1 46%;max-width:48%;border-collapse:collapse;font-size:15px;text-align:right;align-self:center">${meta.stats.map(r=>`<tr><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap;vertical-align:top">${esc(r[0])}</td><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:'';
+    const stT=pure&&Array.isArray(meta.stats)&&meta.stats.length?`<table class="mirsam-stats" style="flex:1 1 46%;max-width:48%;border-collapse:collapse;font-size:15px;text-align:right;align-self:center">${__stIn(meta.stats).map(r=>`<tr><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap;vertical-align:top">${esc(r[0])}</td><td style="padding:4px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:'';
     box.innerHTML=pure?`<div style="font-weight:700;font-size:13px;margin-bottom:4px;">${esc(meta.title||'الرسمة')}</div><div style="display:flex;gap:14px;align-items:flex-start;justify-content:center;direction:rtl">${stT}<img style="max-width:${stT?'50%':'100%'};width:auto;height:auto;object-fit:contain;border:1px solid #e5e0d6;border-radius:6px;"></div>`:`<div style="font-weight:700;margin-bottom:6px;">${esc(meta.name||meta.title||'الرسمة')}</div><img style="max-width:100%;height:auto;border:1px solid #ddd;border-radius:6px;">`;
     area.appendChild(box);
     lastLoad=drawingSrc(meta).then(src=>new Promise(res=>{const im=box.querySelector('img');if(!src){box.innerHTML='<div class="mirsam-missing" style="color:#A6453D;font-size:13px;padding:8px;border:1px dashed #e0c9a8;border-radius:8px">⚠️ الرسمة ما تحمّلت ('+esc(lastImgErr)+') — تأكد من الإنترنت وافتح الوصل من جديد، أو اكبس «ارسم الآن» وحوّل الرسمة واحفظ</div>';return res()}im.onload=()=>{fitBox(area,box,im);res()};im.onerror=()=>res();im.src=src}));
@@ -5897,7 +5900,7 @@ if('serviceWorker' in navigator){
       <div class="hd"><div><h1>🏭 طلبية ${ordNo(j)}</h1><div style="font-size:13px">${esc(settings.companyName||"")}</div></div><div style="font-size:13px;text-align:left">${fmtD(j.at)}<br>الحالة: ${esc(j.status)}${j.due?'<br>التسليم المطلوب: '+fmtD(new Date(j.due).getTime()):''}</div></div>
       <div class="info"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div><div><b>الهاتف:</b> <span dir="ltr">${esc(j.cust.phone||'-')}</span></div><div style="grid-column:1/-1"><b>العنوان:</b> ${esc(j.cust.addr||'-')}</div></div>
       <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
-      ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?(j.draw&&Array.isArray(j.draw.stats)&&j.draw.stats.length?`<div style="display:flex;gap:14px;align-items:center;direction:rtl;margin-top:14px"><table style="flex:1 1 46%;width:48%;font-size:15px">${j.draw.stats.map(r=>`<tr><td style="text-align:right;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="text-align:right;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table><img src="${img}" style="max-width:56%;margin:0"></div>`:`<img src="${img}">`):''}
+      ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?(j.draw&&Array.isArray(j.draw.stats)&&j.draw.stats.length?`<div style="display:flex;gap:14px;align-items:center;direction:rtl;margin-top:14px"><table style="flex:1 1 46%;width:48%;font-size:15px">${__stIn(j.draw.stats).map(r=>`<tr><td style="text-align:right;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="text-align:right;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table><img src="${img}" style="max-width:56%;margin:0"></div>`:`<img src="${img}">`):''}
       <div class="sig"><span>المسؤول بالمعمل: ..................</span><span>تاريخ التنفيذ: ..................</span></div>
       <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);w.document.close();
   }
@@ -5956,7 +5959,7 @@ if('serviceWorker' in navigator){
       openStudio(null,{customer:j.cust,mstate:j.draw&&j.draw.mstate||null,onResult:async d=>{
         try{const img=await compress(d.images.pure);if(!img){toast('تعذر قراءة الرسمة');return}const pid='mirsam_drw_'+uid();
           await db.collection(FS_COLLECTION).doc(pid).set({img,kind:'pure',title:d.title||'',name:d.name||'',createdAt:new Date().toISOString()});drwCache[pid]=img;
-          await osave(a=>a.map(x=>x.id===j.id?stamp({...x,draw:{id:pid,kind:'pure',title:d.title||'',name:d.name||'',...(d.mstate?{mstate:d.mstate}:{}),...(Array.isArray(d.stats)&&d.stats.length?{stats:d.stats.slice(0,14).map(r=>[String(r[0]),String(r[1])])}:{})}},'عدّل الرسمة'):x));
+          await osave(a=>a.map(x=>x.id===j.id?stamp({...x,draw:{id:pid,kind:'pure',title:d.title||'',name:d.name||'',...(d.mstate?{mstate:d.mstate}:{}),...(Array.isArray(d.stats)&&d.stats.length?{stats:d.stats.slice(0,14).map(r=>({k:String(r[0]),v:String(r[1])}))}:{})}},'عدّل الرسمة'):x));
         }catch(err){console.error(err);toast('ما انحفظت الرسمة')}}});return}
     if(b=g('[data-addph]')){const fi=ov.querySelector('[data-photo]');fi.dataset.for=b.dataset.addph;fi.click();return}
     if(b=g('[data-st]')){const id=b.dataset.st,v=b.dataset.v;const j=jobs.find(x=>x.id===id);if(!j||j.status===v)return;
