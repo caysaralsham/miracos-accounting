@@ -5797,8 +5797,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       const onR=e=>{if(e.source===f.contentWindow&&e.data&&e.data.type==='mirsam-render-ready'){clearTimeout(to);removeEventListener('message',onR);res(f)}};addEventListener('message',onR);
       f.src=RENDER_URL;document.body.appendChild(f)});return rReady}
   const rendered={};
-  async function renderFromState(ms){if(!ms||!ms.tab)return null;const key=JSON.stringify(ms);if(rendered[key])return rendered[key];
-    try{const f=await renderer();const id=++rSeq;const d=await new Promise(res=>{rWait[id]=res;f.contentWindow.postMessage({type:'mirsam-render',id,mstate:ms},'https://cesar-alcham.com');setTimeout(()=>{if(rWait[id]){delete rWait[id];res({})}},12000)});
+  async function renderFromState(ms,part){if(!ms||!ms.tab)return null;const key=JSON.stringify(ms)+(part||'');if(rendered[key])return rendered[key];
+    try{const f=await renderer();const id=++rSeq;const d=await new Promise(res=>{rWait[id]=res;f.contentWindow.postMessage({type:'mirsam-render',id,mstate:ms,...(part?{part}:{})},'https://cesar-alcham.com');setTimeout(()=>{if(rWait[id]){delete rWait[id];res({})}},12000)});
       if(d.img){rendered[key]=d.img;return d.img}}catch(e){console.warn('engine',e)}return null}
   // الرسمة للعرض والطباعة: أول شي من القياسات (المحرك)، وإذا ما زبط: من الجهاز، وبعدين من السحابة
   // أول شي النسخة المحفوظة عالجهاز (فوري)، وإذا مش موجودة: المحرك من القياسات، وبعدين السحابة
@@ -5935,10 +5935,14 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   const ow=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(ow);ostart()}},1000);
   const lines=j=>j.items.map(x=>(x.qty?x.qty+' × ':'')+x.desc+(x.unit?' ('+x.unit+')':'')).join('\n');
   const parse=t=>t.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const m=l.match(/^([\d.,]+)\s*[×x\*]\s*(.+)$/);return m?{qty:m[1],desc:m[2],unit:''}:{qty:'',desc:l,unit:''}});
+  // مقطع الحفر من النص (للمعمل): لكل جرن أعلى من 30 سم
+  const needSec=j=>{const ms=j&&j.draw&&j.draw.mstate;return !!(ms&&ms.tab==='jurn'&&+((ms.state||{}).H)>30)};
+  const secImg=async j=>needSec(j)?await renderFromState(j.draw.mstate,'section'):null;
+  const secHtml=(src,mw)=>src?`<div style="margin-top:14px;text-align:center;page-break-inside:avoid"><div style="font-weight:800;font-size:15px;margin-bottom:6px">مقطع الحفر من النص</div><img src="${src}" style="max-width:${mw};max-height:360px;border:1px solid #E6D6BC;display:block;margin:0 auto"></div>`:'';
   // صورة ورقة الطلبية للواتساب (نفس شكل ورقة الطباعة)
   const jobPrep={};
   async function jobImage(j){
-    const img=j.draw?await drawingSrc(j.draw):null;
+    const img=j.draw?await drawingSrc(j.draw):null,sec=await secImg(j);
     const rows=j.items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.qty||'')}</td><td style="text-align:right">${esc(x.desc)}${x.unit?' ('+esc(x.unit)+')':''}</td></tr>`).join('');
     const st=j.draw?__stIn(j.draw.stats):[];
     const h=document.createElement('div');h.style.cssText='position:fixed;top:0;left:0;width:794px;background:#fff;z-index:-1;pointer-events:none;';
@@ -5947,9 +5951,9 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       <div style="font-size:16px;margin-bottom:14px"><b>الزبون:</b> ${esc(j.cust.name||'-')}</div>
       <table style="width:100%;border-collapse:collapse;font-size:16px">${'<tr>'+['#','العدد','النوع والتفاصيل'].map(t=>`<th style="border:1px solid #CDB894;padding:8px;background:#F5ECDD">${t}</th>`).join('')+'</tr>'}${rows.replace(/<td/g,'<td style="border:1px solid #CDB894;padding:8px;text-align:center"').replace(/text-align:center" style="text-align:right"/g,'text-align:right"')}</table>
       ${j.note?`<div style="margin-top:12px;font-size:15px;border:1px dashed #CDB894;padding:8px;border-radius:6px"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}
-      ${img?`<div style="display:flex;gap:14px;align-items:center;margin-top:14px">${st.length?`<table style="flex:1 1 44%;border-collapse:collapse;font-size:16px">${st.map(r=>`<tr><td style="padding:5px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="padding:5px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:''}<img src="${img}" style="max-width:${st.length?'54%':'100%'};max-height:520px;border:1px solid #E6D6BC;margin:0 auto"></div>`:''}</div>`;
+      ${img?`<div style="display:flex;gap:14px;align-items:center;margin-top:14px">${st.length?`<table style="flex:1 1 44%;border-collapse:collapse;font-size:16px">${st.map(r=>`<tr><td style="padding:5px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="padding:5px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:''}<img src="${img}" style="max-width:${st.length?'54%':'100%'};max-height:520px;border:1px solid #E6D6BC;margin:0 auto"></div>`:''}${secHtml(sec,'60%')}</div>`;
     document.body.appendChild(h);
-    try{const im=h.querySelector('img');if(im&&!im.complete)await new Promise(r=>{im.onload=im.onerror=r});
+    try{for(const im of h.querySelectorAll('img'))if(!im.complete)await new Promise(r=>{im.onload=im.onerror=r});
       const c=await html2canvas(h.firstElementChild,{scale:2,backgroundColor:'#ffffff',width:794,windowWidth:1200});return await new Promise(r=>c.toBlob(r,'image/jpeg',.9))}
     finally{h.remove()}
   }
@@ -5961,7 +5965,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   async function printJob(j,viewOnly){
     if(!j)return;const w=window.open('','_blank');if(!w){toast('اسمح بالنوافذ المنبثقة للطباعة');return}
     w.document.write('<p style="font-family:sans-serif">جاري التجهيز...</p>');
-    const img=j.draw?await drawingSrc(j.draw):null;
+    const img=j.draw?await drawingSrc(j.draw):null,sec=await secImg(j);
     const rows=j.items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.qty||'')}</td><td style="text-align:right">${esc(x.desc)}${x.unit?' ('+esc(x.unit)+')':''}${x.draws&&typeof drawsHtml==='function'?drawsHtml(x.draws):''}</td></tr>`).join('');
     w.document.open();w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>طلبية ${ordNo(j)} - ${esc(j.cust.name||'')}</title><style>
       body{font-family:Cairo,Tahoma,Arial,sans-serif;color:#3B2414;margin:24px}h1{margin:0;font-size:22px}.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #9A6A3A;padding-bottom:8px;margin-bottom:14px}
@@ -5972,6 +5976,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       <div class="info"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div><div><b>الهاتف:</b> <span dir="ltr">${esc(j.cust.phone||'-')}</span></div><div style="grid-column:1/-1"><b>العنوان:</b> ${esc(j.cust.addr||'-')}</div></div>
       <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
       ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?(j.draw&&Array.isArray(j.draw.stats)&&j.draw.stats.length?`<div style="display:flex;gap:14px;align-items:center;direction:rtl;margin-top:14px"><table style="flex:1 1 46%;width:48%;font-size:15px">${__stIn(j.draw.stats).map(r=>`<tr><td style="text-align:right;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="text-align:right;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table><img src="${img}" style="max-width:56%;margin:0"></div>`:`<img src="${img}">`):''}
+      ${secHtml(sec,'55%')}
       <div class="sig"><span>المسؤول بالمعمل: ..................</span><span>تاريخ التنفيذ: ..................</span></div>
       ${viewOnly?'':'<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>'}</body></html>`);w.document.close();
   }
