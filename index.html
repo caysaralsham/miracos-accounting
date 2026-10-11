@@ -3205,7 +3205,8 @@ function shareImageChoice(blob, fileName, title, phone){
   const text=shareMsg(title),file=new File([blob],fileName,{type:'image/jpeg'});
   const go=async()=>{
     // الجوال: قائمة المشاركة والصورة مرفقة
-    if(navigator.canShare && navigator.canShare({files:[file]})){
+    const mobile=/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    if(mobile && navigator.canShare && navigator.canShare({files:[file]})){
       try{await navigator.share({files:[file],text});return true}
       catch(e){if(e&&e.name==='AbortError')return true;if(e&&e.name==='NotAllowedError')return false}
     }
