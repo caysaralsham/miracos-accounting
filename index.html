@@ -2530,7 +2530,9 @@ function newPaymentRow(payment){
   row.querySelector('.pm-date').addEventListener('input', recalcTotals);
   row.querySelector('.pm-remove').addEventListener('click', ()=>{ row.remove(); recalcTotals(); });
 }
-document.getElementById('btnAddPaymentRow').addEventListener('click', ()=>newPaymentRow());
+// «إضافة دفعة»: بيروح دغري على خانة المبلغ تبع الدفعة الجديدة
+function focusNewPayment(bodyId,cls){const b=document.getElementById(bodyId).lastElementChild,a=b&&b.querySelector(cls);if(a){a.scrollIntoView({block:'center',behavior:'smooth'});setTimeout(()=>a.focus(),60)}}
+document.getElementById('btnAddPaymentRow').addEventListener('click', ()=>{newPaymentRow();focusNewPayment('paymentsBody','.pm-amount')});
 document.getElementById('btnAddItemRow').addEventListener('click', ()=>newItemRow());
 document.getElementById('rcpDiscount').addEventListener('input', recalcTotals);
 
@@ -3200,17 +3202,40 @@ async function blobToPng(blob){
     return await new Promise(res=>c.toBlob(res,'image/png'));}
   finally{URL.revokeObjectURL(url)}
 }
-// الكمبيوتر: وقت كبسة «مشاركة» منفتح واتساب ومنحجز النسخ فوراً (المتصفح بيسمح بس وقت الكبسة)، والصورة بتلحق لما تجهز
-document.addEventListener('click',e=>{
-  if(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent))return;
+// المشاركة: صورة الوصل بتتجهز بالخلفية أول ما ينفتح، فلما تكبس «مشاركة» بتفتح دغري المشاركة والصورة مرفقة
+// (المتصفح ما بيسمح يفتح المشاركة إلا بنفس لحظة الكبسة — لهيك لازم تكون الصورة جاهزة قبل)
+window.__sharePrep=null;
+function prepShare(kind,id){
+  const area=document.getElementById(kind==='rcp'?'receiptPrintArea':'invoicePrintArea');if(!area)return;
+  const prep={kind,id,blob:null};prep.promise=new Promise(r=>setTimeout(r,400)).then(()=>captureAsPage(area)).then(b=>{prep.blob=b;return b}).catch(()=>null);
+  window.__sharePrep=prep;
+}
+function shareInfo(kind){
+  if(kind==='rcp'){const r=receipts.find(x=>x.id===currentViewedReceiptId);return r&&{id:r.id,phone:r.phone,title:`وصل #${r.no}`,file:`وصل-${r.no}.jpg`}}
+  const v=invoices.find(x=>x.id===currentViewedInvoiceId);if(!v)return null;const L=v.docType==='simple'?'عرض سعر':(v.docType==='facture'?'Facture':'Devis');
+  return{id:v.id,phone:v.clientPhone,title:L+' '+v.no,file:(L+'-'+v.no+'.jpg').replace(/\s+/g,'-')};
+}
+function sendNow(blob,info){
+  const file=new File([blob],info.file,{type:'image/jpeg'}),text=shareMsg(info.title);
+  if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],text}).catch(e=>{if(e&&e.name==='NotAllowedError')oneButton(blob,info)});return}
+  downloadBlob(blob,info.file);openWA(waPhone(info.phone),text);toast('نزلت الصورة — اسحبها على محادثة واتساب');
+}
+function oneButton(blob,info){
+  const old=document.getElementById('shareChoiceOverlay');if(old)old.remove();
+  const ov=document.createElement('div');ov.id='shareChoiceOverlay';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px;';
+  ov.innerHTML='<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:300px;text-align:center;"><button type="button" class="btn" style="width:100%;background:#25D366;color:#fff;border-color:#25D366;font-size:16px;">إرسال على واتساب</button></div>';
+  document.body.appendChild(ov);ov.addEventListener('click',e=>{if(e.target===ov)ov.remove()});
+  ov.querySelector('button').addEventListener('click',()=>{ov.remove();sendNow(blob,info)});
+}
+document.addEventListener('click',async e=>{
   const b=e.target.closest&&e.target.closest('#btnShareReceipt,#btnShareInvoice');if(!b)return;
-  let phone='',title='';
-  if(b.id==='btnShareReceipt'){const r=receipts.find(x=>x.id===currentViewedReceiptId);if(!r)return;phone=r.phone;title=`وصل #${r.no}`}
-  else{const v=invoices.find(x=>x.id===currentViewedInvoiceId);if(!v)return;phone=v.clientPhone;title=(v.docType==='simple'?'عرض سعر':(v.docType==='facture'?'Facture':'Devis'))+' '+v.no}
-  let res;const pr=new Promise(r=>res=r),slot={resolve:res,done:Promise.resolve(false)};
-  try{if(navigator.clipboard&&window.ClipboardItem)slot.done=navigator.clipboard.write([new ClipboardItem({'image/png':pr})]).then(()=>true,()=>false)}catch(_){}
-  window.__shareSlot=slot;
-  openWA(waPhone(phone),shareMsg(title));
+  const kind=b.id==='btnShareReceipt'?'rcp':'inv',info=shareInfo(kind);if(!info)return;
+  e.stopImmediatePropagation();e.preventDefault();
+  let p=window.__sharePrep;if(!p||p.kind!==kind||p.id!==info.id){prepShare(kind,info.id);p=window.__sharePrep}
+  if(p.blob){sendNow(p.blob,info);return}
+  toast('ثانية، عم تتجهز الصورة…');const blob=await p.promise;
+  if(!blob){toast('تعذر إنشاء الصورة');return}
+  oneButton(blob,info);
 },true);
 // المشاركة: على طول على واتساب (بلا قائمة). إذا المتصفح طلب كبسة جديدة، بيطلع زر واحد بس
 function shareImageChoice(blob, fileName, title, phone){
@@ -3378,7 +3403,7 @@ function newInvoicePaymentRow(payment){
   row.querySelector('.inv-pm-remove').addEventListener('click', ()=>{ row.remove(); recalcInvoiceTotals(); });
 }
 document.getElementById('btnAddInvoiceItemRow').addEventListener('click', ()=>newInvoiceItemRow());
-document.getElementById('btnAddInvoicePaymentRow').addEventListener('click', ()=>newInvoicePaymentRow());
+document.getElementById('btnAddInvoicePaymentRow').addEventListener('click', ()=>{newInvoicePaymentRow();focusNewPayment('invPaymentsBody','.inv-pm-amount')});
 
 function nextInvoiceNo(docType){
   const year = new Date().getFullYear();
@@ -6066,6 +6091,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
 </script>
 <script>
 // يفتح تطبيق واتساب مباشرة (بلا ما يمرق على المتصفح)
+{const _vr=viewReceipt;viewReceipt=function(id){_vr(id);try{prepShare('rcp',id)}catch(e){}};const _vi=viewInvoice;viewInvoice=function(id){_vi(id);try{prepShare('inv',id)}catch(e){}}}
 window.openWA=function(phone,text){const d=String(phone||'').replace(/\D/g,'');
   location.href='whatsapp://send?'+(d?'phone='+d+'&':'')+'text='+encodeURIComponent(text||'');};
 </script>
