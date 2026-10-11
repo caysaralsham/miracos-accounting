@@ -3216,8 +3216,8 @@ function shareInfo(kind){
   return{id:v.id,phone:v.clientPhone,title:L+' '+v.no,file:(L+'-'+v.no+'.jpg').replace(/\s+/g,'-')};
 }
 function sendNow(blob,info){
-  const file=new File([blob],info.file,{type:'image/jpeg'}),text=info.text||shareMsg(info.title);
-  if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],text}).catch(e=>{if(e&&e.name==='NotAllowedError')oneButton(blob,info)});return}
+  const file=new File([blob],info.file,{type:'image/jpeg'}),text=('text' in info)?info.text:shareMsg(info.title);
+  if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share(text?{files:[file],text}:{files:[file]}).catch(e=>{if(e&&e.name==='NotAllowedError')oneButton(blob,info)});return}
   downloadBlob(blob,info.file);openWA(waPhone(info.phone),text);toast('نزلت الصورة — اسحبها على محادثة واتساب');
 }
 function oneButton(blob,info){
@@ -5953,7 +5953,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   }
   function prepJob(j){if(!j)return null;const key=j.id+'|'+((j.upd&&j.upd.at)||j.at);let p=jobPrep[j.id];if(p&&p.key===key)return p;
     p={key,blob:null};p.promise=jobImage(j).then(b=>{p.blob=b;return b}).catch(e=>{console.error(e);return null});jobPrep[j.id]=p;return p}
-  async function shareJob(j){if(!j)return;const p=prepJob(j),info={phone:'',title:'طلبية '+ordNo(j),file:('طلبية-'+ordNo(j)+'.jpg'),text:'طلبية '+ordNo(j)+' — '+(j.cust.name||'')+'\n'+lines(j)+(j.note?'\nملاحظة: '+j.note:'')};
+  async function shareJob(j){if(!j)return;const p=prepJob(j),info={phone:'',title:'طلبية '+ordNo(j),file:('طلبية-'+ordNo(j)+'.jpg'),text:''};
     if(p.blob)return sendNow(p.blob,info);
     toast('ثانية، عم تتجهز الصورة…');const b=await p.promise;if(!b){toast('تعذر إنشاء الصورة');return}oneButton(b,info)}
   async function printJob(j,viewOnly){
