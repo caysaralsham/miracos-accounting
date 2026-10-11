@@ -3187,40 +3187,44 @@ function downloadBlob(blob, fileName){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(()=>URL.revokeObjectURL(url), 2000);
 }
+// رسالة المشاركة: رقم الوصل + طلب تقييم على غوغل + الموقع
+const REVIEW_URL='https://maps.app.goo.gl/g6wBPVBsZmQipM2j6';
+function shareMsg(title){
+  let head=String(title||'').split(' — ')[0].trim();head=/#/.test(head)?head.replace(/\s*#\s*/,' رقم '):head.replace(/\s+(\S*\d\S*)$/,' رقم $1');
+  return 'السلام عليكم،\n'+head+'\n\nرأيك بيهمّنا 🌹 من فضلك قيّمنا على غوغل، ما بياخد غير دقيقة:\n'+REVIEW_URL+'\n\ncesar-alcham.com';
+}
+async function blobToPng(blob){
+  const url=URL.createObjectURL(blob);
+  try{const im=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});
+    const c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;c.getContext('2d').drawImage(im,0,0);
+    return await new Promise(res=>c.toBlob(res,'image/png'));}
+  finally{URL.revokeObjectURL(url)}
+}
+// المشاركة: على طول على واتساب (بلا قائمة). إذا المتصفح طلب كبسة جديدة، بيطلع زر واحد بس
 function shareImageChoice(blob, fileName, title, phone){
-  const old = document.getElementById('shareChoiceOverlay');
-  if(old) old.remove();
-  const ov = document.createElement('div');
-  ov.id = 'shareChoiceOverlay';
-  ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:99999; padding:16px;';
-  ov.innerHTML = `<div style="background:var(--marble,#faf8f4); border-radius:14px; padding:20px; width:100%; max-width:320px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,.25);">
-    <div style="font-weight:800; margin-bottom:14px;">${title}</div>
-    <button type="button" class="btn btn-primary" data-act="save" style="width:100%; margin-bottom:8px;">💾 حفظ الصورة</button>
-    <button type="button" class="btn" data-act="wa" style="width:100%; margin-bottom:8px; background:#25D366; color:#fff; border-color:#25D366;">إرسال على واتساب</button>
-    <button type="button" class="btn btn-ghost" data-act="cancel" style="width:100%;">إلغاء</button>
-  </div>`;
-  document.body.appendChild(ov);
-  const close = ()=>ov.remove();
-  ov.addEventListener('click', e=>{ if(e.target===ov) close(); });
-  ov.querySelector('[data-act="cancel"]').addEventListener('click', close);
-  ov.querySelector('[data-act="save"]').addEventListener('click', ()=>{
-    close();
-    downloadBlob(blob, fileName);
-    toast('تم حفظ الصورة');
-  });
-  ov.querySelector('[data-act="wa"]').addEventListener('click', async ()=>{
-    close();
-    const file = new File([blob], fileName, {type:'image/jpeg'});
-    // الجوال: بتفتح قائمة المشاركة وبتختار واتساب، والصورة مرفقة
+  const text=shareMsg(title),file=new File([blob],fileName,{type:'image/jpeg'});
+  const go=async()=>{
+    // الجوال: قائمة المشاركة والصورة مرفقة
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      try{ await navigator.share({ files:[file], title, text: 'السلام عليكم، مرفق '+title+' من '+(settings.companyName||'')+'.\ncesar-alcham.com' }); return; }
-      catch(e){ if(e && e.name === 'AbortError') return; }
+      try{await navigator.share({files:[file],text});return true}
+      catch(e){if(e&&e.name==='AbortError')return true;if(e&&e.name==='NotAllowedError')return false}
     }
-    // الكمبيوتر: المتصفح ما بيقدر يرفق صورة لواتساب لحاله — بننزّل الصورة وبنفتح محادثة الزبون
-    downloadBlob(blob, fileName);
-    const p = waPhone(phone);
-    openWA(p,('السلام عليكم، مرفق '+title+' من '+(settings.companyName||'')+'.\ncesar-alcham.com'));
-    toast('نزلت الصورة — اسحبها على محادثة واتساب');
+    // الكمبيوتر: الصورة بتنسخ (Ctrl+V بمحادثة واتساب) وبتفتح محادثة الزبون
+    let copied=false;
+    try{if(navigator.clipboard&&window.ClipboardItem){const png=await blobToPng(blob);await navigator.clipboard.write([new ClipboardItem({'image/png':png})]);copied=true}}catch(e){}
+    if(!copied)downloadBlob(blob,fileName);
+    openWA(waPhone(phone),text);
+    toast(copied?'الصورة منسوخة — بمحادثة واتساب اكبس Ctrl+V وبعدين إرسال':'نزلت الصورة — اسحبها على محادثة واتساب');
+    return true;
+  };
+  go().then(ok=>{if(ok)return;
+    const old=document.getElementById('shareChoiceOverlay');if(old)old.remove();
+    const ov=document.createElement('div');ov.id='shareChoiceOverlay';
+    ov.style.cssText='position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:99999; padding:16px;';
+    ov.innerHTML=`<div style="background:var(--marble,#faf8f4); border-radius:14px; padding:18px; width:100%; max-width:300px; text-align:center;"><button type="button" class="btn" data-act="wa" style="width:100%; background:#25D366; color:#fff; border-color:#25D366; font-size:16px;">إرسال على واتساب</button></div>`;
+    document.body.appendChild(ov);
+    ov.addEventListener('click',e=>{if(e.target===ov)ov.remove()});
+    ov.querySelector('[data-act="wa"]').addEventListener('click',()=>{ov.remove();go()});
   });
 }
 
