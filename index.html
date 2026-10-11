@@ -3200,6 +3200,18 @@ async function blobToPng(blob){
     return await new Promise(res=>c.toBlob(res,'image/png'));}
   finally{URL.revokeObjectURL(url)}
 }
+// الكمبيوتر: وقت كبسة «مشاركة» منفتح واتساب ومنحجز النسخ فوراً (المتصفح بيسمح بس وقت الكبسة)، والصورة بتلحق لما تجهز
+document.addEventListener('click',e=>{
+  if(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent))return;
+  const b=e.target.closest&&e.target.closest('#btnShareReceipt,#btnShareInvoice');if(!b)return;
+  let phone='',title='';
+  if(b.id==='btnShareReceipt'){const r=receipts.find(x=>x.id===currentViewedReceiptId);if(!r)return;phone=r.phone;title=`وصل #${r.no}`}
+  else{const v=invoices.find(x=>x.id===currentViewedInvoiceId);if(!v)return;phone=v.clientPhone;title=(v.docType==='simple'?'عرض سعر':(v.docType==='facture'?'Facture':'Devis'))+' '+v.no}
+  let res;const pr=new Promise(r=>res=r),slot={resolve:res,done:Promise.resolve(false)};
+  try{if(navigator.clipboard&&window.ClipboardItem)slot.done=navigator.clipboard.write([new ClipboardItem({'image/png':pr})]).then(()=>true,()=>false)}catch(_){}
+  window.__shareSlot=slot;
+  openWA(waPhone(phone),shareMsg(title));
+},true);
 // المشاركة: على طول على واتساب (بلا قائمة). إذا المتصفح طلب كبسة جديدة، بيطلع زر واحد بس
 function shareImageChoice(blob, fileName, title, phone){
   const text=shareMsg(title),file=new File([blob],fileName,{type:'image/jpeg'});
@@ -3210,11 +3222,12 @@ function shareImageChoice(blob, fileName, title, phone){
       try{await navigator.share({files:[file],text});return true}
       catch(e){if(e&&e.name==='AbortError')return true;if(e&&e.name==='NotAllowedError')return false}
     }
-    // الكمبيوتر: الصورة بتنسخ (Ctrl+V بمحادثة واتساب) وبتفتح محادثة الزبون
-    let copied=false;
-    try{if(navigator.clipboard&&window.ClipboardItem){const png=await blobToPng(blob);await navigator.clipboard.write([new ClipboardItem({'image/png':png})]);copied=true}}catch(e){}
+    // الكمبيوتر: واتساب انفتح وقت الكبسة، والصورة بتنسخ (Ctrl+V بمحادثة واتساب)
+    const slot=window.__shareSlot;window.__shareSlot=null;let copied=false;
+    if(slot){slot.resolve(await blobToPng(blob));copied=await slot.done}
+    else{try{if(navigator.clipboard&&window.ClipboardItem){await navigator.clipboard.write([new ClipboardItem({'image/png':await blobToPng(blob)})]);copied=true}}catch(e){}
+      openWA(waPhone(phone),text)}
     if(!copied)downloadBlob(blob,fileName);
-    openWA(waPhone(phone),text);
     toast(copied?'الصورة منسوخة — بمحادثة واتساب اكبس Ctrl+V وبعدين إرسال':'نزلت الصورة — اسحبها على محادثة واتساب');
     return true;
   };
