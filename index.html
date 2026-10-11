@@ -2347,6 +2347,7 @@ function newItemRow(item){
   `;
   if(item.measType) row.dataset.measType = item.measType;
   if(item.draws && item.draws.length) row.dataset.draws = JSON.stringify(item.draws);
+  if(item.md) row.dataset.md = '1';
   document.getElementById('itemsBody').appendChild(row);
   requestAnimationFrame(()=>autoGrow(row.querySelector('.it-desc')));
   const qty = row.querySelector('.it-qty');
@@ -2682,7 +2683,7 @@ function convertReceiptToQuote(){
     const qty = Number(qtyEl.value)||0;
     const desc = row.querySelector('.it-desc').value.trim();
     const price = Number(row.querySelector('.it-price').value)||0;
-    if(desc || qty || price) items.push({qty, desc, unit:'', price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {})});
+    if(desc || qty || price) items.push({qty, desc, unit:'', price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {}), ...(row.dataset.md ? {md:1} : {})});
   });
   const discount = Number(document.getElementById('rcpDiscount').value)||0;
   if(discount > 0) items.push({qty:1, desc:'خصم', unit:'', price:-discount, amount:-discount});
@@ -2745,7 +2746,7 @@ async function buildAndSaveReceiptFromForm(){
     const qty = Number(qtyEl.value)||0;
     const desc = row.querySelector('.it-desc').value.trim();
     const price = Number(row.querySelector('.it-price').value)||0;
-    if(desc || qty || price) items.push({qty, desc, price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {})});
+    if(desc || qty || price) items.push({qty, desc, price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {}), ...(row.dataset.md ? {md:1} : {})});
   });
   const hasDetails = items.some(it=>it.desc);
   if(!hasDetails){ toast('يرجى كتابة تفاصيل البند (النوع) — خانة إجبارية'); return null; }
@@ -3281,6 +3282,7 @@ function newInvoiceItemRow(item){
   `;
   if(item.measType) row.dataset.measType = item.measType;
   if(item.draws && item.draws.length) row.dataset.draws = JSON.stringify(item.draws);
+  if(item.md) row.dataset.md = '1';
   document.getElementById('invItemsBody').appendChild(row);
   requestAnimationFrame(()=>autoGrow(row.querySelector('.inv-it-desc')));
   const qty = row.querySelector('.inv-it-qty');
@@ -3508,7 +3510,7 @@ async function buildAndSaveInvoiceFromForm(){
     const desc = row.querySelector('.inv-it-desc').value.trim();
     const unit = row.querySelector('.inv-it-unit').value.trim();
     const price = Number(row.querySelector('.inv-it-price').value)||0;
-    if(desc || qty || price) items.push({qty, desc, unit, price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {})});
+    if(desc || qty || price) items.push({qty, desc, unit, price, amount: qty*price, ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {}), ...(row.dataset.md ? {md:1} : {})});
   });
   const ht = items.reduce((s,it)=>s+it.amount,0);
   const isSimpleDoc = document.getElementById('invDocType').value === 'simple';
@@ -4578,7 +4580,7 @@ wireConvertMenu('btnConvReceiptEdit', 'receipt', ()=>{
     const qty = Number(q.value)||0, desc = d.value.trim(), price = Number(pr.value)||0;
     if(!desc && !qty && !price) return null;
     return {qty, desc, unit:'', price, amount: qty*price,
-      ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {})};
+      ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {}), ...(row.dataset.md ? {md:1} : {})};
   }).filter(Boolean);
   const dur = document.getElementById('rcpDuration').value.trim();
   return {kind:'receipt', label: `وصل رقم ${document.getElementById('rcpNo').value}`,
@@ -4596,7 +4598,7 @@ wireConvertMenu('btnConvInvoiceEdit', ()=>document.getElementById('invDocType').
     const qty = Number(q.value)||0, desc = d.value.trim(), price = Number(pr.value)||0;
     if(!desc && !qty && !price) return null;
     return {qty, desc, unit: u ? u.value.trim() : '', price, amount: qty*price,
-      ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {})};
+      ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {}), ...(row.dataset.md ? {md:1} : {})};
   }).filter(Boolean);
   const v = id => (document.getElementById(id)||{}).value || '';
   const dt = v('invDocType'), lbl = dt==='facture' ? 'Facture' : dt==='devis' ? 'Devis' : 'عرض سعر';
@@ -5739,13 +5741,13 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     // عند تعديل رسمة موجودة: بنود الرسمة القديمة (نفس أول كلمة قبل «—»، متل «عامود مدور» أو «قاعدة عامود») بتتبدّل بالبنود الجديدة بنفس مكانها وبنفس السعر — ما بتتكرر
     const oldL=(old&&old.lines)||[],keep={},keyOf=t=>String(t||'').split(' — ')[0].replace(/\s*\([^)]*\)\s*$/,'').trim();
     const keys=new Set([...oldL.map(keyOf),...lines.map(l=>keyOf(mk(l)))].filter(k=>k&&k.length>2));
-    let mark=null;
+    let mark=null;const oldP=[];
     for(const r of [...body.querySelectorAll('tr')]){const d=dsc(r).trim();
-      if(d&&(oldL.includes(d)||keys.has(keyOf(d)))){const key=keyOf(d);if(!(key in keep))keep[key]=prc(r);if(!mark){mark=document.createComment('mirsam');body.insertBefore(mark,r)}r.remove()}
+      if(r.dataset.md||(d&&(oldL.includes(d)||keys.has(keyOf(d))))){const key=keyOf(d);if(!(key in keep))keep[key]=prc(r);oldP.push(prc(r));if(!mark){mark=document.createComment('mirsam');body.insertBefore(mark,r)}r.remove()}
       else if(empty(r))r.remove()}
     let first=null;
-    lines.forEach(l=>{const price=keep[keyOf(mk(l))]||'';
-      if(rcp)newItemRow({qty:l.qty,desc:mk(l),price,...(l.draws?{draws:l.draws}:{})});else newInvoiceItemRow({qty:l.qty,desc:l.desc,unit:l.unit,price,...(l.draws?{draws:l.draws}:{})});
+    lines.forEach((l,li)=>{const price=keep[keyOf(mk(l))]||oldP[li]||'';
+      if(rcp)newItemRow({qty:l.qty,desc:mk(l),price,md:1,...(l.draws?{draws:l.draws}:{})});else newInvoiceItemRow({qty:l.qty,desc:l.desc,unit:l.unit,price,md:1,...(l.draws?{draws:l.draws}:{})});
       const row=body.lastElementChild;if(mark&&row)body.insertBefore(row,mark);
       if(!first)first=row});
     if(mark)mark.remove();
