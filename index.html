@@ -2786,7 +2786,8 @@ async function buildAndSaveReceiptFromForm(){
     note: document.getElementById('rcpNote').value.trim(),
     measurementTables: measTablesToSave,
     delivered: isDelivered,
-    deliveredDate
+    deliveredDate,
+    ...(window.__mdSave&&window.__mdSave.rcp?{mirsamDrawing:window.__mdSave.rcp}:{})
   };
 
   noteReceiptNoUsed(data.no);
@@ -3495,7 +3496,8 @@ async function buildAndSaveInvoiceFromForm(){
     clientPhone: document.getElementById('invClientPhone').value.trim(),
     items, ht, tva, ttc, payments,
     paid, remaining: ttc - paid,
-    note: document.getElementById('invNote').value.trim()
+    note: document.getElementById('invNote').value.trim(),
+    ...(window.__mdSave&&window.__mdSave.inv?{mirsamDrawing:window.__mdSave.inv}:{})
   };
 
   if(id){
@@ -5729,11 +5731,11 @@ if('serviceWorker' in navigator){
   const _openR=openReceiptModal;openReceiptModal=function(r){_openR(r);const m=carry||(r&&r.mirsamDrawing?{...r.mirsamDrawing,dirty:false}:null);carry=null;MD.rcp=m;renderPrev('rcp')};
   const _openI=openInvoiceModal;openInvoiceModal=function(inv){_openI(inv);const m=carry||(inv&&inv.mirsamDrawing?{...inv.mirsamDrawing,dirty:false}:null);carry=null;MD.inv=m;renderPrev('inv')};
   const _saveR=buildAndSaveReceiptFromForm;buildAndSaveReceiptFromForm=async function(){
-    const meta=await persist('rcp');const id=await _saveR();if(!id)return id;
-    const r=receipts.find(x=>x.id===id);if(r){if(meta)r.mirsamDrawing=meta;else delete r.mirsamDrawing;saveReceipts()}return id};
+    const meta=await persist('rcp');window.__mdSave={rcp:meta};let id;try{id=await _saveR()}finally{window.__mdSave=null}if(!id)return id;
+    const r=receipts.find(x=>x.id===id);if(r&&!meta&&r.mirsamDrawing){delete r.mirsamDrawing;saveReceipts()}return id};
   const _saveI=buildAndSaveInvoiceFromForm;buildAndSaveInvoiceFromForm=async function(){
-    const meta=await persist('inv');const id=await _saveI();if(!id)return id;
-    const v=invoices.find(x=>x.id===id);if(v){if(meta)v.mirsamDrawing=meta;else delete v.mirsamDrawing;saveInvoices()}return id};
+    const meta=await persist('inv');window.__mdSave={inv:meta};let id;try{id=await _saveI()}finally{window.__mdSave=null}if(!id)return id;
+    const v=invoices.find(x=>x.id===id);if(v&&!meta&&v.mirsamDrawing){delete v.mirsamDrawing;saveInvoices()}return id};
   const _convI=convertInvoiceToReceipt;convertInvoiceToReceipt=function(id){const inv=invoices.find(i=>i.id===id);carry=inv&&inv.mirsamDrawing?{...inv.mirsamDrawing,dirty:false}:null;try{_convI(id)}finally{carry=null}};
   const rtq=document.getElementById('btnReceiptToQuote');if(rtq)rtq.addEventListener('click',()=>{carry=MD.rcp?{...MD.rcp}:null},true);
 
