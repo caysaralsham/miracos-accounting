@@ -3216,7 +3216,7 @@ function shareInfo(kind){
   return{id:v.id,phone:v.clientPhone,title:L+' '+v.no,file:(L+'-'+v.no+'.jpg').replace(/\s+/g,'-')};
 }
 function sendNow(blob,info){
-  const file=new File([blob],info.file,{type:'image/jpeg'}),text=shareMsg(info.title);
+  const file=new File([blob],info.file,{type:'image/jpeg'}),text=info.text||shareMsg(info.title);
   if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],text}).catch(e=>{if(e&&e.name==='NotAllowedError')oneButton(blob,info)});return}
   downloadBlob(blob,info.file);openWA(waPhone(info.phone),text);toast('نزلت الصورة — اسحبها على محادثة واتساب');
 }
@@ -5933,6 +5933,29 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   const ow=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(ow);ostart()}},1000);
   const lines=j=>j.items.map(x=>(x.qty?x.qty+' × ':'')+x.desc+(x.unit?' ('+x.unit+')':'')).join('\n');
   const parse=t=>t.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const m=l.match(/^([\d.,]+)\s*[×x\*]\s*(.+)$/);return m?{qty:m[1],desc:m[2],unit:''}:{qty:'',desc:l,unit:''}});
+  // صورة ورقة الطلبية للواتساب (نفس شكل ورقة الطباعة)
+  const jobPrep={};
+  async function jobImage(j){
+    const img=j.draw?await drawingSrc(j.draw):null;
+    const rows=j.items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.qty||'')}</td><td style="text-align:right">${esc(x.desc)}${x.unit?' ('+esc(x.unit)+')':''}</td></tr>`).join('');
+    const st=j.draw?__stIn(j.draw.stats):[];
+    const h=document.createElement('div');h.style.cssText='position:fixed;top:0;left:0;width:794px;background:#fff;z-index:-1;pointer-events:none;';
+    h.innerHTML=`<div dir="rtl" style="font-family:Cairo,Tahoma,Arial,sans-serif;color:#3B2414;padding:28px;background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #9A6A3A;padding-bottom:8px;margin-bottom:14px"><div><div style="font-size:24px;font-weight:800">🏭 طلبية ${ordNo(j)}</div><div style="font-size:14px">${esc(settings.companyName||'')}</div></div><div style="font-size:14px;text-align:left">${fmtD(j.at)}${j.due?'<br>التسليم: '+fmtD(new Date(j.due).getTime()):''}</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;font-size:16px;margin-bottom:14px"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div><div><b>الهاتف:</b> <span dir="ltr">${esc(j.cust.phone||'-')}</span></div>${j.cust.addr?`<div style="grid-column:1/-1"><b>العنوان:</b> ${esc(j.cust.addr)}</div>`:''}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:16px">${'<tr>'+['#','العدد','النوع والتفاصيل'].map(t=>`<th style="border:1px solid #CDB894;padding:8px;background:#F5ECDD">${t}</th>`).join('')+'</tr>'}${rows.replace(/<td/g,'<td style="border:1px solid #CDB894;padding:8px;text-align:center"').replace(/text-align:center" style="text-align:right"/g,'text-align:right"')}</table>
+      ${j.note?`<div style="margin-top:12px;font-size:15px;border:1px dashed #CDB894;padding:8px;border-radius:6px"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}
+      ${img?`<div style="display:flex;gap:14px;align-items:center;margin-top:14px">${st.length?`<table style="flex:1 1 44%;border-collapse:collapse;font-size:16px">${st.map(r=>`<tr><td style="padding:5px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="padding:5px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:''}<img src="${img}" style="max-width:${st.length?'54%':'100%'};max-height:520px;border:1px solid #E6D6BC;margin:0 auto"></div>`:''}</div>`;
+    document.body.appendChild(h);
+    try{const im=h.querySelector('img');if(im&&!im.complete)await new Promise(r=>{im.onload=im.onerror=r});
+      const c=await html2canvas(h.firstElementChild,{scale:2,backgroundColor:'#ffffff',width:794,windowWidth:1200});return await new Promise(r=>c.toBlob(r,'image/jpeg',.9))}
+    finally{h.remove()}
+  }
+  function prepJob(j){if(!j)return null;const key=j.id+'|'+((j.upd&&j.upd.at)||j.at);let p=jobPrep[j.id];if(p&&p.key===key)return p;
+    p={key,blob:null};p.promise=jobImage(j).then(b=>{p.blob=b;return b}).catch(e=>{console.error(e);return null});jobPrep[j.id]=p;return p}
+  async function shareJob(j){if(!j)return;const p=prepJob(j),info={phone:'',title:'طلبية '+ordNo(j),file:('طلبية-'+ordNo(j)+'.jpg'),text:'طلبية '+ordNo(j)+' — '+(j.cust.name||'')+'\n'+lines(j)+(j.note?'\nملاحظة: '+j.note:'')};
+    if(p.blob)return sendNow(p.blob,info);
+    toast('ثانية، عم تتجهز الصورة…');const b=await p.promise;if(!b){toast('تعذر إنشاء الصورة');return}oneButton(b,info)}
   async function printJob(j,viewOnly){
     if(!j)return;const w=window.open('','_blank');if(!w){toast('اسمح بالنوافذ المنبثقة للطباعة');return}
     w.document.write('<p style="font-family:sans-serif">جاري التجهيز...</p>');
@@ -5967,8 +5990,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     ov.querySelector('[data-list]').innerHTML=list.map(j=>{const st=j.status,op=openIds.has(j.id),un=isUnseen(j),du=dueInfo(j);return `<div style="border:1px solid ${un?'#C0392B':'var(--line)'};border-inline-start:5px solid ${STC[st]};border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--marble,#fff)">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:var(--brass-deep)">${ordNo(j)}</b><b>${esc(j.cust.name||'بدون اسم')}</b>${j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}
         <span style="background:${STC[st]};color:#fff;border-radius:20px;padding:1px 10px;font-size:12px;font-weight:700">${STI[st]} ${st}</span>${du?`<span style="color:${du.c};font-size:12px;font-weight:700">📅 ${du.t}</span>`:''}${un?'<span style="background:#C0392B;color:#fff;border-radius:20px;padding:1px 8px;font-size:11.5px">🔔 جديد</span>':''}<span style="flex:1"></span>
-        <button type="button" class="btn btn-sm" data-ed="${j.id}">${op?'إخفاء':'✏️ تعديل'}</button><button type="button" class="btn btn-sm" data-vw="${j.id}">👁 إظهار الوصل</button>${ME==='main'&&j.rcpId&&receipts.some(x=>x.id===j.rcpId)?`<button type="button" class="btn btn-sm" data-rv="${j.rcpId}" title="وصل الزبون الأصلي (مع الأسعار)">🧾 وصل الزبون</button>`:''}<button type="button" class="btn btn-sm" data-pr="${j.id}">🖨</button><button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" title="حذف الطلبية" style="color:#A6453D">🗑</button></div>
-      <div style="font-size:13px;color:var(--text-dim);margin-top:4px">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)+(x.draws?' 📏':'')).join(' · ')}${j.draw?' · 📐 رسمة':''}${j.photos.length?' · 📷 '+j.photos.length:''}${j.note?' · 📝 '+esc(j.note):''}</div>
+        <button type="button" class="btn btn-sm" data-ed="${j.id}">${op?'إخفاء':'✏️ تعديل'}</button><button type="button" class="btn btn-sm" data-vw="${j.id}">👁 إظهار الوصل</button><button type="button" class="btn btn-sm" data-wa="${j.id}" style="background:#25D366;color:#fff;border-color:#25D366">واتساب</button>${ME==='main'&&j.rcpId&&receipts.some(x=>x.id===j.rcpId)?`<button type="button" class="btn btn-sm" data-rv="${j.rcpId}" title="وصل الزبون الأصلي (مع الأسعار)">🧾 وصل الزبون</button>`:''}<button type="button" class="btn btn-sm" data-pr="${j.id}">🖨</button><button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" title="حذف الطلبية" style="color:#A6453D">🗑</button></div>
+      <div style="font-size:13px;color:var(--text-dim);margin-top:4px">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)+(x.draws?' 📏':'')).join(' · ')}${j.photos.length?' · 📷 '+j.photos.length:''}${j.note?' · 📝 '+esc(j.note):''}</div>${j.draw?`<img data-jdraw="${j.id}" data-vw="${j.id}" alt="" title="الرسمة" style="display:block;margin-top:8px;max-width:280px;max-height:${op?260:150}px;min-width:80px;min-height:60px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;cursor:pointer">`:''}
       ${j.upd?`<div style="font-size:11.5px;color:${un?'#C0392B':'var(--text-dim)'};margin-top:3px">آخر تعديل: ${j.upd.by==='factory'?'المعمل':'المعرض'} — ${esc(j.upd.txt||'')} — ${fmtT(j.upd.at)}</div>`:''}
       ${op?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
         <div style="display:flex;gap:6px;flex-wrap:wrap">${ST.map(s=>`<button type="button" class="btn btn-sm${s===st?' btn-primary':''}" data-st="${j.id}" data-v="${s}">${STI[s]} ${s}</button>`).join('')}</div>
@@ -5982,6 +6005,9 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
         <details style="margin-top:8px;font-size:12px;color:var(--text-dim)"><summary style="cursor:pointer">سجل التعديلات (${(j.log||[]).length})</summary>${(j.log||[]).slice().reverse().map(l=>`<div>• ${l.by==='factory'?'المعمل':'المعرض'}: ${esc(l.txt)} — ${fmtT(l.at)}</div>`).join('')}</details></div>`:''}
     </div>`}).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبيات.</div>';
     ov.querySelectorAll('img[data-pid]').forEach(async im=>{const src=await loadImg({id:im.dataset.pid});if(src)im.src=src});
+    ov.querySelectorAll('img[data-jdraw]').forEach(async im=>{const j=jobs.find(x=>x.id===im.dataset.jdraw);const src=j&&j.draw?await drawingSrc(j.draw):null;if(src)im.src=src;else im.remove()});
+    ov.querySelectorAll('[data-wa]').forEach(b=>{const f=()=>prepJob(jobs.find(x=>x.id===b.dataset.wa));b.addEventListener('pointerenter',f,{once:true});b.addEventListener('focus',f,{once:true})});
+    list.filter(j=>openIds.has(j.id)).forEach(j=>setTimeout(()=>prepJob(j),500));
   }
   async function markSeen(id){const j=jobs.find(x=>x.id===id);if(!j||!isUnseen(j))return;
     await osave(a=>a.map(x=>x.id===id?{...x,seen:{...(x.seen||{}),[ME]:Date.now()}}:x),false)}
@@ -5999,6 +6025,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   ov.addEventListener('click',async e=>{const t=e.target;
     const g=s=>t.closest(s);let b;
     if(b=g('[data-pr]'))return printJob(jobs.find(x=>x.id===b.dataset.pr));
+    if(b=g('[data-wa]'))return shareJob(jobs.find(x=>x.id===b.dataset.wa));
     if(b=g('[data-vw]'))return printJob(jobs.find(x=>x.id===b.dataset.vw),true);
     if(b=g('[data-rv]'))return viewReceipt(b.dataset.rv);
     if(b=g('[data-ed]')){const id=b.dataset.ed;if(openIds.has(id))openIds.delete(id);else{openIds.add(id);markSeen(id)}render();return}
