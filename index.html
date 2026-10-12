@@ -6577,7 +6577,14 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
           ${card('عدد الوصولات',rs.length)}${card('مجموع الشغل',F(tot))}${card('المقبوض بالشهر',F(paid),'#1F8F55')}${card('الباقي على وصولات الشهر',F(rem),'#A6453D')}${card('المصاريف',F(ex),'#A6453D')}${card('الصافي (المقبوض − المصاريف)',F(paid-ex))}${card('طلبيات الشهر',jm.length+' (منفّذة '+done+')')}${card('طلبيات متأخرة الآن',late,late?'#C0392B':'')}</div>
           ${top.length?`<div style="margin-top:10px;font-size:13px"><b>أكتر الأشغال:</b> ${top.map(([k,v])=>esc(k)+' ('+v+')').join(' · ')}</div>`:''}`;};
       mi.addEventListener('change',build);
-      pn.querySelector('[data-p]').onclick=()=>{build();const w=window.open('','_blank');if(!w)return;w.document.write(`<!doctype html><html dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>تقرير ${mLbl(mi.value)}</title><style>body{font-family:Cairo,Tahoma,sans-serif;color:#3B2414;margin:24px}</style></head><body>${window.popBar()}<h2>📊 تقرير شهر ${mLbl(mi.value)} — ${FS_DOC==='factory'?'المعمل':'المعرض'}</h2>${pn.querySelector('[data-o]').innerHTML}<script>setTimeout(()=>print(),300)<\/script></body></html>`);w.document.close()};
+      // طباعة مباشرة من نفس الصفحة (بلا ما تفتح صفحة جديدة): نسخة مخفية عالشاشة وبتبيّن بالطباعة بس
+      pn.querySelector('[data-p]').onclick=()=>{build();
+        const old=document.getElementById('monthPrintOverlay');if(old)old.remove();
+        const ov=document.createElement('div');ov.className='overlay show';ov.id='monthPrintOverlay';ov.style.display='none';
+        ov.innerHTML=`<div style="font-family:Cairo,Tahoma,sans-serif;color:#3B2414;padding:10mm;background:#fff"><h2>📊 تقرير شهر ${mLbl(mi.value)} — ${FS_DOC==='factory'?'المعمل':'المعرض'}</h2>${pn.querySelector('[data-o]').innerHTML}</div>`;
+        document.body.appendChild(ov);
+        const done=()=>{window.removeEventListener('afterprint',done);ov.remove()};
+        window.addEventListener('afterprint',done);setTimeout(()=>{window.print();setTimeout(()=>{if(document.body.contains(ov))done()},60000)},50)};
       const nv=document.querySelector('.nav-item[data-view="reports"]');if(nv)nv.addEventListener('click',()=>setTimeout(build,50));
       setTimeout(build,3000);
     }
