@@ -2,7 +2,7 @@
 // باش يفتح البرنامج حتى بلا نت خالص. البيانات المالية نفسها ما تتخزنش هنا —
 // هذي مسؤولية Firestore offline persistence (مفعّلة من كود التطبيق نفسه).
 
-const CACHE_NAME = 'miracos-cache-v68';
+const CACHE_NAME = 'miracos-main-v69'; // اسم مختلف لكل برنامج: المعرض والمعمل على نفس الموقع
 
 const APP_SHELL = [
   './',
@@ -27,7 +27,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k !== CACHE_NAME && (k.startsWith('miracos-main-') || k.startsWith('miracos-cache-'))).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();

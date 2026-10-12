@@ -1353,10 +1353,10 @@ try{ safeSession = makeSafeStorage(window.sessionStorage); }catch(e){ safeSessio
 
 // نخزّن آخر إعدادات (بما فيها الشعار) محليًا بهالجهاز، حتى تظهر فورًا من أول ثانية
 // بفتح البرنامج بدون انتظار الاتصال بالسحابة — هيك ما في وميض شعار خاطئ ثم تبديله.
-const SETTINGS_CACHE_KEY = 'miracos_cached_settings';
+const SETTINGS_CACHE_KEY = 'miracos_cached_settings_main'; // مفتاح لكل برنامج، حتى ما يبين شعار المعرض بالمعمل
 let settings = (function(){
   try{
-    const cached = JSON.parse(safeLocal.getItem(SETTINGS_CACHE_KEY) || 'null');
+    const cached = JSON.parse(safeLocal.getItem(SETTINGS_CACHE_KEY) || safeLocal.getItem('miracos_cached_settings') || 'null');
     if(cached) return {...DEFAULT_SETTINGS, ...cached};
   }catch(e){}
   return {...DEFAULT_SETTINGS};
@@ -1631,7 +1631,7 @@ function renderPriceCategoryChips(){
   if(select){
     const current = select.value;
     select.innerHTML = `<option value="">-- اختاري قسم --</option>`
-      + priceCategories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')
+      + priceCategories.map(c=>`<option value="${c.id}">${escHtmlText(c.name)}</option>`).join('')
       + `<option value="__new__">+ قسم جديد...</option>`;
     if([...select.options].some(o=>o.value===current)) select.value = current;
     toggleNewCategoryInput();
@@ -1690,7 +1690,7 @@ function renderPriceListGrouped(){
     const isOpen = expandedPriceCategoryIds.has(cat.id);
     html += `<div class="panel" style="margin-top:10px; padding:0; overflow:hidden;">
       <div data-cat-toggle="${cat.id}" style="cursor:pointer; display:flex; align-items:center; justify-content:space-between; padding:14px 18px;">
-        <span style="font-weight:700; color:var(--brass-deep);">${cat.name} <span style="color:var(--text-dim); font-weight:400; font-size:12.5px;">(${items.length})</span></span>
+        <span style="font-weight:700; color:var(--brass-deep);">${escHtmlText(cat.name)} <span style="color:var(--text-dim); font-weight:400; font-size:12.5px;">(${items.length})</span></span>
         <span style="color:var(--text-dim);">${isOpen ? '▲' : '▼'}</span>
       </div>`;
     if(isOpen){
@@ -2465,7 +2465,7 @@ function measResultFor(type, l, w, h, h2){
   return {value: l*w, label: (l*w).toFixed(2)+' م²'};
 }
 
-function escHtmlText(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escHtmlText(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function autoGrow(el){ el.style.height = 'auto'; el.style.height = (el.scrollHeight + 2) + 'px'; }
 document.addEventListener('input', e=>{ if(e.target.classList && e.target.classList.contains('desc-grow')) autoGrow(e.target); });
 // Enter بالبيان ما بيعمل سطر جديد (البيان سطر واحد بيلتف لحاله)
@@ -2914,6 +2914,7 @@ async function buildAndSaveReceiptFromForm(){
     if(amount) payments.push({id: pid, date, amount, method});
   });
   const paid = payments.reduce((s,p)=>s+p.amount,0);
+  if(paid > total && !confirm(`المدفوع (${fmt(paid)}) أكبر من الإجمالي (${fmt(total)}) بـ ${fmt(paid-total)}.\nالباقي رح يصير بالسالب. متأكد بدك تحفظ؟`)) return null;
 
   const measTablesToSave = receiptMeasTables
     .map(tbl => ({type: tbl.type, rows: tbl.rows.filter(measRowFilled)}))
@@ -2955,7 +2956,8 @@ async function buildAndSaveReceiptFromForm(){
   saveReceipts();
   logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no, details: items.map(it=>it.desc).filter(Boolean).join('، ')}, prevReceipt ? prevReceipt.payments : []);
   if(convertingFromInvoiceId){
-    invoices = invoices.filter(i=>i.id!==convertingFromInvoiceId);
+    const src = invoices.find(i=>i.id===convertingFromInvoiceId);
+    if(src){ src.convertedTo = {receiptNo: data.no, at: new Date().toISOString()}; }
     saveInvoices();
     renderInvoicesTable();
     convertingFromInvoiceId = null;
@@ -3043,9 +3045,9 @@ function renderReceiptsTable(){
     const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
     html += `<tr>
       <td>${r.no}</td>
-      <td>${r.name}</td>
-      <td class="wrap-cell"><div class="details-wrap">${details}</div></td>
-      <td>${r.phone||'—'}</td>
+      <td>${escHtmlText(r.name)}</td>
+      <td class="wrap-cell"><div class="details-wrap">${escHtmlText(details)}</div></td>
+      <td>${escHtmlText(r.phone||'—')}</td>
       <td>${r.delivered ? '<span style="color:var(--verdigris-deep); font-weight:700;">✔ تم التسليم</span>' : daysUntilLabel(computeDeliveryDate(r))}</td>
       <td>${fmt(r.total)}</td>
       <td>${fmt(r.remaining)}</td>
@@ -3170,7 +3172,7 @@ function renderTrash(){
     const delDate = r.deletedAt ? r.deletedAt.slice(0,10) : '—';
     return `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
       <div style="font-size:13px;">
-        <b>${r.name}</b> — وصل #${r.no} — ${fmt(r.total)}
+        <b>${escHtmlText(r.name)}</b> — وصل #${r.no} — ${fmt(r.total)}
         <div style="color:var(--text-dim); font-size:12px;">اتحذف بتاريخ ${delDate}</div>
       </div>
       <div style="display:flex; gap:6px;">
@@ -3200,7 +3202,7 @@ function viewReceipt(id){
   if(!r) return;
   currentViewedReceiptId = id;
   const itemsRows = r.items.map((it,i)=>`
-    <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td>${it.desc}${itemMeasDrawingsHtml(it, r.measurementTables)}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+    <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td>${escHtmlText(it.desc)}${itemMeasDrawingsHtml(it, r.measurementTables)}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
   `).join('');
   const payList = getReceiptPayments(r);
   const paymentsRows = payList.map(p=>`
@@ -3263,7 +3265,7 @@ function viewReceipt(id){
               <div>
                 <div class="name">${settings.companyName}</div>
                 <div class="meta">${settings.companyDesc}</div>
-                <div class="meta">${settings.address} · ${settings.phone}</div>
+                <div class="meta">${escHtmlText(settings.address)} · ${escHtmlText(settings.phone)}</div>
               </div>
             </div>
             <div class="receipt-stamp">
@@ -3276,11 +3278,11 @@ function viewReceipt(id){
       <tbody class="doc-intro">
         <tr class="intro-row"><td colspan="5">
           <div class="receipt-info-grid">
-            <div><span>الاسم: </span>${r.name}</div>
+            <div><span>الاسم: </span>${escHtmlText(r.name)}</div>
             <div><span>التاريخ: </span>${r.date||''}</div>
-            <div><span>الهاتف: </span>${r.phone||'—'}</div>
+            <div><span>الهاتف: </span>${escHtmlText(r.phone||'—')}</div>
             <div><span>المدة: </span>${r.duration||'—'}</div>
-            <div><span>العنوان: </span>${r.address||'—'}</div>
+            <div><span>العنوان: </span>${escHtmlText(r.address||'—')}</div>
           </div>
         </td></tr>
         <tr><th class="row-no">#</th><th>العدد</th><th>النوع والتفاصيل</th><th>السعر</th><th>المبلغ</th></tr>
@@ -3295,7 +3297,7 @@ function viewReceipt(id){
       ${paymentsRows}
       <div class="totals-row" style="color:var(--danger); font-weight:700;"><span>الباقي</span><span>${fmt(r.remaining)}</span></div>
     </div>
-    ${r.note ? `<div class="field" style="margin-top:14px;"><label>ملاحظة</label><div>${r.note}</div></div>` : ''}
+    ${r.note ? `<div class="field" style="margin-top:14px;"><label>ملاحظة</label><div>${escHtmlText(r.note)}</div></div>` : ''}
     ${measTablesHtml}
   `;
   document.getElementById('viewReceiptOverlay').classList.add('show');
@@ -3707,6 +3709,7 @@ async function buildAndSaveInvoiceFromForm(){
     if(amount) payments.push({id: pid, date, amount, method});
   });
   const paid = payments.reduce((s,p)=>s+p.amount,0);
+  if(paid > ttc && !confirm(`المدفوع (${fmt(paid)}) أكبر من الإجمالي (${fmt(ttc)}) بـ ${fmt(paid-ttc)}.\nالباقي رح يصير بالسالب. متأكد بدك تحفظ؟`)) return null;
 
   const id = document.getElementById('invId').value;
   const prevInvoice = id ? invoices.find(i=>i.id===id) : null;
@@ -3778,10 +3781,10 @@ function renderInvoicesTable(){
     const typeTag = isFacture ? 'Facture' : (isDevis ? 'Devis' : 'عرض مبسط');
     const typeClass = isFacture ? 'tag-paid' : (isDevis ? 'tag-partial' : 'tag-due');
     html += `<tr${inv.cancelled?' style="opacity:.55"':''}>
-      <td><span class="tag ${typeClass}">${typeTag}</span>${inv.cancelled?' <span class="tag tag-due">ملغاة</span>':''}</td>
+      <td><span class="tag ${typeClass}">${typeTag}</span>${inv.cancelled?' <span class="tag tag-due">ملغاة</span>':''}${inv.convertedTo?` <span class="tag" title="انعمل منه وصل">تحوّل لوصل ${escHtmlText(inv.convertedTo.receiptNo||'')}</span>`:''}</td>
       <td>${inv.no}</td>
       <td>${inv.date||''}</td>
-      <td>${inv.clientName}</td>
+      <td>${escHtmlText(inv.clientName)}</td>
       <td>${fmt(inv.ttc)}</td>
       <td>${fmt(inv.remaining)}</td>
       <td>
@@ -3832,7 +3835,7 @@ function duplicateInvoice(id){
 function convertInvoiceToReceipt(id){
   const inv = invoices.find(i=>i.id===id);
   if(!inv) return;
-  if(!confirm(`تحويل "${inv.clientName}" إلى وصل زبون جديد؟ عرض السعر الأصلي رح ينحذف نهائيًا بمجرد ما تحفظي الوصل.`)) return;
+  if(!confirm(`تحويل "${inv.clientName}" إلى وصل زبون جديد؟ عرض السعر الأصلي بيضل محفوظ وبيتعلّم «تحوّل لوصل».`)) return;
   convertingFromInvoiceId = id;
   const pseudoReceipt = {
     id: '',
@@ -3914,7 +3917,7 @@ function viewInvoice(id){
 
   if(isSimple){
     const itemsRowsAr = (inv.items||[]).map((it,i)=>`
-      <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td style="text-align:right;">${it.desc}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+      <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td style="text-align:right;">${escHtmlText(it.desc)}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
     `).join('');
     const paymentsRowsAr = (inv.payments||[]).map(p=>`
       <div class="totals-row"><span>دفعة بتاريخ ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
@@ -3929,7 +3932,7 @@ function viewInvoice(id){
                 <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
                 <div>
                   <div class="name" style="font-size:16px;">${settings.companyName} — ${settings.companyDesc}</div>
-                  <div class="meta" style="font-size:11px; line-height:1.5;">${settings.address} · ${settings.phone}</div>
+                  <div class="meta" style="font-size:11px; line-height:1.5;">${escHtmlText(settings.address)} · ${escHtmlText(settings.phone)}</div>
                 </div>
               </div>
               <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
@@ -3944,10 +3947,10 @@ function viewInvoice(id){
         <tbody class="doc-intro">
           <tr class="intro-row"><td colspan="6">
             <div class="receipt-info-grid">
-              <div><span>الاسم: </span>${inv.clientName}</div>
+              <div><span>الاسم: </span>${escHtmlText(inv.clientName)}</div>
               <div><span>التاريخ: </span>${inv.date||''}</div>
-              <div><span>الهاتف: </span>${inv.clientPhone||'—'}</div>
-              <div><span>العنوان: </span>${inv.clientAddress||'—'}</div>
+              <div><span>الهاتف: </span>${escHtmlText(inv.clientPhone||'—')}</div>
+              <div><span>العنوان: </span>${escHtmlText(inv.clientAddress||'—')}</div>
             </div>
           </td></tr>
           <tr><th class="row-no">#</th><th>العدد</th><th>البيان</th><th>الوحدة</th><th>السعر</th><th>المجموع</th></tr>
@@ -3960,7 +3963,7 @@ function viewInvoice(id){
         <div class="totals-row" style="color:var(--danger); font-weight:700;"><span>الباقي</span><span>${fmt(inv.remaining)}</span></div>
       </div>
       ${inv.delay ? `<div class="field" style="margin-top:14px;"><label>مدة التسليم</label><div>${inv.delay}</div></div>` : ''}
-      ${inv.note ? `<div class="field" style="margin-top:14px;"><label>ملاحظة</label><div>${inv.note}</div></div>` : ''}
+      ${inv.note ? `<div class="field" style="margin-top:14px;"><label>ملاحظة</label><div>${escHtmlText(inv.note)}</div></div>` : ''}
     `;
     document.getElementById('viewInvoiceTitle').textContent = 'عرض سعر مبسط';
     markCancelledInvoiceView(inv);
@@ -3970,7 +3973,7 @@ function viewInvoice(id){
 
   const docLabel = (inv.docType === 'facture') ? 'FACTURE' : 'DEVIS';
   const itemsRows = (inv.items||[]).map((it,i)=>`
-    <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td style="text-align:left;">${it.desc}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+    <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td style="text-align:left;">${escHtmlText(it.desc)}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
   `).join('');
   const paymentsRows = (inv.payments||[]).map(p=>`
     <div class="totals-row"><span>Paiement du ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
@@ -3987,7 +3990,7 @@ function viewInvoice(id){
               <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
               <div>
                 <div class="name" style="font-size:16px;">${settings.companyName} — ${settings.companyDesc}</div>
-                <div class="meta" style="font-size:10.5px; line-height:1.5;">${settings.address} · ${settings.phone} · RC: ${settings.rc||''} · NIF: ${settings.nif||''}</div>
+                <div class="meta" style="font-size:10.5px; line-height:1.5;">${escHtmlText(settings.address)} · ${escHtmlText(settings.phone)} · RC: ${settings.rc||''} · NIF: ${settings.nif||''}</div>
                 <div class="meta" style="font-size:10.5px; line-height:1.5;">NIS: ${settings.nis||''} · Art: ${settings.article||''} · ${settings.bank||''} · ${settings.email||''}</div>
               </div>
             </div>
@@ -4004,7 +4007,7 @@ function viewInvoice(id){
       <tbody class="doc-intro">
         <tr class="intro-row"><td colspan="6">
           <div style="direction:ltr; text-align:left; margin-bottom:14px; font-size:13.5px; line-height:1.6;">
-            <div><b>Client:</b> ${inv.clientName} ${inv.clientAddress ? '— '+inv.clientAddress : ''}</div>
+            <div><b>Client:</b> ${escHtmlText(inv.clientName)} ${inv.clientAddress ? '— '+escHtmlText(inv.clientAddress) : ''}</div>
             ${clientLegalLine}
           </div>
         </td></tr>
@@ -4020,10 +4023,10 @@ function viewInvoice(id){
       <div class="totals-row" style="color:var(--danger); font-weight:700;"><span>Reste à payer</span><span>${fmt(inv.remaining)}</span></div>
     </div>
     ${inv.delay ? `<div class="field" style="margin-top:14px; direction:ltr; text-align:left;"><label>Délai de livraison</label><div>${inv.delay}</div></div>` : ''}
-    ${inv.note ? `<div class="field" style="margin-top:14px; direction:ltr; text-align:left;"><label>Remarque</label><div>${inv.note}</div></div>` : ''}
+    ${inv.note ? `<div class="field" style="margin-top:14px; direction:ltr; text-align:left;"><label>Remarque</label><div>${escHtmlText(inv.note)}</div></div>` : ''}
     <div style="direction:ltr; display:flex; justify-content:space-between; margin-top:60px;">
       <div style="text-align:center; width:45%;">
-        <div style="font-size:13px; font-weight:700; margin-bottom:50px;">Nom et signature du client${inv.clientName ? ' — '+inv.clientName : ''}</div>
+        <div style="font-size:13px; font-weight:700; margin-bottom:50px;">Nom et signature du client${inv.clientName ? ' — '+escHtmlText(inv.clientName) : ''}</div>
         <div style="border-top:1px solid var(--ink); width:100%;"></div>
       </div>
       <div style="text-align:center; width:45%;">
@@ -4154,8 +4157,8 @@ function renderExpensesTable(){
   list.forEach(e=>{
     html += `<tr>
       <td>${e.date||''}</td>
-      <td>${e.desc}</td>
-      <td>${e.category}</td>
+      <td>${escHtmlText(e.desc)}</td>
+      <td>${escHtmlText(e.category)}</td>
       <td>${fmt(e.amount)}</td>
       <td>
         <div class="row-actions">
@@ -5324,7 +5327,7 @@ function renderMeasurementsTable(){
   [...measurementsList].reverse().forEach(rec=>{
     html += `<tr>
       <td>${rec.date||''}</td>
-      <td>${rec.customerName}</td>
+      <td>${escHtmlText(rec.customerName)}</td>
       <td>${rec.tables.length}</td>
       <td>
         <div class="row-actions">
@@ -5372,7 +5375,7 @@ function renderMeasurementRecordInto(rec){
       </div>
     </div>
     <div class="receipt-info-grid">
-      <div><span>الزبون: </span>${rec.customerName}</div>
+      <div><span>الزبون: </span>${escHtmlText(rec.customerName)}</div>
       <div><span>الهاتف: </span>${rec.customerPhone||'—'}</div>
     </div>`;
 
@@ -5518,7 +5521,7 @@ function renderDashboard(){
     dueWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا توجد مبالغ متبقية على أي زبون 🎉</div>';
   } else {
     dueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th></tr></thead><tbody>${
-      due.map(r=>`<tr><td>${r.name}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td></tr>`).join('')
+      due.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td></tr>`).join('')
     }</tbody></table>`;
   }
 
@@ -5528,7 +5531,7 @@ function renderDashboard(){
     deliveredDueWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن مستلمين وعليهم دين 🎉</div>';
   } else {
     deliveredDueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th><th style="width:90px"></th></tr></thead><tbody>${
-      deliveredDue.map(r=>`<tr><td>${r.name}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td><button class="btn btn-sm btn-primary" data-dashboard-edit-receipt="${r.id}">تعديل</button></td></tr>`).join('')
+      deliveredDue.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td><button class="btn btn-sm btn-primary" data-dashboard-edit-receipt="${r.id}">تعديل</button></td></tr>`).join('')
     }</tbody></table>`;
     deliveredDueWrap.querySelectorAll('[data-dashboard-edit-receipt]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
@@ -5556,7 +5559,7 @@ function renderDashboard(){
     recentWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا توجد حركات بعد.</div>';
   } else {
     recentWrap.innerHTML = `<table><thead><tr><th>النوع</th><th>البيان</th><th>التاريخ</th><th>المبلغ المقبوض</th></tr></thead><tbody>${
-      combined.map(c=>`<tr><td>${c.type}</td><td>${c.label}</td><td>${c.date||''}</td><td style="color:${c.amount<0?'var(--danger)':'var(--verdigris-deep)'};font-weight:700;">${c.amount<0?'-':''}${fmt(Math.abs(c.amount))}</td></tr>`).join('')
+      combined.map(c=>`<tr><td>${c.type}</td><td>${escHtmlText(c.label)}</td><td>${c.date||''}</td><td style="color:${c.amount<0?'var(--danger)':'var(--verdigris-deep)'};font-weight:700;">${c.amount<0?'-':''}${fmt(Math.abs(c.amount))}</td></tr>`).join('')
     }</tbody></table>`;
   }
 }
@@ -5613,8 +5616,8 @@ function renderCustomerReports(){
       withDelivery.map(({r, deliveryDate})=>{
         const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
         return `<tr>
-          <td>${r.name}</td>
-          <td class="wrap-cell"><div class="details-wrap">${details}</div></td>
+          <td>${escHtmlText(r.name)}</td>
+          <td class="wrap-cell"><div class="details-wrap">${escHtmlText(details)}</div></td>
           <td>${r.date||''}</td>
           <td>${r.duration} يوم</td>
           <td>${deliveryDate}</td>
@@ -5649,9 +5652,9 @@ function renderCustomerReports(){
           ? `<span style="color:var(--danger); font-weight:700;">دين</span>`
           : `<span style="color:var(--verdigris-deep); font-weight:700;">مدفوع</span>`;
         return `<tr>
-          <td>${r.name}</td>
-          <td class="wrap-cell"><div class="details-wrap">${details}</div></td>
-          <td>${r.phone||'—'}</td>
+          <td>${escHtmlText(r.name)}</td>
+          <td class="wrap-cell"><div class="details-wrap">${escHtmlText(details)}</div></td>
+          <td>${escHtmlText(r.phone||'—')}</td>
           <td>${r.date||''}</td>
           <td>${r.deliveredDate||'—'}</td>
           <td>${fmt(r.total)}</td>
@@ -5707,8 +5710,8 @@ function renderPaymentHistoryTable(){
     html += `<tr>
       <td>${h.date||'—'}</td>
       <td>${loggedTime}</td>
-      <td>${h.customerName||'—'}</td>
-      <td class="wrap-cell"><div class="details-wrap">${detailsFull}</div></td>
+      <td>${escHtmlText(h.customerName||'—')}</td>
+      <td class="wrap-cell"><div class="details-wrap">${escHtmlText(detailsFull)}</div></td>
       <td>${fmt(h.amount)}</td>
       <td>${h.docType||''} ${h.docNo?'#'+h.docNo:''}</td>
       <td>${h.method||'—'}</td>
@@ -5857,7 +5860,7 @@ function showLedger(title, rows){
         <tr><th style="width:60px;">#</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr>
       </thead>
       <tbody>
-        ${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.date||'—'}</td><td style="text-align:right;">${r.details}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
+        ${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.date||'—'}</td><td style="text-align:right;">${escHtmlText(r.details)}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
       </tbody>
     </table>
     <div class="totals-box" style="margin-top:14px;">
