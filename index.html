@@ -2842,29 +2842,37 @@ function attachAutocomplete(inputEl, getMatches, onPick){
   box.className = 'autocomplete-box';
   box.style.cssText = 'position:absolute; top:100%; right:0; left:0; z-index:50; background:#fff; border:1px solid var(--line); border-radius:8px; box-shadow:0 6px 18px rgba(0,0,0,.12); max-height:180px; overflow-y:auto; display:none; margin-top:2px;';
   inputEl.parentElement.appendChild(box);
+  let justPicked = false;
   function hide(){ box.style.display = 'none'; box.innerHTML = ''; }
+  // الاختيار بيشتغل بالماوس وباللمس وبالقلم (pointerdown)، وبعد الاختيار القائمة بتتسكّر وما بترجع تفتح
+  function pick(v){
+    inputEl.value = v;
+    hide();
+    justPicked = true;
+    inputEl.dispatchEvent(new Event('input', {bubbles:true}));
+    inputEl.dispatchEvent(new Event('change', {bubbles:true}));
+    justPicked = false;
+    if(onPick) onPick(v);
+  }
   function render(){
+    if(justPicked) return;
     const q = inputEl.value.trim();
     if(!q){ hide(); return; }
     const matches = getMatches(q).slice(0, 8);
-    if(matches.length === 0){ hide(); return; }
-    box.innerHTML = matches.map(m=>`<div class="ac-item" style="padding:8px 10px; cursor:pointer; font-size:13.5px;">${m}</div>`).join('');
+    if(matches.length === 0 || (matches.length === 1 && matches[0] === q)){ hide(); return; }
+    box.innerHTML = matches.map(m=>`<div class="ac-item" style="padding:8px 10px; cursor:pointer; font-size:13.5px;">${escHtmlText(m)}</div>`).join('');
     box.style.display = 'block';
     [...box.children].forEach((el, i)=>{
-      el.addEventListener('mousedown', (e)=>{
-        e.preventDefault();
-        inputEl.value = matches[i];
-        hide();
-        if(onPick) onPick(matches[i]);
-        inputEl.dispatchEvent(new Event('input'));
-      });
+      el.addEventListener('pointerdown', (e)=>{ e.preventDefault(); pick(matches[i]); });
+      el.addEventListener('mousedown', (e)=>{ e.preventDefault(); });
       el.addEventListener('mouseenter', ()=>{ el.style.background = 'var(--marble-2)'; });
       el.addEventListener('mouseleave', ()=>{ el.style.background = ''; });
     });
   }
   inputEl.addEventListener('input', render);
   inputEl.addEventListener('focus', render);
-  inputEl.addEventListener('blur', ()=> setTimeout(hide, 150));
+  inputEl.addEventListener('keydown', e=>{ if(e.key==='Escape') hide(); if(e.key==='Enter' && box.style.display==='block' && box.firstElementChild){ e.preventDefault(); pick(box.firstElementChild.textContent); } });
+  inputEl.addEventListener('blur', ()=> setTimeout(hide, 250));
 }
 
 function wireCustomerNameAutocomplete(nameInputId, phoneInputId){
