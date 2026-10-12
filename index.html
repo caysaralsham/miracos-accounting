@@ -1835,6 +1835,8 @@ document.getElementById('btnDisconnectFirebase').addEventListener('click', ()=>{
 
 function uid(){ return 'id' + Date.now() + Math.floor(Math.random()*1000); }
 // تنسيق الأرقام يدوياً (أرقام لاتينية دايماً 0-9) — بعض الأجهزة كانت تطلع أرقام عربية ٠١٢ من إعدادات المتصفح
+// تاريخ اليوم بتوقيت الجهاز (الجزائر) — toISOString كان يعطي تاريخ الأمس بين 00:00 و01:00
+function localDate(d){ d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function fmtNumLatn(n, maxFrac){
   n = Number(n)||0; if(maxFrac===undefined) maxFrac = 3;
   const neg = n < 0;
@@ -2155,7 +2157,7 @@ function exportExcelReport(silent){
     const net = totalIncomePaid - commission - totalExpenses;
 
     add([{v: settings.companyName||'ميراكوس كنستريكسون', s:S.title, span:6}], 30);
-    add([{v:`تقرير مالي — ${new Date().toISOString().slice(0,10).split('-').reverse().join('/')}`, s:S.sub, span:6}]);
+    add([{v:`تقرير مالي — ${localDate().split('-').reverse().join('/')}`, s:S.sub, span:6}]);
     blank();
 
     // ===== جدول الملخص: الدخل، المصروف، العمولة، الصافي =====
@@ -2209,7 +2211,7 @@ function exportExcelReport(silent){
     const blob = buildXlsx(rows, [12, 13, 28, 15, 15, 15]);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    const dateStr = new Date().toISOString().slice(0,10);
+    const dateStr = localDate();
     a.href = url;
     a.download = `تقرير-ميراكوس-${dateStr}.xlsx`;
     document.body.appendChild(a);
@@ -2226,11 +2228,11 @@ function exportExcelReport(silent){
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
-  const restoreData = { savedAt: new Date().toISOString(), factoryOrders: (window.__ordersJobs||[]), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts, deletedInvoices };
+  const restoreData = { savedAt: new Date().toISOString(), doc: FS_DOC, factoryOrders: (window.__ordersJobs||[]), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts, deletedInvoices };
   const blob = new Blob([JSON.stringify(restoreData)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const dateStr = new Date().toISOString().slice(0,10);
+  const dateStr = localDate();
   a.href = url;
   a.download = `استرجاع-ميراكوس-${dateStr}.json`;
   document.body.appendChild(a);
@@ -2333,7 +2335,7 @@ function runDailyBackupIfNeeded(){
     if(isRunningDailyBackup) return;
     const now = new Date();
     if(now.getHours() < DAILY_BACKUP_HOUR) return;
-    const today = now.toISOString().slice(0,10);
+    const today = localDate(now);
     const mobile = isMobileDevice();
     if(mobile){
       // على الموبايل: النسخة التلقائية ملغاة (كانت تفتح ملفات التنزيل بوجهك أول ما يفتح البرنامج)
@@ -2375,6 +2377,7 @@ document.getElementById('btnImportRestore').addEventListener('click', ()=>{
 document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
   const file = e.target.files[0];
   if(!file) return;
+  e.target.value = ''; // حتى لو اخترت نفس الملف مرة تانية يشتغل
   const reader = new FileReader();
   reader.onload = async ()=>{
     try{
@@ -2383,7 +2386,16 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
         toast('الملف غير صالح');
         return;
       }
-      if(!confirm('هل تريد استبدال كل البيانات الحالية بمحتوى هذا الملف؟ لا يمكن التراجع.')) return;
+      const myName = FS_DOC==='factory' ? 'المعمل' : 'المعرض', fileName = data.doc==='factory' ? 'المعمل' : (data.doc==='main' ? 'المعرض' : '');
+      if(data.doc && data.doc !== FS_DOC){
+        if(!confirm(`⚠️ انتبه: هذا الملف نسخة من «${fileName}»، وإنت هلق ببرنامج «${myName}».\nإذا كملت، رح تنحط بيانات ${fileName} مكان بيانات ${myName}.\n\nمتأكد بدك تكمل؟`)) return;
+      }
+      const when = data.savedAt ? new Date(data.savedAt).toLocaleString('fr-FR') : 'غير معروف';
+      if(!confirm(`استرجاع من نسخة بتاريخ ${when}:\n${(data.receipts||[]).length} وصل، ${(data.invoices||[]).length} فاتورة/عرض، ${(data.expenses||[]).length} مصروف.\n\nرح تنستبدل كل البيانات الحالية. قبلها رح تنحفظ نسخة سحابية من الوضع الحالي (وبتقدر ترجعلها).\nمتابعة؟`)) return;
+      toast('جارٍ حفظ نسخة من الوضع الحالي قبل الاسترجاع...');
+      const cloudOk = await runCloudBackupIfNeeded(true);
+      if(!cloudOk){ try{ exportRestoreJSON(true); }catch(e){} if(!confirm('ما قدرنا نحفظ نسخة سحابية من الوضع الحالي (الإنترنت؟). نزلت نسخة على جهازك. متابعة الاسترجاع؟')) return; }
+      const keepRcpNo = lastReceiptNo, keepInvNo = (settings.invNoCounters||{}), keepCloud = {lastCloudBackupDay: settings.lastCloudBackupDay, lastCloudBackupAt: settings.lastCloudBackupAt};
       receipts = data.receipts;
       expenses = data.expenses;
       if(Array.isArray(data.invoices)) invoices = data.invoices;
@@ -2394,18 +2406,18 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       if(Array.isArray(data.expenseCategories)) expenseCategories = data.expenseCategories;
       if(Array.isArray(data.deletedReceipts)) deletedReceipts = data.deletedReceipts;
       if(Array.isArray(data.deletedInvoices)) deletedInvoices = data.deletedInvoices;
-      if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
-      lastReceiptNo = (typeof data.lastReceiptNo === 'number') ? data.lastReceiptNo : computeMaxReceiptNo();
-      await saveReceipts();
-      await saveExpenses();
-      await saveInvoices();
-      await saveMeasurementsList();
-      await savePaymentHistory();
-      await savePriceList();
-      await saveExpenseCategories();
-      await saveLastReceiptNo();
-      await saveDeletedReceipts();
-      await saveSettings();
+      if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; }
+      // الترقيم ما بيرجع لورا أبداً (حتى ما تتكرر أرقام مطبوعة بعد النسخة)
+      lastReceiptNo = Math.max(keepRcpNo, (typeof data.lastReceiptNo === 'number') ? data.lastReceiptNo : 0, computeMaxReceiptNo());
+      const mergedInv = {...(settings.invNoCounters||{})};
+      Object.keys(keepInvNo).forEach(k=>{ mergedInv[k] = Math.max(Number(mergedInv[k])||0, Number(keepInvNo[k])||0); });
+      settings.invNoCounters = mergedInv;
+      Object.assign(settings, keepCloud);
+      cacheSettingsLocally();
+      // كتابة وحدة لكل البيانات (يا بتنجح كلها يا ما بيتغيّر شي)
+      try{
+        await db.collection(FS_COLLECTION).doc(FS_DOC).set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts, deletedInvoices}, {merge:true});
+      }catch(err){ console.error(err); toast('تعذر الحفظ — ما تغيّر شي بالسحابة'); return; }
       applySettingsToUI();
       renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
       renderTrash();
@@ -2642,7 +2654,7 @@ function paymentMethodOptions(selected){
   return PAYMENT_METHODS.map(m=>`<option value="${m}" ${m===selected?'selected':''}>${m}</option>`).join('');
 }
 function newPaymentRow(payment){
-  payment = payment || {date: new Date().toISOString().slice(0,10), amount:'', method:'نقدي'};
+  payment = payment || {date: localDate(), amount:'', method:'نقدي'};
   if(!payment.id) payment.id = uid();
   const row = document.createElement('tr');
   row.dataset.pmId = payment.id;
@@ -2768,7 +2780,7 @@ function openReceiptModal(receipt){
     document.getElementById('receiptModalTitle').textContent = 'وصل دفع جديد';
     document.getElementById('rcpId').value = '';
     document.getElementById('rcpNo').value = getNextReceiptNo();
-    document.getElementById('rcpDate').value = new Date().toISOString().slice(0,10);
+    document.getElementById('rcpDate').value = localDate();
     document.getElementById('rcpDuration').value = '';
     document.getElementById('rcpName').value = '';
     document.getElementById('rcpPhone').value = '';
@@ -2817,7 +2829,7 @@ function convertReceiptToQuote(){
     id: '',
     docType: 'simple',
     no: nextInvoiceNo('simple'),
-    date: new Date().toISOString().slice(0,10),
+    date: localDate(),
     delay: document.getElementById('rcpDuration').value ? `${document.getElementById('rcpDuration').value} يوم` : '',
     clientName: document.getElementById('rcpName').value.trim(),
     clientAddress: document.getElementById('rcpAddress').value.trim(),
@@ -2914,7 +2926,7 @@ async function buildAndSaveReceiptFromForm(){
   if(isDelivered){
     deliveredDate = (prevReceipt && prevReceipt.delivered && prevReceipt.deliveredDate)
       ? prevReceipt.deliveredDate
-      : new Date().toISOString().slice(0,10);
+      : localDate();
   }
   const data = {
     id: id || uid(),
@@ -2995,7 +3007,7 @@ function computeDeliveryDate(receipt){
   if(!receipt.date || !days || isNaN(days)) return null;
   const d = new Date(receipt.date + 'T00:00:00');
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0,10);
+  return localDate(d);
 }
 function daysUntilLabel(dateStr){
   if(!dateStr) return '<span style="color:var(--text-dim);">—</span>';
@@ -3069,7 +3081,7 @@ function duplicateReceipt(id){
   const pseudoReceipt = {
     id: '',
     no: getNextReceiptNo(),
-    date: new Date().toISOString().slice(0,10),
+    date: localDate(),
     duration: r.duration || '',
     name: r.name || '',
     phone: r.phone || '',
@@ -3548,7 +3560,7 @@ function recalcInvoiceTotals(){
 }
 
 function newInvoicePaymentRow(payment){
-  payment = payment || {date: new Date().toISOString().slice(0,10), amount:'', method:'نقدي'};
+  payment = payment || {date: localDate(), amount:'', method:'نقدي'};
   if(!payment.id) payment.id = uid();
   const row = document.createElement('tr');
   row.dataset.pmId = payment.id;
@@ -3651,7 +3663,7 @@ function openInvoiceModal(invoice){
     document.getElementById('invId').value = '';
     document.getElementById('invDocType').value = 'simple';
     document.getElementById('invNo').value = nextInvoiceNo('devis');
-    document.getElementById('invDate').value = new Date().toISOString().slice(0,10);
+    document.getElementById('invDate').value = localDate();
     document.getElementById('invDelay').value = '';
     document.getElementById('invClientName').value = '';
     document.getElementById('invClientAddress').value = '';
@@ -3799,7 +3811,7 @@ function duplicateInvoice(id){
     id: '',
     docType: inv.docType,
     no: nextInvoiceNo(inv.docType),
-    date: new Date().toISOString().slice(0,10),
+    date: localDate(),
     delay: inv.delay || '',
     clientName: inv.clientName || '',
     clientAddress: inv.clientAddress || '',
@@ -3825,7 +3837,7 @@ function convertInvoiceToReceipt(id){
   const pseudoReceipt = {
     id: '',
     no: getNextReceiptNo(),
-    date: new Date().toISOString().slice(0,10),
+    date: localDate(),
     duration: '',
     name: inv.clientName || '',
     phone: inv.clientPhone || '',
@@ -4084,7 +4096,7 @@ function openExpenseModal(exp){
   } else {
     document.getElementById('expenseModalTitle').textContent = 'إضافة مصروف';
     document.getElementById('expId').value = '';
-    document.getElementById('expDate').value = new Date().toISOString().slice(0,10);
+    document.getElementById('expDate').value = localDate();
     document.getElementById('expDesc').value = '';
     document.getElementById('expCategory').value = expenseCategories[0] || 'أخرى';
     document.getElementById('expAmount').value = '';
@@ -4547,7 +4559,7 @@ function calcToFactoryOrder(tablesArg, customerArg, dateArg){
   return {
     workshop: document.getElementById('measWorkshop').value.trim(),
     customer: customerArg !== undefined ? customerArg : document.getElementById('measCustomerName').value.trim(),
-    date: dateArg || new Date().toISOString().slice(0,10),
+    date: dateArg || localDate(),
     pieces, extras
   };
 }
@@ -4700,7 +4712,7 @@ function tablesFromDocItems(items){
   return Object.values(byType);
 }
 function convertDocTo(target, doc){
-  const today = new Date().toISOString().slice(0,10);
+  const today = localDate();
   const from = doc.label ? ` (محوّل من ${doc.label})` : '';
   if(target === 'receipt'){
     openReceiptModal({id:'', no:getNextReceiptNo(), date:today, duration: doc.duration||'', name:doc.name, phone:doc.phone, address:doc.address,
@@ -4782,7 +4794,7 @@ function factoryOrderFromItems(items, customer){
     if(it.draws && it.draws.length) it.draws.forEach(d=>pieces.push(Object.assign({}, d)));
     else if(String(it.desc||'').trim()) extras.push(`${it.qty ? it.qty + ' × ' : ''}${it.desc}`);
   });
-  return {workshop: (document.getElementById('measWorkshop')||{}).value || '', customer: customer||'', date: new Date().toISOString().slice(0,10), pieces, extras};
+  return {workshop: (document.getElementById('measWorkshop')||{}).value || '', customer: customer||'', date: localDate(), pieces, extras};
 }
 document.getElementById('btnReceiptToFactory').addEventListener('click', ()=>{
   const r = receipts.find(x=>x.id===currentViewedReceiptId); if(!r) return;
@@ -5104,7 +5116,7 @@ function buildMeasurementRecord(allowNoName){
   if(tables.length===0){ toast('يرجى إدخال قياس واحد على الأقل'); return null; }
   return {
     id: uid(),
-    date: new Date().toISOString().slice(0,10),
+    date: localDate(),
     customerName: name,
     customerPhone: document.getElementById('measCustomerPhone').value.trim(),
     tables
@@ -5211,7 +5223,7 @@ function convertMeasToQuote(rec){
     .map(it=>({qty: it.qty, desc: it.desc, unit:'', price:'', amount:0, measType: it.measType, draws: it.draws}));
   const pseudoInvoice = {
     id: '', docType: 'simple', no: nextInvoiceNo('simple'),
-    date: new Date().toISOString().slice(0,10), delay: '',
+    date: localDate(), delay: '',
     clientName: rec.customerName, clientAddress: '', clientRC: '', clientNIF: '', clientNIS: '',
     clientPhone: rec.customerPhone || '',
     note: '',
@@ -5235,7 +5247,7 @@ function convertMeasToReceipt(rec){
   const pseudoReceipt = {
     id: '',
     no: getNextReceiptNo(),
-    date: new Date().toISOString().slice(0,10),
+    date: localDate(),
     duration: '',
     name: rec.customerName,
     phone: rec.customerPhone || '',
@@ -6186,7 +6198,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     ov.addEventListener('click',e=>{if(e.target===ov||e.target.closest('[data-x]'))return ov.remove();if(e.target.closest('[data-ok]')){const v=ov.querySelector('[data-due]').value;ov.remove();cb(v)}});
   }
   window.__mirsamCreateOrder=(o)=>new Promise(res=>askDue(o.cust.name,o.items.length,async due=>res(await createOrder({...o,due}))));
-  const addDays=(d,n)=>{const t=new Date((d||new Date().toISOString().slice(0,10))+'T12:00');if(isNaN(t))return '';t.setDate(t.getDate()+n);return t.toISOString().slice(0,10)};
+  const addDays=(d,n)=>{const t=new Date((d||localDate())+'T12:00');if(isNaN(t))return '';t.setDate(t.getDate()+n);return t.toISOString().slice(0,10)};
   const dueFrom=(date,dur)=>{const n=parseInt(String(dur||'').replace(/[^\d]/g,''));return n>0?addDays(date,n):''};
   const mapItems=items=>(items||[]).filter(x=>x.desc||x.draws).map(x=>({qty:String(x.qty??''),desc:x.desc||'',unit:x.unit||'',...(x.draws&&x.draws.length?{draws:x.draws}:{}),...(x.measType?{measType:x.measType}:{})}));
   // إرسال (أو تحديث) طلبية من وصل/عرض محفوظ أو من الفورم
