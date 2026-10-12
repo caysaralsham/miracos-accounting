@@ -928,6 +928,15 @@
         <hr style="margin:16px 0; border:none; border-top:1px solid var(--line);">
         <p style="font-size:13px; color:var(--text-dim); margin-top:0;"><b>النسخة التلقائية:</b> بتنزّل تلقائيًا (ملفين: Excel + استرجاع) لمجلد التنزيلات (Downloads) بجهازك، أول مرة تفتح فيها البرنامج بعد الساعة 5 مساءً. على الكمبيوتر بتصير <b>كل يوم</b>. على الموبايل <b>ما في نسخة تلقائية</b> — إذا بدك نسخة من الموبايل استعمل الأزرار فوق. هاي مرتبطة بالجهاز والمتصفح يلي تفتحي فيه — مش بتصير من جهاز تاني ما فتحتي منه البرنامج.</p>
         <p style="font-size:13px; margin-top:0;">آخر نسخة تلقائية بهالجهاز: <b id="lastDailyBackupLabel" style="color:var(--brass-deep);">—</b></p>
+        <hr style="margin:16px 0; border:none; border-top:1px solid var(--line);">
+        <p style="font-size:13px; color:var(--text-dim); margin-top:0;"><b>☁️ النسخة السحابية اليومية:</b> كل يوم أول ما تفتح البرنامج (من الموبايل أو الكمبيوتر) بتنحفظ نسخة كاملة بالسحابة تلقائيًا، وما حدا بيقدر يعدّلها أو يمسحها. بتنفع إذا انمسح شي بالغلط.</p>
+        <p style="font-size:13px; margin-top:0;">آخر نسخة سحابية: <b id="lastCloudBackupLabel" style="color:var(--brass-deep);">—</b></p>
+        <button class="btn" id="btnCloudBackupNow">☁️ نسخة سحابية الآن</button>
+        <button class="btn" id="btnCloudBackupList" style="margin-inline-start:8px;">⬇️ تنزيل نسخة سحابية</button>
+        <hr style="margin:16px 0; border:none; border-top:1px solid var(--line);">
+        <p style="font-size:13px; margin:0 0 6px;"><b>حجم البيانات:</b> <span id="dataSizeLabel">—</span></p>
+        <div style="height:8px; background:var(--line); border-radius:6px; overflow:hidden;"><div id="dataSizeBar" style="height:100%; width:0; background:var(--brass-deep);"></div></div>
+        <p style="font-size:12px; color:var(--text-dim); margin:6px 0 0;">الحد الأقصى للمستند الواحد بالسحابة 1 ميغا. إذا وصلت لـ 80% بيطلعلك تنبيه.</p>
       </div>
 
       <div class="panel" style="max-width:520px;">
@@ -1303,6 +1312,7 @@ const DEFAULT_SETTINGS = {
 let receipts = [];
 let expenses = [];
 let deletedReceipts = [];
+let deletedInvoices = []; // عروض الأسعار/Devis المحذوفة (سلة 30 يوم)
 let invoices = [];
 let measurementsList = [];
 let paymentHistory = [];
@@ -1414,10 +1424,13 @@ function startRealtimeSync(){
   unsubscribeSnapshot = ref.onSnapshot(async (doc)=>{
     if(doc.exists){
       const data = doc.data();
+      snapBase(data);
+      updateDataSizeMeter(data);
       if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
       if(data.receipts) receipts = data.receipts;
       if(data.expenses) expenses = data.expenses;
       if(Array.isArray(data.deletedReceipts)) deletedReceipts = data.deletedReceipts;
+      if(Array.isArray(data.deletedInvoices)) deletedInvoices = data.deletedInvoices;
       if(data.invoices) invoices = data.invoices;
       if(data.measurementsList) measurementsList = data.measurementsList;
       if(data.paymentHistory) paymentHistory = data.paymentHistory;
@@ -1445,6 +1458,7 @@ function startRealtimeSync(){
     renderTrash();
     purgeOldTrash();
     runDailyBackupIfNeeded();
+    runCloudBackupIfNeeded();
   }, (err)=>{
     console.error(err);
     toast('انقطع الاتصال بقاعدة البيانات السحابية');
@@ -1468,7 +1482,44 @@ async function cloudSet(partial){
   catch(e){ console.error(e); toast('تعذر الحفظ على السحابة'); }
 }
 async function saveSettings(){ await cloudSet({settings}); }
-async function saveReceipts(){ await cloudSet({receipts}); }
+// ===== الحفظ الآمن =====
+// بدل ما نكتب القائمة كاملة من نسخة هالجهاز (وممكن تمسح شي زاده جهاز تاني)، منقارن مع آخر
+// نسخة وصلت من السحابة ومنبعت التغييرات بس جوّا معاملة. إذا ما في نت، منرجع للطريقة القديمة.
+const __base = {};
+const SAFE_FIELDS = ['receipts','expenses','invoices','paymentHistory','deletedReceipts','deletedInvoices','measurementsList'];
+function snapBase(data){
+  SAFE_FIELDS.forEach(k=>{ if(Array.isArray(data[k])) __base[k] = new Map(data[k].filter(x=>x && x.id).map(x=>[x.id, JSON.stringify(x)])); });
+}
+function withTimeout(pr, ms){ return Promise.race([pr, new Promise((_, rej)=>setTimeout(()=>rej(new Error('timeout')), ms))]); }
+async function safeSaveArray(field, localArr){
+  if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
+  const base = __base[field];
+  if(!base || localArr.some(x=>!x || !x.id)){ await cloudSet({[field]: localArr}); return true; }
+  const localIds = new Set(localArr.map(x=>x.id));
+  const ups = localArr.filter(x=>base.get(x.id) !== JSON.stringify(x));
+  const dels = [...base.keys()].filter(id=>!localIds.has(id));
+  if(!ups.length && !dels.length) return true;
+  const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
+  try{
+    let merged = null;
+    await withTimeout(db.runTransaction(async (tx)=>{
+      const doc = await tx.get(ref);
+      let srv = (doc.exists && Array.isArray(doc.data()[field])) ? doc.data()[field].slice() : [];
+      const delSet = new Set(dels);
+      srv = srv.filter(x=>!(x && delSet.has(x.id)));
+      ups.forEach(u=>{ const i = srv.findIndex(x=>x && x.id===u.id); if(i>-1) srv[i] = u; else srv.push(u); });
+      tx.set(ref, {[field]: srv}, {merge:true});
+      merged = srv;
+    }), 10000);
+    if(merged) __base[field] = new Map(merged.filter(x=>x && x.id).map(x=>[x.id, JSON.stringify(x)]));
+    return true;
+  }catch(e){
+    console.warn('safeSave fallback', field, e && e.message);
+    await cloudSet({[field]: localArr});
+    return true;
+  }
+}
+async function saveReceipts(){ await safeSaveArray('receipts', receipts); }
 // حفظ آمن للوصولات: يقرأ آخر نسخة من السيرفر جوا معاملة (transaction) ويطبق عليها
 // التعديل المطلوب بس، بدل ما يكتب فوق كامل القائمة بنسخة قد تكون قديمة عند هذا الجهاز
 // (مثلاً بعد فترة بلا نت، أو جهاز ثاني زاد وصل بنفس اللحظة).
@@ -1490,8 +1541,9 @@ async function saveReceiptsTx(mutateFn){
     return false;
   }
 }
-async function saveDeletedReceipts(){ await cloudSet({deletedReceipts}); }
-async function saveExpenses(){ await cloudSet({expenses}); }
+async function saveDeletedReceipts(){ await safeSaveArray('deletedReceipts', deletedReceipts); }
+async function saveDeletedInvoices(){ await safeSaveArray('deletedInvoices', deletedInvoices); }
+async function saveExpenses(){ await safeSaveArray('expenses', expenses); }
 async function saveExpensesTx(mutateFn){
   if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
   try{
@@ -1506,7 +1558,7 @@ async function saveExpensesTx(mutateFn){
     return true;
   }catch(e){ console.error(e); toast('تعذر الحفظ على السحابة'); return false; }
 }
-async function saveInvoices(){ await cloudSet({invoices}); }
+async function saveInvoices(){ await safeSaveArray('invoices', invoices); }
 async function saveInvoicesTx(mutateFn){
   if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
   try{
@@ -1521,7 +1573,7 @@ async function saveInvoicesTx(mutateFn){
     return true;
   }catch(e){ console.error(e); toast('تعذر الحفظ على السحابة'); return false; }
 }
-async function saveMeasurementsList(){ await cloudSet({measurementsList}); }
+async function saveMeasurementsList(){ await safeSaveArray('measurementsList', measurementsList); }
 async function saveExpenseCategories(){ await cloudSet({expenseCategories}); }
 async function saveMeasurementsListTx(mutateFn){
   if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
@@ -1537,7 +1589,7 @@ async function saveMeasurementsListTx(mutateFn){
     return true;
   }catch(e){ console.error(e); toast('تعذر الحفظ على السحابة'); return false; }
 }
-async function savePaymentHistory(){ await cloudSet({paymentHistory}); }
+async function savePaymentHistory(){ await safeSaveArray('paymentHistory', paymentHistory); }
 async function savePriceList(){ await cloudSet({priceList, priceCategories}); }
 
 function renderPriceCategoryChips(){
@@ -1907,6 +1959,7 @@ function showLoginScreen(){
 }
 function hideLoginScreen(){
   document.getElementById('loginScreen').style.display = 'none';
+  try{ updateCloudBackupLabel(); }catch(e){}
   updateLastDailyBackupLabel();
   runDailyBackupIfNeeded();
 }
@@ -2173,7 +2226,7 @@ function exportExcelReport(silent){
 document.getElementById('btnExportBackup').addEventListener('click', ()=>exportExcelReport(false));
 
 function exportRestoreJSON(silent){
-  const restoreData = { savedAt: new Date().toISOString(), factoryOrders: (window.__ordersJobs||[]), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts };
+  const restoreData = { savedAt: new Date().toISOString(), factoryOrders: (window.__ordersJobs||[]), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts, deletedInvoices };
   const blob = new Blob([JSON.stringify(restoreData)], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2193,6 +2246,77 @@ const MOBILE_BACKUP_INTERVAL_DAYS = 7; // أسبوع
 function isMobileDevice(){
   return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 }
+// ===== مؤشر حجم البيانات =====
+let sizeWarned = false;
+function updateDataSizeMeter(data){
+  try{
+    const bytes = new Blob([JSON.stringify(data)]).size, pct = Math.min(100, bytes / 1048576 * 100);
+    const lbl = document.getElementById('dataSizeLabel'), bar = document.getElementById('dataSizeBar');
+    if(lbl) lbl.textContent = `${Math.round(bytes/1024)} كيلوبايت من 1024 تقريباً (${pct.toFixed(0)}%)`;
+    if(bar){ bar.style.width = pct + '%'; bar.style.background = pct >= 80 ? 'var(--danger)' : (pct >= 60 ? '#C27C0E' : 'var(--brass-deep)'); }
+    if(pct >= 80 && !sizeWarned){ sizeWarned = true; setTimeout(()=>alert(`⚠️ حجم بيانات البرنامج وصل ${pct.toFixed(0)}% من الحد الأقصى (1 ميغا).\nإذا وصل 100% بيوقف الحفظ. تواصل لنقسم البيانات قبل ما يمتلي.`), 1500); }
+  }catch(e){}
+}
+// ===== النسخة السحابية اليومية (Firebase Storage: backups/<المعرض أو المعمل>/) =====
+function localDay(){ return new Date().toLocaleDateString('sv-SE'); }
+let cloudBackupBusy = false;
+function updateCloudBackupLabel(){
+  const el = document.getElementById('lastCloudBackupLabel'); if(!el) return;
+  el.textContent = settings.lastCloudBackupAt ? new Date(settings.lastCloudBackupAt).toLocaleString('fr-FR') : 'ما في لسا';
+}
+function storageObjUrl(name){ const b = (firebase.app().options.storageBucket); return `https://firebasestorage.googleapis.com/v0/b/${b}/o`+(name!==undefined?'/'+encodeURIComponent(name):''); }
+async function uploadCloudBackup(name){
+  const payload = JSON.stringify({ savedAt: new Date().toISOString(), doc: FS_DOC, factoryOrders: (window.__ordersJobs||[]), settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts, deletedInvoices });
+  let body = new Blob([payload], {type:'application/json'}), ctype = 'application/json', ext = 'json';
+  if('CompressionStream' in window){ body = await new Response(body.stream().pipeThrough(new CompressionStream('gzip'))).blob(); ctype = 'application/gzip'; ext = 'json.gz'; }
+  const token = await firebase.auth().currentUser.getIdToken();
+  const full = `backups/${FS_DOC}/${name}.${ext}`;
+  const r = await fetch(storageObjUrl() + '?uploadType=media&name=' + encodeURIComponent(full), {method:'POST', headers:{'Authorization':'Firebase '+token, 'Content-Type':ctype}, body});
+  if(r.ok) return 'ok';
+  // 403 لأن نسخة اليوم موجودة أصلاً (من جهاز تاني)؟ — منتأكد بقراءة معلوماتها
+  const chk = await fetch(storageObjUrl(full), {headers:{'Authorization':'Firebase '+token}});
+  return chk.ok ? 'exists' : ('err-' + r.status);
+}
+async function runCloudBackupIfNeeded(force){
+  try{
+    if(cloudBackupBusy || !firebase.auth().currentUser) return false;
+    const day = localDay();
+    if(!force && settings.lastCloudBackupDay === day) return true;
+    if(!force && !receipts.length && !invoices.length && !expenses.length) return false;
+    cloudBackupBusy = true;
+    const name = force ? day + '-' + new Date().toTimeString().slice(0,8).replace(/:/g,'') : day;
+    const res = await uploadCloudBackup(name);
+    if(res === 'ok' || res === 'exists'){
+      settings.lastCloudBackupDay = day; if(res === 'ok') settings.lastCloudBackupAt = new Date().toISOString();
+      await saveSettings(); updateCloudBackupLabel();
+      return true;
+    }
+    console.warn('cloud backup failed', res); return false;
+  }catch(e){ console.warn('cloud backup error', e); return false; }
+  finally{ cloudBackupBusy = false; }
+}
+document.getElementById('btnCloudBackupNow').addEventListener('click', async ()=>{
+  toast('جارٍ حفظ نسخة سحابية...');
+  toast(await runCloudBackupIfNeeded(true) ? '✓ انحفظت نسخة سحابية' : 'ما انحفظت — تأكد من الإنترنت');
+});
+document.getElementById('btnCloudBackupList').addEventListener('click', async ()=>{
+  try{
+    const token = await firebase.auth().currentUser.getIdToken();
+    const r = await fetch(storageObjUrl() + '?prefix=' + encodeURIComponent(`backups/${FS_DOC}/`), {headers:{'Authorization':'Firebase '+token}});
+    const items = ((await r.json()).items || []).map(x=>x.name).sort().reverse();
+    if(!items.length){ toast('ما في نسخ سحابية لسا'); return; }
+    const list = items.slice(0, 30);
+    const pick = prompt('النسخ السحابية (الأحدث أولاً). اكتب رقم النسخة لتنزيلها:\n\n' + list.map((n,i)=>`${i+1}) ${n.split('/').pop()}`).join('\n'), '1');
+    const idx = parseInt(pick, 10) - 1; if(!(idx >= 0 && idx < list.length)) return;
+    const f = await fetch(storageObjUrl(list[idx]) + '?alt=media', {headers:{'Authorization':'Firebase '+token}});
+    let blob = await f.blob();
+    if(list[idx].endsWith('.gz') && 'DecompressionStream' in window) blob = await new Response(blob.stream().pipeThrough(new DecompressionStream('gzip'))).blob();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([blob], {type:'application/json'}));
+    a.download = 'سحابية-' + list[idx].split('/').pop().replace(/\.gz$/,''); document.body.appendChild(a); a.click(); a.remove();
+    toast('✓ نزلت — بتقدر تسترجع منها بزر «استرجاع من ملف»');
+  }catch(e){ console.error(e); toast('تعذّر جلب النسخ السحابية'); }
+});
+
 function updateLastDailyBackupLabel(){
   const el = document.getElementById('lastDailyBackupLabel');
   if(!el) return;
@@ -2269,6 +2393,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       if(Array.isArray(data.priceCategories)) priceCategories = data.priceCategories;
       if(Array.isArray(data.expenseCategories)) expenseCategories = data.expenseCategories;
       if(Array.isArray(data.deletedReceipts)) deletedReceipts = data.deletedReceipts;
+      if(Array.isArray(data.deletedInvoices)) deletedInvoices = data.deletedInvoices;
       if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
       lastReceiptNo = (typeof data.lastReceiptNo === 'number') ? data.lastReceiptNo : computeMaxReceiptNo();
       await saveReceipts();
@@ -2295,17 +2420,22 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
 });
 
 document.getElementById('btnResetAll').addEventListener('click', async ()=>{
-  if(!confirm('هل أنت متأكد من حذف جميع الوصولات والمصاريف والفواتير؟ لا يمكن التراجع عن هذا الإجراء.')) return;
+  const typed = prompt('⚠️ هذا بيمسح كل الوصولات والمصاريف والفواتير من البرنامج.\nقبل المسح رح تنحفظ نسخة سحابية وتنزل نسخة على جهازك.\n\nللتأكيد اكتب بالضبط:  احذف كل شيء');
+  if(typed === null) return;
+  if(typed.trim() !== 'احذف كل شيء'){ toast('النص ما بيطابق — ما انمسح شي'); return; }
+  toast('جارٍ حفظ نسخة قبل المسح...');
+  const cloudOk = await runCloudBackupIfNeeded(true);
+  try{ exportRestoreJSON(true); }catch(e){}
+  if(!cloudOk && !confirm('ما قدرنا نحفظ النسخة السحابية (الإنترنت؟). نزلت نسخة على جهازك بس. متابعة المسح؟')) return;
   receipts = [];
   expenses = [];
   invoices = [];
-  lastReceiptNo = 0;
+  // ترقيم الوصولات والفواتير ما بيرجع للصفر، حتى ما تتكرر أرقام مطبوعة قبل
   await saveReceipts();
   await saveExpenses();
   await saveInvoices();
-  await saveLastReceiptNo();
   renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports();
-  toast('تم حذف جميع البيانات');
+  toast('تم حذف جميع البيانات (والنسخة محفوظة)');
 });
 
 let currentItems = [];
@@ -3007,14 +3137,19 @@ async function permanentlyDeleteFromTrash(id){
 async function purgeOldTrash(){
   const cutoff = Date.now() - 30*24*60*60*1000;
   const expired = deletedReceipts.filter(r => new Date(r.deletedAt).getTime() < cutoff);
-  if(expired.length === 0) return;
-  deletedReceipts = deletedReceipts.filter(r => new Date(r.deletedAt).getTime() >= cutoff);
-  saveDeletedReceipts();
+  if(expired.length){
+    deletedReceipts = deletedReceipts.filter(r => new Date(r.deletedAt).getTime() >= cutoff);
+    saveDeletedReceipts();
+  }
+  if(deletedInvoices.some(i => new Date(i.deletedAt).getTime() < cutoff)){
+    deletedInvoices = deletedInvoices.filter(i => new Date(i.deletedAt).getTime() >= cutoff);
+    saveDeletedInvoices();
+  }
 }
 function renderTrash(){
   const wrap = document.getElementById('trashWrap');
   if(!wrap) return;
-  if(deletedReceipts.length === 0){
+  if(deletedReceipts.length === 0 && deletedInvoices.length === 0){
     wrap.innerHTML = '<div class="empty-state" style="padding:16px 0;">السلة فارغة.</div>';
     return;
   }
@@ -3029,6 +3164,19 @@ function renderTrash(){
       <div style="display:flex; gap:6px;">
         <button class="btn btn-sm" onclick="restoreReceiptFromTrash('${r.id}')">↺ استرجاع</button>
         <button class="btn btn-sm btn-danger" onclick="permanentlyDeleteFromTrash('${r.id}')">حذف نهائي</button>
+      </div>
+    </div>`;
+  }).join('') + [...deletedInvoices].sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||'')).map(i=>{
+    const delDate = i.deletedAt ? i.deletedAt.slice(0,10) : '—';
+    const label = i.docType==='devis' ? 'Devis' : 'عرض سعر';
+    return `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
+      <div style="font-size:13px;">
+        <b>${escHtmlText(i.clientName||'')}</b> — ${label} ${escHtmlText(i.no||'')} — ${fmt(i.ttc)}
+        <div style="color:var(--text-dim); font-size:12px;">اتحذف بتاريخ ${delDate}</div>
+      </div>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-sm" onclick="restoreInvoiceFromTrash('${i.id}')">↺ استرجاع</button>
+        <button class="btn btn-sm btn-danger" onclick="permanentlyDeleteInvoiceFromTrash('${i.id}')">حذف نهائي</button>
       </div>
     </div>`;
   }).join('');
@@ -3617,8 +3765,8 @@ function renderInvoicesTable(){
     const isDevis = inv.docType === 'devis';
     const typeTag = isFacture ? 'Facture' : (isDevis ? 'Devis' : 'عرض مبسط');
     const typeClass = isFacture ? 'tag-paid' : (isDevis ? 'tag-partial' : 'tag-due');
-    html += `<tr>
-      <td><span class="tag ${typeClass}">${typeTag}</span></td>
+    html += `<tr${inv.cancelled?' style="opacity:.55"':''}>
+      <td><span class="tag ${typeClass}">${typeTag}</span>${inv.cancelled?' <span class="tag tag-due">ملغاة</span>':''}</td>
       <td>${inv.no}</td>
       <td>${inv.date||''}</td>
       <td>${inv.clientName}</td>
@@ -3630,7 +3778,7 @@ function renderInvoicesTable(){
           <button class="btn btn-sm btn-ghost" onclick="editInvoice('${inv.id}')" title="تعديل">✎</button>
           <button class="btn btn-sm btn-ghost" onclick="duplicateInvoice('${inv.id}')" title="نسخ (لعمل نسخة تانية بنفس الزبون)">⧉</button>
           <button class="btn btn-sm btn-ghost" onclick="convertInvoiceToReceipt('${inv.id}')" title="تحويل إلى وصل زبون">➜🧾</button>
-          <button class="btn btn-sm btn-ghost" onclick="deleteInvoice('${inv.id}')" title="حذف">🗑</button>
+          <button class="btn btn-sm btn-ghost" onclick="deleteInvoice('${inv.id}')" title="${isFacture ? (inv.cancelled ? 'إرجاع الفاتورة فعّالة' : 'إلغاء الفاتورة') : 'حذف (للسلة)'}">${isFacture ? (inv.cancelled ? '↺' : '⊘') : '🗑'}</button>
         </div>
       </td>
     </tr>`;
@@ -3693,12 +3841,56 @@ function convertInvoiceToReceipt(id){
 }
 
 async function deleteInvoice(id){
-  if(!confirm('هل تريد حذف هذه الفاتورة؟')) return;
+  const inv = invoices.find(i=>i.id===id);
+  if(!inv) return;
+  if(inv.docType === 'facture'){
+    // الفاتورة القانونية ما بتنحذف: بتنلغى وبيضل رقمها محجوز
+    if(inv.cancelled){
+      if(!confirm(`الفاتورة ${inv.no} ملغاة. بدك ترجعها فعّالة؟`)) return;
+      inv.cancelled = false; delete inv.cancelledAt;
+      toast('رجعت الفاتورة فعّالة');
+    } else {
+      if(!confirm(`الفاتورة (Facture) ما بتنحذف قانونياً — بتنلغى.\nبيضل رقمها ${inv.no} محجوز وبتظهر «ملغاة» بالقائمة وعالطباعة.\nإلغاء الفاتورة؟`)) return;
+      inv.cancelled = true; inv.cancelledAt = new Date().toISOString();
+      toast('تم إلغاء الفاتورة');
+    }
+    await saveInvoices();
+    renderInvoicesTable(); renderDashboard();
+    return;
+  }
+  if(!confirm('حذف هذا المستند؟ رح ينحط بسلة المهملات 30 يوم وبتقدر ترجعه.')) return;
   invoices = invoices.filter(i=>i.id!==id);
-  saveInvoices();
-  renderInvoicesTable();
-  renderDashboard();
-  toast('تم حذف الفاتورة');
+  const paymentIds = new Set((inv.payments||[]).map(p=>p.id).filter(Boolean));
+  const trashedPaymentEntries = paymentIds.size ? paymentHistory.filter(h=>paymentIds.has(h.paymentId)) : [];
+  if(trashedPaymentEntries.length){ paymentHistory = paymentHistory.filter(h=>!paymentIds.has(h.paymentId)); savePaymentHistory(); renderPaymentHistoryTable(); }
+  deletedInvoices.push({...inv, deletedAt: new Date().toISOString(), trashedPaymentEntries});
+  await saveInvoices();
+  saveDeletedInvoices();
+  renderInvoicesTable(); renderDashboard(); renderTrash();
+  toast('انحط بسلة المهملات (من الإعدادات بتقدر ترجعه)');
+}
+async function restoreInvoiceFromTrash(id){
+  const target = deletedInvoices.find(i=>i.id===id);
+  if(!target) return;
+  deletedInvoices = deletedInvoices.filter(i=>i.id!==id);
+  const {deletedAt, trashedPaymentEntries, ...invData} = target;
+  invoices.push(invData);
+  await saveInvoices();
+  if(trashedPaymentEntries && trashedPaymentEntries.length){ paymentHistory = [...paymentHistory, ...trashedPaymentEntries]; savePaymentHistory(); renderPaymentHistoryTable(); }
+  saveDeletedInvoices();
+  renderInvoicesTable(); renderDashboard(); renderTrash();
+  toast('تم استرجاع المستند');
+}
+async function permanentlyDeleteInvoiceFromTrash(id){
+  const target = deletedInvoices.find(i=>i.id===id);
+  if(!target) return;
+  const typed = prompt(`حذف نهائي لا رجعة فيه للمستند ${target.no}.\nللتأكيد اكتب الرقم بالضبط: ${target.no}`);
+  if(typed === null) return;
+  if(typed.trim() !== String(target.no)){ toast('الرقم ما يطابقش — تم إلغاء الحذف'); return; }
+  deletedInvoices = deletedInvoices.filter(i=>i.id!==id);
+  saveDeletedInvoices();
+  renderTrash();
+  toast('تم الحذف النهائي');
 }
 
 let currentViewedInvoiceId = null;
@@ -3759,6 +3951,7 @@ function viewInvoice(id){
       ${inv.note ? `<div class="field" style="margin-top:14px;"><label>ملاحظة</label><div>${inv.note}</div></div>` : ''}
     `;
     document.getElementById('viewInvoiceTitle').textContent = 'عرض سعر مبسط';
+    markCancelledInvoiceView(inv);
     document.getElementById('viewInvoiceOverlay').classList.add('show');
     return;
   }
@@ -3827,7 +4020,13 @@ function viewInvoice(id){
       </div>
     </div>
   `;
+  markCancelledInvoiceView(inv);
   document.getElementById('viewInvoiceOverlay').classList.add('show');
+}
+function markCancelledInvoiceView(inv){
+  if(!inv || !inv.cancelled) return;
+  const area = document.getElementById('invoicePrintArea'); if(!area) return;
+  area.insertAdjacentHTML('afterbegin', `<div style="border:3px solid #A6453D; color:#A6453D; font-weight:900; font-size:22px; text-align:center; padding:8px; margin-bottom:10px; letter-spacing:2px;">ANNULÉE — ملغاة${inv.cancelledAt ? ' — ' + new Date(inv.cancelledAt).toLocaleDateString('fr-FR') : ''}</div>`);
 }
 
 document.getElementById('btnPrintInvoice').addEventListener('click', ()=>window.print());
