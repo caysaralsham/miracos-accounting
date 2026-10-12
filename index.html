@@ -5513,46 +5513,83 @@ function renderPaymentHistoryTable(){
 // ===== مطابقة سجل الدفعات مع الوصولات والفواتير (تصحيح القديم) =====
 // يحسب الفروقات بدون ما يغيّر شي: دفعات انعدّلت، دفعات ناقصة بالسجل، وسطور بالسجل لدفعات ما عادت موجودة
 function computePaymentReconcile(rcpts, invs, hist){
-  const docPays = new Map();
-  (rcpts||[]).forEach(r=>getReceiptPayments(r).forEach(p=>{ if(p && p.id) docPays.set(p.id, {p, meta:{customerName:r.name, docType:'وصل', docNo:r.no, details:(r.items||[]).map(it=>it.desc).filter(Boolean).join('، ')}}); }));
-  (invs||[]).forEach(i=>(i.payments||[]).forEach(p=>{ if(p && p.id) docPays.set(p.id, {p, meta:{customerName:i.clientName, docType:i.docType==='facture'?'فاتورة':(i.docType==='devis'?'Devis':'عرض سعر'), docNo:i.no, details:(i.items||[]).map(it=>it.desc).filter(Boolean).join('، ')}}); }));
-  const updates = [], removes = [], adds = [], seen = new Set();
-  let untracked = 0;
+  // 1) كل دفعة بالوصولات والفواتير — والدفعات القديمة بلا رقم بتاخد رقم جديد (بينحفظ بالوصل/الفاتورة)
+  const docPays = new Map(), idFixes = [];
+  const metaR = r=>({customerName:r.name, docType:'وصل', docNo:r.no, details:(r.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
+  const metaI = i=>({customerName:i.clientName, docType:i.docType==='facture'?'فاتورة':(i.docType==='devis'?'Devis':'عرض سعر'), docNo:i.no, details:(i.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
+  const collect = (kind, d, list, meta)=>{
+    let fix = null;
+    list.forEach((p, idx)=>{
+      if(!p || !(Number(p.amount)>0)) return;
+      let pid = p.id;
+      if(!pid){ pid = uid(); fix = fix || {kind, id:d.id, ids:{}}; fix.ids[idx] = pid; }
+      docPays.set(pid, {p:{...p, id:pid}, m:meta(d)});
+    });
+    if(fix) idFixes.push(fix);
+  };
+  (rcpts||[]).forEach(r=>collect('r', r, getReceiptPayments(r), metaR));
+  (invs||[]).forEach(i=>collect('i', i, i.payments||[], metaI));
+  // 2) سطور السجل القديمة بلا رقم دفعة: منحاول نربطها بدفعة بنفس رقم المستند والمبلغ
+  const linked = new Set((hist||[]).map(h=>h.paymentId).filter(Boolean));
+  const links = new Map();
   (hist||[]).forEach(h=>{
-    if(!h.paymentId){ untracked++; return; }
-    if(seen.has(h.paymentId)){ removes.push({h, why:'مكررة بالسجل'}); return; }
-    seen.add(h.paymentId);
-    const d = docPays.get(h.paymentId);
+    if(h.paymentId) return;
+    for(const [pid, d] of docPays){
+      if(linked.has(pid)) continue;
+      if(String(d.m.docNo)===String(h.docNo||'') && Number(d.p.amount)===Number(h.amount)){ links.set(h, pid); linked.add(pid); break; }
+    }
+  });
+  const updates = [], removes = [], adds = [], seen = new Set();
+  (hist||[]).forEach(h=>{
+    const pidOf = h.paymentId || links.get(h);
+    if(!pidOf){ removes.push({h, why:'سطر قديم غير مرتبط بأي دفعة موجودة'}); return; }
+    if(seen.has(pidOf)){ removes.push({h, why:'مكررة بالسجل'}); return; }
+    seen.add(pidOf);
+    const d = docPays.get(pidOf);
     if(!d){ removes.push({h, why:'الدفعة ما عادت موجودة بأي وصل أو فاتورة'}); return; }
-    const p = d.p, m = d.meta;
-    if(Number(h.amount)!==Number(p.amount) || (h.date||'')!==(p.date||'') || (h.method||'نقدي')!==(p.method||'نقدي') || h.customerName!==m.customerName || h.docNo!==m.docNo)
+    const p = d.p, m = d.m;
+    if(!h.paymentId || Number(h.amount)!==Number(p.amount) || (h.date||'')!==(p.date||'') || (h.method||'نقدي')!==(p.method||'نقدي') || h.customerName!==m.customerName || h.docNo!==m.docNo)
       updates.push({h, p, m});
   });
-  docPays.forEach((d, id)=>{ if(!seen.has(id)) adds.push({p:d.p, m:d.meta}); });
-  return {updates, removes, adds, untracked};
+  docPays.forEach((d, id)=>{ if(!seen.has(id)) adds.push({p:d.p, m:d.m}); });
+  const sumR = (rcpts||[]).reduce((s,r)=>s+getReceiptPayments(r).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+  const sumI = (invs||[]).reduce((s,i)=>s+(i.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+  return {updates, removes, adds, idFixes, sumR, sumI};
 }
 function applyPaymentReconcile(hist, rec){
   const rm = new Set(rec.removes.map(x=>x.h));
   let out = hist.filter(h=>!rm.has(h));
-  rec.updates.forEach(({h, p, m})=>{ Object.assign(h, {amount:p.amount, date:p.date||'', method:p.method||'نقدي', customerName:m.customerName, docType:m.docType, docNo:m.docNo, editedAt:new Date().toISOString()}); });
+  rec.updates.forEach(({h, p, m})=>{ Object.assign(h, {paymentId:p.id, amount:p.amount, date:p.date||'', method:p.method||'نقدي', customerName:m.customerName, docType:m.docType, docNo:m.docNo, editedAt:new Date().toISOString()}); });
   rec.adds.forEach(({p, m})=>out.push({id:uid(), paymentId:p.id, loggedAt:new Date().toISOString(), date:p.date||'', customerName:m.customerName, amount:p.amount, method:p.method||'نقدي', docType:m.docType, docNo:m.docNo, details:m.details||'', addedByReconcile:true}));
   return out;
+}
+// يحفظ أرقام الدفعات الجديدة جوّا الوصولات/الفواتير القديمة (حتى ما تضيع المطابقة بعدين)
+async function saveReconcileIdFixes(rec){
+  const fr = rec.idFixes.filter(f=>f.kind==='r'), fi = rec.idFixes.filter(f=>f.kind==='i');
+  const put = (list, getList)=>arr=>arr.map(d=>{ const f = list.find(x=>x.id===d.id); if(!f) return d;
+    const pays = getList(d).map((p, idx)=> (p && !p.id && f.ids[idx]) ? {...p, id:f.ids[idx]} : p); return {...d, payments: pays}; });
+  let ok = true;
+  if(fr.length) ok = (await saveReceiptsTx(put(fr, getReceiptPayments))) && ok;
+  if(fi.length) ok = (await saveInvoicesTx(put(fi, d=>d.payments||[]))) && ok;
+  return ok;
 }
 document.getElementById('btnReconcilePayments').addEventListener('click', async ()=>{
   const rec = computePaymentReconcile(receipts, invoices, paymentHistory);
   const n = rec.updates.length + rec.removes.length + rec.adds.length;
-  if(!n){ toast('✓ سجل الدفعات مطابق للوصولات والفواتير'); return; }
+  const why = `المقبوضات بالتقارير (الوصولات): ${fmt(rec.sumR)}\nدفعات الفواتير وعروض الأسعار: ${fmt(rec.sumI)}\nلوحة التحكم = الاثنين معاً = ${fmt(rec.sumR + rec.sumI)}`;
+  if(!n){ alert('✓ سجل الدفعات مطابق للوصولات والفواتير.\n\n' + why); return; }
   const line = (name, no, a)=>`• ${name||'-'} — ${no||'-'} — ${fmt(a)}`;
   const parts = [];
-  if(rec.updates.length) parts.push(`تعديل ${rec.updates.length} دفعة (المبلغ أو التاريخ تغيّر بالوصل):\n` + rec.updates.slice(0,8).map(u=>line(u.m.customerName,u.m.docNo,u.p.amount)+`  (كان ${fmt(u.h.amount)})`).join('\n'));
+  if(rec.updates.length) parts.push(`تعديل ${rec.updates.length} سطر (مبلغ أو تاريخ تغيّر، أو سطر قديم انربط بدفعته):\n` + rec.updates.slice(0,8).map(u=>line(u.m.customerName,u.m.docNo,u.p.amount)+(Number(u.h.amount)!==Number(u.p.amount)?`  (كان ${fmt(u.h.amount)})`:'')).join('\n'));
   if(rec.adds.length) parts.push(`إضافة ${rec.adds.length} دفعة ناقصة بالسجل:\n` + rec.adds.slice(0,8).map(a=>line(a.m.customerName,a.m.docNo,a.p.amount)).join('\n'));
-  if(rec.removes.length) parts.push(`حذف ${rec.removes.length} سطر من السجل (دفعة محذوفة من الوصل أو مكررة):\n` + rec.removes.slice(0,8).map(r=>line(r.h.customerName,r.h.docNo,r.h.amount)).join('\n'));
+  if(rec.removes.length) parts.push(`حذف ${rec.removes.length} سطر من السجل (دفعة محذوفة، مكررة، أو قديمة بلا وصل):\n` + rec.removes.slice(0,8).map(r=>line(r.h.customerName,r.h.docNo,r.h.amount)).join('\n'));
   const more = (rec.updates.length>8||rec.adds.length>8||rec.removes.length>8) ? '\n(والباقي بنفس الطريقة)' : '';
-  if(!confirm('مطابقة سجل الدفعات مع الوصولات والفواتير:\n\n' + parts.join('\n\n') + more + '\n\nقبل التصحيح رح تنزل نسخة احتياطية كاملة على جهازك. متابعة؟')) return;
+  if(!confirm('مطابقة سجل الدفعات مع الوصولات والفواتير:\n\n' + parts.join('\n\n') + more + '\n\nبعد التصحيح:\n' + why + '\n\nقبل التصحيح رح تنزل نسخة احتياطية كاملة على جهازك. متابعة؟')) return;
   try{ exportRestoreJSON(true); }catch(e){ console.error(e); if(!confirm('تعذّر تنزيل النسخة الاحتياطية. متابعة بدونها؟')) return; }
+  if(rec.idFixes.length && !(await saveReconcileIdFixes(rec))){ toast('ما انحفظ — تأكد من الإنترنت وجرّب مرة تانية'); return; }
   paymentHistory = applyPaymentReconcile(paymentHistory, rec);
   await savePaymentHistory();
-  renderPaymentHistoryTable(); renderDashboard(); renderReports();
+  renderPaymentHistoryTable(); renderDashboard(); renderReports(); renderReceiptsTable(); renderInvoicesTable();
   toast(`✓ تم: ${rec.updates.length} تعديل، ${rec.adds.length} إضافة، ${rec.removes.length} حذف`);
 });
 
