@@ -1418,22 +1418,148 @@ function connectFirebase(cfg){
   }
 }
 
+
+// ===== تقسيم البيانات على عدة مستندات (كل قسم إلو حد 1 ميغا لحاله بدل حد واحد للكل) =====
+// المستند الأساسي بيضل فيه الإعدادات والترقيم والأسعار. الأقسام الكبيرة كل واحد بمستند:
+//   <FS_DOC>__receipts / __invoices / __payments / __expenses / __measurements / __trash
+// النقل بيصير مرة وحدة تلقائياً (بعد نسخة سحابية)، بمعاملة وحدة: يا بينتقل كل شي يا ما بيتغيّر شي.
+const PARTS = {receipts:'receipts', invoices:'invoices', paymentHistory:'payments', expenses:'expenses', measurementsList:'measurements', deletedReceipts:'trash', deletedInvoices:'trash'};
+const PART_NAMES = [...new Set(Object.values(PARTS))];
+let SPLIT = false, splitTried = false, splitRetryAt = 0, healBusy = false;
+const partLoaded = {}, docSizes = {};
+let partUnsubs = [], partWaiters = [];
+function mainRef(){ return db.collection(FS_COLLECTION).doc(FS_DOC); }
+function partRef(p){ return db.collection(FS_COLLECTION).doc(FS_DOC + '__' + p); }
+function refFor(field){ return (SPLIT && PARTS[field]) ? partRef(PARTS[field]) : mainRef(); }
+function allPartsLoaded(){ return !SPLIT || PART_NAMES.every(p=>partLoaded[p]); }
+function waitPartsLoaded(ms){
+  if(allPartsLoaded()) return Promise.resolve(true);
+  return new Promise(res=>{ const tm = setTimeout(()=>res(allPartsLoaded()), ms); partWaiters.push(()=>{ clearTimeout(tm); res(true); }); });
+}
+function setArrayField(k, v){
+  if(!Array.isArray(v)) return;
+  if(k==='receipts') receipts = v; else if(k==='invoices') invoices = v; else if(k==='paymentHistory') paymentHistory = v;
+  else if(k==='expenses') expenses = v; else if(k==='measurementsList') measurementsList = v;
+  else if(k==='deletedReceipts') deletedReceipts = v; else if(k==='deletedInvoices') deletedInvoices = v;
+}
+// كتابة جزئية: كل حقل بيروح على مستنده. أكتر من مستند = دفعة وحدة (batch) بتنجح كلها أو لا شي
+function cloudWrite(partial){
+  const groups = {};
+  Object.keys(partial).forEach(k=>{ const g = (SPLIT && PARTS[k]) ? PARTS[k] : ''; (groups[g] = groups[g] || {})[k] = partial[k]; });
+  const keys = Object.keys(groups);
+  const refOf = g => g ? partRef(g) : mainRef();
+  if(keys.length === 1) return refOf(keys[0]).set(groups[keys[0]], {merge:true});
+  const b = db.batch(); keys.forEach(g=>b.set(refOf(g), groups[g], {merge:true})); return b.commit();
+}
+let renderTimer = null;
+function renderAllViews(){
+  applySettingsToUI();
+  renderDashboard(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
+  renderTrash();
+  renderReceiptsTable(); // آخر وحدة: بعدها بتتعلّم أزرار «إرسال للمعمل» بكل الجداول
+}
+function scheduleRender(){ clearTimeout(renderTimer); renderTimer = setTimeout(renderAllViews, 40); }
+function afterDataReady(){
+  if(!allPartsLoaded()) return; // ما منعمل تنظيف ولا نسخ قبل ما توصل كل الأقسام
+  purgeOldTrash();
+  runDailyBackupIfNeeded();
+  runCloudBackupIfNeeded();
+}
+function showSizeMeter(){
+  const vals = Object.values(docSizes); if(!vals.length) return;
+  updateDataSizeMeter(null, Math.max(...vals));
+}
+function startPartListeners(){
+  if(partUnsubs.length) return;
+  PART_NAMES.forEach(p=>{
+    partUnsubs.push(partRef(p).onSnapshot(doc=>{
+      const data = doc.exists ? doc.data() : {};
+      Object.keys(PARTS).forEach(k=>{ if(PARTS[k]===p){ if(!Array.isArray(data[k])) data[k] = []; } });
+      snapBase(data);
+      Object.keys(data).forEach(k=>{ if(PARTS[k]===p) setArrayField(k, data[k]); });
+      docSizes[p] = doc.exists ? new Blob([JSON.stringify(data)]).size : 0; showSizeMeter();
+      const first = !partLoaded[p]; partLoaded[p] = true;
+      if(first && allPartsLoaded()){ const w = partWaiters; partWaiters = []; w.forEach(fn=>fn()); }
+      scheduleRender();
+      afterDataReady();
+    }, err=>{ console.error(err); toast('انقطع الاتصال بقاعدة البيانات السحابية'); setFbStatus(false); }));
+  });
+}
+function stopPartListeners(){ partUnsubs.forEach(u=>{ try{ u(); }catch(e){} }); partUnsubs = []; PART_NAMES.forEach(p=>{ delete partLoaded[p]; }); }
+// النقل لأول مرة: من المستند الواحد للمستندات المقسّمة
+async function maybeSplit(doc, data){
+  if(SPLIT || splitTried || data.splitV === 1 || Date.now() < splitRetryAt) return;
+  if(doc.metadata && doc.metadata.fromCache) return;
+  if(!navigator.onLine || !firebase.auth().currentUser) return;
+  splitTried = true;
+  try{
+    for(let i=0; i<60 && cloudBackupBusy; i++) await new Promise(r=>setTimeout(r,1000)); // إذا في نسخة يومية شغالة، منستنّاها
+    const backed = await runCloudBackupIfNeeded(true); // نسخة كاملة قبل أي نقل
+    if(!backed){ console.warn('split postponed: no cloud backup'); splitTried = false; splitRetryAt = Date.now() + 10*60*1000; return; }
+    await withTimeout(db.runTransaction(async (tx)=>{
+      const cur = await tx.get(mainRef());
+      if(!cur.exists) return;
+      const srv = cur.data();
+      if(srv.splitV === 1) return;
+      const parts = {};
+      Object.keys(PARTS).forEach(k=>{ (parts[PARTS[k]] = parts[PARTS[k]] || {})[k] = Array.isArray(srv[k]) ? srv[k] : []; });
+      PART_NAMES.forEach(p=>tx.set(partRef(p), parts[p]));
+      const upd = {splitV: 1, splitAt: new Date().toISOString()};
+      Object.keys(PARTS).forEach(k=>{ if(k in srv) upd[k] = firebase.firestore.FieldValue.delete(); });
+      tx.update(mainRef(), upd);
+    }), 30000);
+  }catch(e){ console.warn('split failed (nothing changed)', e && e.message); splitTried = false; splitRetryAt = Date.now() + 6*60*60*1000; }
+}
+// إذا جهاز عليه نسخة قديمة من البرنامج كتب قسم بالمستند الأساسي بعد النقل: منرجّعه لمكانه (منجمع، ما منمسح شي)
+async function healMovedFields(doc, data){
+  const moved = Object.keys(PARTS).filter(k=>Array.isArray(data[k]));
+  if(!moved.length || healBusy) return;
+  if((doc.metadata && doc.metadata.fromCache) || !navigator.onLine) return;
+  healBusy = true;
+  try{
+    await withTimeout(db.runTransaction(async (tx)=>{
+      const cur = await tx.get(mainRef()); if(!cur.exists) return;
+      const srv = cur.data(); const ks = Object.keys(PARTS).filter(k=>Array.isArray(srv[k])); if(!ks.length) return;
+      const ps = [...new Set(ks.map(k=>PARTS[k]))], pdocs = {};
+      for(const p of ps){ const pd = await tx.get(partRef(p)); pdocs[p] = pd.exists ? pd.data() : {}; }
+      const out = {}, upd = {};
+      ks.forEach(k=>{
+        const have = Array.isArray(pdocs[PARTS[k]][k]) ? pdocs[PARTS[k]][k].slice() : [];
+        srv[k].forEach(x=>{ if(!x) return; const i = x.id ? have.findIndex(y=>y && y.id===x.id) : -1; if(i>-1) have[i] = x; else if(!have.some(y=>JSON.stringify(y)===JSON.stringify(x))) have.push(x); });
+        (out[PARTS[k]] = out[PARTS[k]] || {})[k] = have;
+        upd[k] = firebase.firestore.FieldValue.delete();
+      });
+      Object.keys(out).forEach(p=>tx.set(partRef(p), out[p], {merge:true}));
+      tx.update(mainRef(), upd);
+    }), 20000);
+  }catch(e){ console.warn('heal failed', e && e.message); }
+  finally{ healBusy = false; }
+}
+
 function startRealtimeSync(){
   if(unsubscribeSnapshot) unsubscribeSnapshot();
-  const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
-  unsubscribeSnapshot = ref.onSnapshot(async (doc)=>{
+  const ref = mainRef();
+  const unsubMain = ref.onSnapshot(async (doc)=>{
     if(doc.exists){
       const data = doc.data();
-      snapBase(data);
-      updateDataSizeMeter(data);
+      SPLIT = data.splitV === 1;
+      if(SPLIT){
+        startPartListeners();
+        docSizes.main = new Blob([JSON.stringify(data)]).size; showSizeMeter();
+      } else {
+        snapBase(data);
+        updateDataSizeMeter(data);
+      }
       if(data.settings){ settings = {...DEFAULT_SETTINGS, ...data.settings}; cacheSettingsLocally(); }
-      if(data.receipts) receipts = data.receipts;
-      if(data.expenses) expenses = data.expenses;
-      if(Array.isArray(data.deletedReceipts)) deletedReceipts = data.deletedReceipts;
-      if(Array.isArray(data.deletedInvoices)) deletedInvoices = data.deletedInvoices;
-      if(data.invoices) invoices = data.invoices;
-      if(data.measurementsList) measurementsList = data.measurementsList;
-      if(data.paymentHistory) paymentHistory = data.paymentHistory;
+      if(!SPLIT){
+        if(data.receipts) receipts = data.receipts;
+        if(data.expenses) expenses = data.expenses;
+        if(Array.isArray(data.deletedReceipts)) deletedReceipts = data.deletedReceipts;
+        if(Array.isArray(data.deletedInvoices)) deletedInvoices = data.deletedInvoices;
+        if(data.invoices) invoices = data.invoices;
+        if(data.measurementsList) measurementsList = data.measurementsList;
+        if(data.paymentHistory) paymentHistory = data.paymentHistory;
+      }
       if(data.priceList) priceList = data.priceList;
       if(data.priceCategories) priceCategories = data.priceCategories;
       if(Array.isArray(data.expenseCategories)){
@@ -1444,26 +1570,25 @@ function startRealtimeSync(){
       }
       if(typeof data.lastReceiptNo === 'number'){
         lastReceiptNo = data.lastReceiptNo;
-      } else {
+      } else if(allPartsLoaded()){
         lastReceiptNo = computeMaxReceiptNo();
         await saveLastReceiptNo();
       }
+      if(SPLIT) healMovedFields(doc, data);
     } else {
       expenseCategories = DEFAULT_EXPENSE_CATEGORIES.slice();
       lastReceiptNo = computeMaxReceiptNo();
       await ref.set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts});
     }
-    applySettingsToUI();
-    renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
-    renderTrash();
-    purgeOldTrash();
-    runDailyBackupIfNeeded();
-    runCloudBackupIfNeeded();
+    renderAllViews();
+    afterDataReady();
+    if(doc.exists) maybeSplit(doc, doc.data());
   }, (err)=>{
     console.error(err);
     toast('انقطع الاتصال بقاعدة البيانات السحابية');
     setFbStatus(false);
   });
+  unsubscribeSnapshot = ()=>{ unsubMain(); stopPartListeners(); };
 }
 
 async function loadAll(){
@@ -1478,7 +1603,8 @@ async function loadAll(){
 
 async function cloudSet(partial){
   if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return; }
-  try{ await db.collection(FS_COLLECTION).doc(FS_DOC).set(partial, {merge:true}); }
+  if(SPLIT && Object.keys(partial).some(k=>PARTS[k]) && !(await waitPartsLoaded(15000))){ toast('لسا عم تتحمّل البيانات — جرّب كمان شوي'); return; }
+  try{ await cloudWrite(partial); }
   catch(e){ console.error(e); toast('تعذر الحفظ على السحابة'); }
 }
 async function saveSettings(){ await cloudSet({settings}); }
@@ -1493,13 +1619,14 @@ function snapBase(data){
 function withTimeout(pr, ms){ return Promise.race([pr, new Promise((_, rej)=>setTimeout(()=>rej(new Error('timeout')), ms))]); }
 async function safeSaveArray(field, localArr){
   if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
+  if(SPLIT && PARTS[field] && !(await waitPartsLoaded(15000))){ toast('لسا عم تتحمّل البيانات — جرّب كمان شوي'); return false; }
   const base = __base[field];
   if(!base || localArr.some(x=>!x || !x.id)){ await cloudSet({[field]: localArr}); return true; }
   const localIds = new Set(localArr.map(x=>x.id));
   const ups = localArr.filter(x=>base.get(x.id) !== JSON.stringify(x));
   const dels = [...base.keys()].filter(id=>!localIds.has(id));
   if(!ups.length && !dels.length) return true;
-  const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
+  const ref = refFor(field);
   try{
     let merged = null;
     await withTimeout(db.runTransaction(async (tx)=>{
@@ -1526,7 +1653,8 @@ async function saveReceipts(){ await safeSaveArray('receipts', receipts); }
 async function saveReceiptsTx(mutateFn){
   if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
   try{
-    const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
+    if(SPLIT && !(await waitPartsLoaded(15000))){ toast('لسا عم تتحمّل البيانات — جرّب كمان شوي'); return false; }
+    const ref = refFor('receipts');
     await db.runTransaction(async (tx)=>{
       const doc = await tx.get(ref);
       const serverReceipts = (doc.exists && Array.isArray(doc.data().receipts)) ? doc.data().receipts : [];
@@ -1547,7 +1675,8 @@ async function saveExpenses(){ await safeSaveArray('expenses', expenses); }
 async function saveExpensesTx(mutateFn){
   if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
   try{
-    const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
+    if(SPLIT && !(await waitPartsLoaded(15000))){ toast('لسا عم تتحمّل البيانات — جرّب كمان شوي'); return false; }
+    const ref = refFor('expenses');
     await db.runTransaction(async (tx)=>{
       const doc = await tx.get(ref);
       const serverExpenses = (doc.exists && Array.isArray(doc.data().expenses)) ? doc.data().expenses : [];
@@ -1562,7 +1691,8 @@ async function saveInvoices(){ await safeSaveArray('invoices', invoices); }
 async function saveInvoicesTx(mutateFn){
   if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
   try{
-    const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
+    if(SPLIT && !(await waitPartsLoaded(15000))){ toast('لسا عم تتحمّل البيانات — جرّب كمان شوي'); return false; }
+    const ref = refFor('invoices');
     await db.runTransaction(async (tx)=>{
       const doc = await tx.get(ref);
       const serverInvoices = (doc.exists && Array.isArray(doc.data().invoices)) ? doc.data().invoices : [];
@@ -1578,7 +1708,8 @@ async function saveExpenseCategories(){ await cloudSet({expenseCategories}); }
 async function saveMeasurementsListTx(mutateFn){
   if(!db){ toast('غير متصل بالسحابة — اذهب للإعدادات للربط'); return false; }
   try{
-    const ref = db.collection(FS_COLLECTION).doc(FS_DOC);
+    if(SPLIT && !(await waitPartsLoaded(15000))){ toast('لسا عم تتحمّل البيانات — جرّب كمان شوي'); return false; }
+    const ref = refFor('measurementsList');
     await db.runTransaction(async (tx)=>{
       const doc = await tx.get(ref);
       const serverList = (doc.exists && Array.isArray(doc.data().measurementsList)) ? doc.data().measurementsList : [];
@@ -2250,9 +2381,9 @@ function isMobileDevice(){
 }
 // ===== مؤشر حجم البيانات =====
 let sizeWarned = false;
-function updateDataSizeMeter(data){
+function updateDataSizeMeter(data, knownBytes){
   try{
-    const bytes = new Blob([JSON.stringify(data)]).size, pct = Math.min(100, bytes / 1048576 * 100);
+    const bytes = (typeof knownBytes === 'number') ? knownBytes : new Blob([JSON.stringify(data)]).size, pct = Math.min(100, bytes / 1048576 * 100);
     const lbl = document.getElementById('dataSizeLabel'), bar = document.getElementById('dataSizeBar');
     if(lbl) lbl.textContent = `${Math.round(bytes/1024)} كيلوبايت من 1024 تقريباً (${pct.toFixed(0)}%)`;
     if(bar){ bar.style.width = pct + '%'; bar.style.background = pct >= 80 ? 'var(--danger)' : (pct >= 60 ? '#C27C0E' : 'var(--brass-deep)'); }
@@ -2416,7 +2547,7 @@ document.getElementById('restoreFileInput').addEventListener('change', (e)=>{
       cacheSettingsLocally();
       // كتابة وحدة لكل البيانات (يا بتنجح كلها يا ما بيتغيّر شي)
       try{
-        await db.collection(FS_COLLECTION).doc(FS_DOC).set({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts, deletedInvoices}, {merge:true});
+        await cloudWrite({settings, receipts, expenses, invoices, measurementsList, paymentHistory, priceList, priceCategories, expenseCategories, lastReceiptNo, deletedReceipts, deletedInvoices});
       }catch(err){ console.error(err); toast('تعذر الحفظ — ما تغيّر شي بالسحابة'); return; }
       applySettingsToUI();
       renderDashboard(); renderReceiptsTable(); renderExpensesTable(); renderReports(); renderInvoicesTable(); renderCustomerReports(); renderMeasurementsTable(); renderPaymentHistoryTable(); renderPriceCategoryChips(); renderPriceListGrouped(); renderExpenseCategoryChips();
