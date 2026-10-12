@@ -757,7 +757,10 @@
       <div class="panel">
         <div class="panel-head">
           <h2>سجل الدفعات (تاريخي)</h2>
-          <button class="btn btn-primary btn-sm" id="btnPrintPaymentHistory">طباعة السجل</button>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" id="btnReconcilePayments" title="يصحّح السجل حتى يطابق الدفعات الموجودة فعلاً بالوصولات والفواتير">🔎 مطابقة مع الوصولات</button>
+            <button class="btn btn-primary btn-sm" id="btnPrintPaymentHistory">طباعة السجل</button>
+          </div>
         </div>
         <p style="font-size:12.5px; color:var(--text-dim); margin-top:0;">كل دفعة جديدة بتتسجل هون تلقائيًا بشكل دائم بالتاريخ والوقت — حتى لو الوصل أو الفاتورة الأصلية اتعدّلت أو انحذفت لاحقًا، السجل هون بيضل موجود.</p>
         <div class="grid2" style="margin-bottom:10px;">
@@ -1919,7 +1922,7 @@ function doLogin(){
   btn.disabled = true;
   btn.textContent = 'جارٍ الدخول...';
   firebase.auth().signInWithEmailAndPassword(email, pass).then(()=>{
-    safeLocal.setItem(REMEMBER_KEY, JSON.stringify({email, pass}));
+    // ما منحفظ كلمة السر: جلسة Firebase نفسها بتضل محفوظة على الجهاز لحد تسجيل الخروج
     document.getElementById('loginUsername').value = '';
     document.getElementById('loginPassword').value = '';
     if(db) startRealtimeSync();
@@ -1954,18 +1957,11 @@ document.getElementById('loginUsername').addEventListener('keydown', (e)=>{ if(e
 
 const REMEMBER_KEY = 'miracos_remember_login';
 let autoLoginAttempted = false;
+// كلمة السر ما عادت تنحفظ بالمتصفح (كانت نص صريح) — ومنمسح أي نسخة قديمة محفوظة
+try{ safeLocal.removeItem(REMEMBER_KEY); }catch(e){}
 function tryAutoLogin(){
-  if(autoLoginAttempted){ showLoginScreen(); return; }
   autoLoginAttempted = true;
-  const raw = safeLocal.getItem(REMEMBER_KEY);
-  if(!raw){ showLoginScreen(); return; }
-  try{
-    const saved = JSON.parse(raw);
-    firebase.auth().signInWithEmailAndPassword(saved.email, saved.pass).catch(()=>{
-      safeLocal.removeItem(REMEMBER_KEY);
-      showLoginScreen();
-    });
-  }catch(e){ showLoginScreen(); }
+  showLoginScreen();
 }
 
 const btnLogoutApp = document.getElementById('btnLogoutApp');
@@ -2714,11 +2710,25 @@ document.getElementById('btnNewReceipt').addEventListener('click', ()=>openRecei
 
 // يسجّل كل دفعة جديدة (مش موجودة قبل بالسجل) بشكل مستقل بسجل تاريخي دائم،
 // بدون ما يمسح أو يعدّل أي سجل قديم — حتى لو الوصل/الفاتورة الأصلية اتعدّلت أو انحذفت لاحقًا.
-async function logPaymentHistoryEntries(payments, meta){
+async function logPaymentHistoryEntries(payments, meta, prevPayments){
   const existingIds = new Set(paymentHistory.map(h=>h.paymentId));
   let changed = false;
+  // دفعة انمسحت من المستند → بتنشال من السجل كمان (حتى الدخل يطابق الوصولات)
+  const nowIds = new Set(payments.map(p=>p.id));
+  const removedIds = new Set((prevPayments||[]).map(p=>p.id).filter(id=>id && !nowIds.has(id)));
+  if(removedIds.size){ paymentHistory = paymentHistory.filter(h=>!removedIds.has(h.paymentId)); changed = true; }
   payments.forEach(p=>{
-    if(!p.id || existingIds.has(p.id)) return;
+    if(!p.id) return;
+    if(existingIds.has(p.id)){
+      // دفعة موجودة وانعدّل مبلغها أو تاريخها أو طريقتها → منحدّث السجل
+      const h = paymentHistory.find(x=>x.paymentId===p.id);
+      if(h && (Number(h.amount)!==Number(p.amount) || (h.date||'')!==(p.date||'') || (h.method||'نقدي')!==(p.method||'نقدي') || h.customerName!==meta.customerName || h.docNo!==meta.docNo)){
+        h.amount = p.amount; h.date = p.date || ''; h.method = p.method || 'نقدي';
+        h.customerName = meta.customerName; h.docNo = meta.docNo; h.docType = meta.docType;
+        h.editedAt = new Date().toISOString(); changed = true;
+      }
+      return;
+    }
     paymentHistory.push({
       id: uid(),
       paymentId: p.id,
@@ -2801,7 +2811,7 @@ async function buildAndSaveReceiptFromForm(){
     receipts.push(data);
   }
   saveReceipts();
-  logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no, details: items.map(it=>it.desc).filter(Boolean).join('، ')});
+  logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no, details: items.map(it=>it.desc).filter(Boolean).join('، ')}, prevReceipt ? prevReceipt.payments : []);
   if(convertingFromInvoiceId){
     invoices = invoices.filter(i=>i.id!==convertingFromInvoiceId);
     saveInvoices();
@@ -3408,11 +3418,22 @@ function newInvoicePaymentRow(payment){
 document.getElementById('btnAddInvoiceItemRow').addEventListener('click', ()=>newInvoiceItemRow());
 document.getElementById('btnAddInvoicePaymentRow').addEventListener('click', ()=>{newInvoicePaymentRow();focusNewPayment('invPaymentsBody','.inv-pm-amount')});
 
+// الرقم = أكبر رقم انستعمل لهالنوع بهالسنة + 1 (من المستندات الموجودة ومن عدّاد محفوظ)
+// هيك حذف فاتورة ما بيرجّع رقمها لفاتورة تانية، والترقيم بيبلّش من 001 كل سنة جديدة
+function invNoKey(docType, year){ const prefix = docType === 'facture' ? 'F' : (docType === 'devis' ? 'D' : 'S'); return prefix + '-' + year; }
+function parseInvNo(no){ const m = String(no||'').match(/^([FDS])(\d+)\/(\d{4})$/); return m ? {prefix:m[1], n:parseInt(m[2],10), year:+m[3]} : null; }
 function nextInvoiceNo(docType){
   const year = new Date().getFullYear();
   const prefix = docType === 'facture' ? 'F' : (docType === 'devis' ? 'D' : 'S');
-  const count = invoices.filter(i=>(i.docType||'simple')===(docType||'simple')).length + 1;
-  return `${prefix}${String(count).padStart(3,'0')}/${year}`;
+  let max = Number(((settings && settings.invNoCounters) || {})[invNoKey(docType, year)]) || 0;
+  invoices.forEach(i=>{ const p = parseInvNo(i.no); if(p && p.prefix===prefix && p.year===year && p.n>max) max = p.n; });
+  return `${prefix}${String(max+1).padStart(3,'0')}/${year}`;
+}
+function noteInvoiceNoUsed(no){
+  const p = parseInvNo(no); if(!p) return;
+  const key = p.prefix + '-' + p.year;
+  settings.invNoCounters = settings.invNoCounters || {};
+  if(!(Number(settings.invNoCounters[key]) >= p.n)){ settings.invNoCounters[key] = p.n; saveSettings(); }
 }
 
 function updateInvNoLabel(){
@@ -3528,6 +3549,7 @@ async function buildAndSaveInvoiceFromForm(){
   const paid = payments.reduce((s,p)=>s+p.amount,0);
 
   const id = document.getElementById('invId').value;
+  const prevInvoice = id ? invoices.find(i=>i.id===id) : null;
   const data = {
     id: id || uid(),
     docType: document.getElementById('invDocType').value,
@@ -3552,8 +3574,9 @@ async function buildAndSaveInvoiceFromForm(){
   } else {
     invoices.push(data);
   }
+  noteInvoiceNoUsed(data.no);
   saveInvoices();
-  logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no, details: (items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
+  logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no, details: (items||[]).map(it=>it.desc).filter(Boolean).join('، ')}, prevInvoice ? prevInvoice.payments : []);
   renderInvoicesTable();
   renderDashboard();
   renderPaymentHistoryTable();
@@ -5487,6 +5510,52 @@ function renderPaymentHistoryTable(){
     </div>`;
   wrap.innerHTML = html;
 }
+// ===== مطابقة سجل الدفعات مع الوصولات والفواتير (تصحيح القديم) =====
+// يحسب الفروقات بدون ما يغيّر شي: دفعات انعدّلت، دفعات ناقصة بالسجل، وسطور بالسجل لدفعات ما عادت موجودة
+function computePaymentReconcile(rcpts, invs, hist){
+  const docPays = new Map();
+  (rcpts||[]).forEach(r=>getReceiptPayments(r).forEach(p=>{ if(p && p.id) docPays.set(p.id, {p, meta:{customerName:r.name, docType:'وصل', docNo:r.no, details:(r.items||[]).map(it=>it.desc).filter(Boolean).join('، ')}}); }));
+  (invs||[]).forEach(i=>(i.payments||[]).forEach(p=>{ if(p && p.id) docPays.set(p.id, {p, meta:{customerName:i.clientName, docType:i.docType==='facture'?'فاتورة':(i.docType==='devis'?'Devis':'عرض سعر'), docNo:i.no, details:(i.items||[]).map(it=>it.desc).filter(Boolean).join('، ')}}); }));
+  const updates = [], removes = [], adds = [], seen = new Set();
+  let untracked = 0;
+  (hist||[]).forEach(h=>{
+    if(!h.paymentId){ untracked++; return; }
+    if(seen.has(h.paymentId)){ removes.push({h, why:'مكررة بالسجل'}); return; }
+    seen.add(h.paymentId);
+    const d = docPays.get(h.paymentId);
+    if(!d){ removes.push({h, why:'الدفعة ما عادت موجودة بأي وصل أو فاتورة'}); return; }
+    const p = d.p, m = d.meta;
+    if(Number(h.amount)!==Number(p.amount) || (h.date||'')!==(p.date||'') || (h.method||'نقدي')!==(p.method||'نقدي') || h.customerName!==m.customerName || h.docNo!==m.docNo)
+      updates.push({h, p, m});
+  });
+  docPays.forEach((d, id)=>{ if(!seen.has(id)) adds.push({p:d.p, m:d.meta}); });
+  return {updates, removes, adds, untracked};
+}
+function applyPaymentReconcile(hist, rec){
+  const rm = new Set(rec.removes.map(x=>x.h));
+  let out = hist.filter(h=>!rm.has(h));
+  rec.updates.forEach(({h, p, m})=>{ Object.assign(h, {amount:p.amount, date:p.date||'', method:p.method||'نقدي', customerName:m.customerName, docType:m.docType, docNo:m.docNo, editedAt:new Date().toISOString()}); });
+  rec.adds.forEach(({p, m})=>out.push({id:uid(), paymentId:p.id, loggedAt:new Date().toISOString(), date:p.date||'', customerName:m.customerName, amount:p.amount, method:p.method||'نقدي', docType:m.docType, docNo:m.docNo, details:m.details||'', addedByReconcile:true}));
+  return out;
+}
+document.getElementById('btnReconcilePayments').addEventListener('click', async ()=>{
+  const rec = computePaymentReconcile(receipts, invoices, paymentHistory);
+  const n = rec.updates.length + rec.removes.length + rec.adds.length;
+  if(!n){ toast('✓ سجل الدفعات مطابق للوصولات والفواتير'); return; }
+  const line = (name, no, a)=>`• ${name||'-'} — ${no||'-'} — ${fmt(a)}`;
+  const parts = [];
+  if(rec.updates.length) parts.push(`تعديل ${rec.updates.length} دفعة (المبلغ أو التاريخ تغيّر بالوصل):\n` + rec.updates.slice(0,8).map(u=>line(u.m.customerName,u.m.docNo,u.p.amount)+`  (كان ${fmt(u.h.amount)})`).join('\n'));
+  if(rec.adds.length) parts.push(`إضافة ${rec.adds.length} دفعة ناقصة بالسجل:\n` + rec.adds.slice(0,8).map(a=>line(a.m.customerName,a.m.docNo,a.p.amount)).join('\n'));
+  if(rec.removes.length) parts.push(`حذف ${rec.removes.length} سطر من السجل (دفعة محذوفة من الوصل أو مكررة):\n` + rec.removes.slice(0,8).map(r=>line(r.h.customerName,r.h.docNo,r.h.amount)).join('\n'));
+  const more = (rec.updates.length>8||rec.adds.length>8||rec.removes.length>8) ? '\n(والباقي بنفس الطريقة)' : '';
+  if(!confirm('مطابقة سجل الدفعات مع الوصولات والفواتير:\n\n' + parts.join('\n\n') + more + '\n\nقبل التصحيح رح تنزل نسخة احتياطية كاملة على جهازك. متابعة؟')) return;
+  try{ exportRestoreJSON(true); }catch(e){ console.error(e); if(!confirm('تعذّر تنزيل النسخة الاحتياطية. متابعة بدونها؟')) return; }
+  paymentHistory = applyPaymentReconcile(paymentHistory, rec);
+  await savePaymentHistory();
+  renderPaymentHistoryTable(); renderDashboard(); renderReports();
+  toast(`✓ تم: ${rec.updates.length} تعديل، ${rec.adds.length} إضافة، ${rec.removes.length} حذف`);
+});
+
 async function deletePaymentHistoryEntry(id){
   if(!confirm('حذف هذه الدفعة من سجل الدفعات؟ هذا ما يأثرش على الوصل الأصلي إذا كان مازال موجود.')) return;
   paymentHistory = paymentHistory.filter(h=>h.id!==id);
