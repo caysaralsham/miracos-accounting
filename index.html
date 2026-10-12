@@ -3461,21 +3461,25 @@ document.getElementById('btnShareReceipt').addEventListener('click', async ()=>{
 
 // صورة المشاركة بشكل صفحة الطباعة: نسخة من الوصل بعرض ورقة A4 (794px) بدل عرض النافذة الضيقة
 async function captureAsPage(area){
+  // الصورة بتنرسم جوّا علبة مخفية (حجمها صفر) — ما بتبيّن بالبرنامج أبداً، حتى لو أخدت وقت
+  const hideBox = document.createElement('div');
+  hideBox.style.cssText = 'position:fixed; top:0; left:0; width:0; height:0; overflow:hidden; pointer-events:none;';
   const holder = document.createElement('div');
-  holder.style.cssText = 'position:fixed; top:0; left:0; width:794px; background:#fff; z-index:-1; pointer-events:none;';
+  holder.style.cssText = 'position:absolute; top:0; left:0; width:794px; background:#fff; pointer-events:none;';
+  hideBox.appendChild(holder);
   const clone = area.cloneNode(true);
   clone.removeAttribute('id');
   clone.classList.add('share-page');
   // المبالغ والأسعار ما تنكسر على سطرين
   clone.querySelectorAll('td, th').forEach(c=>{ const t = c.textContent.trim(); if(/دج|^[\d.,\s×x*]+$/.test(t) && t.length < 25) c.style.whiteSpace = 'nowrap'; });
   holder.appendChild(clone);
-  document.body.appendChild(holder);
+  document.body.appendChild(hideBox);
   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
   try{
     const canvas = await html2canvas(clone, {scale:2, backgroundColor:'#ffffff', useCORS:true, windowWidth:1200, width:794});
     return await new Promise(res=>canvas.toBlob(res, 'image/jpeg', 0.92));
   } finally {
-    holder.remove();
+    hideBox.remove();
   }
 }
 
@@ -4821,14 +4825,14 @@ function cloneItem(it){
     ...(it.measType ? {measType: it.measType} : {}), ...(it.draws && it.draws.length ? {draws: JSON.parse(JSON.stringify(it.draws))} : {})};
 }
 function docFromReceipt(r){
-  return {kind:'receipt', label:`وصل رقم ${r.no}`, name:r.name||'', phone:r.phone||'', address:r.address||'',
+  return {md: r.mirsamDrawing ? {...r.mirsamDrawing, dirty:false} : null, kind:'receipt', label:`وصل رقم ${r.no}`, name:r.name||'', phone:r.phone||'', address:r.address||'',
     delay: r.duration ? `${r.duration} يوم` : '', duration: r.duration||'', note: r.note||'',
     items:(r.items||[]).map(cloneItem), discount:Number(r.discount)||0,
     tables: r.measurementTables ? JSON.parse(JSON.stringify(r.measurementTables)) : null};
 }
 function docFromInvoice(inv){
   const lbl = inv.docType==='facture' ? 'Facture' : inv.docType==='devis' ? 'Devis' : 'عرض سعر';
-  return {kind: inv.docType||'simple', label:`${lbl} ${inv.no}`, name:inv.clientName||'', phone:inv.clientPhone||'', address:inv.clientAddress||'',
+  return {md: inv.mirsamDrawing ? {...inv.mirsamDrawing, dirty:false} : null, kind: inv.docType||'simple', label:`${lbl} ${inv.no}`, name:inv.clientName||'', phone:inv.clientPhone||'', address:inv.clientAddress||'',
     rc:inv.clientRC||'', nif:inv.clientNIF||'', nis:inv.clientNIS||'', delay: inv.delay||'', duration: parseInt(inv.delay,10)||'',
     note: inv.note||'', items:(inv.items||[]).map(cloneItem), discount:0, tables:null};
 }
@@ -4952,7 +4956,7 @@ wireConvertMenu('btnConvReceiptEdit', 'receipt', ()=>{
       ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {}), ...(row.dataset.md ? {md:1} : {})};
   }).filter(Boolean);
   const dur = document.getElementById('rcpDuration').value.trim();
-  return {kind:'receipt', label: `وصل رقم ${document.getElementById('rcpNo').value}`,
+  return {md: window.__mdCurrent ? window.__mdCurrent('rcp') : null, kind:'receipt', label: `وصل رقم ${document.getElementById('rcpNo').value}`,
     name: document.getElementById('rcpName').value.trim(), phone: document.getElementById('rcpPhone').value.trim(), address: document.getElementById('rcpAddress').value.trim(),
     delay: dur ? `${dur} يوم` : '', duration: dur, note: document.getElementById('rcpNote').value.trim(),
     items, discount: Number(document.getElementById('rcpDiscount').value)||0,
@@ -4971,7 +4975,7 @@ wireConvertMenu('btnConvInvoiceEdit', ()=>document.getElementById('invDocType').
   }).filter(Boolean);
   const v = id => (document.getElementById(id)||{}).value || '';
   const dt = v('invDocType'), lbl = dt==='facture' ? 'Facture' : dt==='devis' ? 'Devis' : 'عرض سعر';
-  return {kind: dt, label: `${lbl} ${v('invNo')}`, name: v('invClientName').trim(), phone: v('invClientPhone').trim(), address: v('invClientAddress').trim(),
+  return {md: window.__mdCurrent ? window.__mdCurrent('inv') : null, kind: dt, label: `${lbl} ${v('invNo')}`, name: v('invClientName').trim(), phone: v('invClientPhone').trim(), address: v('invClientAddress').trim(),
     rc: v('invClientRC'), nif: v('invClientNIF'), nis: v('invClientNIS'), delay: v('invDelay'), duration: parseInt(v('invDelay'),10)||'',
     note: v('invNote').trim(), items, discount:0, tables:null};
 }, ()=>document.getElementById('invoiceOverlay').classList.remove('show'));
@@ -6236,6 +6240,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   const _saveI=buildAndSaveInvoiceFromForm;buildAndSaveInvoiceFromForm=async function(){
     const meta=await persist('inv');window.__mdSave={inv:meta};let id;try{id=await _saveI()}finally{window.__mdSave=null}if(!id)return id;
     const v=invoices.find(x=>x.id===id);if(v&&!meta&&v.mirsamDrawing){delete v.mirsamDrawing;saveInvoices()}return id};
+  window.__mdCurrent=k=>MD[k]?{...MD[k]}:null;
+  const _convD=convertDocTo;convertDocTo=function(target,doc){carry=(doc&&doc.md&&target!=='calc')?{...doc.md}:null;try{_convD(target,doc)}finally{carry=null}};
   const _convI=convertInvoiceToReceipt;convertInvoiceToReceipt=function(id){const inv=invoices.find(i=>i.id===id);carry=inv&&inv.mirsamDrawing?{...inv.mirsamDrawing,dirty:false}:null;try{_convI(id)}finally{carry=null}};
   const rtq=document.getElementById('btnReceiptToQuote');if(rtq)rtq.addEventListener('click',()=>{carry=MD.rcp?{...MD.rcp}:null},true);
 
@@ -6397,14 +6403,14 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     const img=j.draw?await drawingSrc(j.draw):null,sec=await secImg(j);
     const rows=j.items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.qty||'')}</td><td style="text-align:right">${esc(x.desc)}${x.unit?' ('+esc(x.unit)+')':''}</td></tr>`).join('');
     const st=j.draw?__stIn(j.draw.stats):[];
-    const h=document.createElement('div');h.style.cssText='position:fixed;top:0;left:0;width:794px;background:#fff;z-index:-1;pointer-events:none;';
+    const hb=document.createElement('div');hb.style.cssText='position:fixed;top:0;left:0;width:0;height:0;overflow:hidden;pointer-events:none;';const h=document.createElement('div');h.style.cssText='position:absolute;top:0;left:0;width:794px;background:#fff;pointer-events:none;';hb.appendChild(h);
     h.innerHTML=`<div dir="rtl" style="font-family:Cairo,Tahoma,Arial,sans-serif;color:#3B2414;padding:28px;background:#fff">
       <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #9A6A3A;padding-bottom:8px;margin-bottom:14px"><div><div style="font-size:24px;font-weight:800">طلبية ${ordNo(j)}</div></div><div style="font-size:14px;text-align:left">${fmtD(j.at)}${j.due?'<br>التسليم: '+fmtD(new Date(j.due).getTime()):''}</div></div>
       <div style="font-size:16px;margin-bottom:14px"><b>الزبون:</b> ${esc(j.cust.name||'-')}</div>
       <table style="width:100%;border-collapse:collapse;font-size:16px">${'<tr>'+['#','العدد','النوع والتفاصيل'].map(t=>`<th style="border:1px solid #CDB894;padding:8px;background:#F5ECDD">${t}</th>`).join('')+'</tr>'}${rows.replace(/<td/g,'<td style="border:1px solid #CDB894;padding:8px;text-align:center"').replace(/text-align:center" style="text-align:right"/g,'text-align:right"')}</table>
       ${j.note?`<div style="margin-top:12px;font-size:15px;border:1px dashed #CDB894;padding:8px;border-radius:6px"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}
       ${img?`<div style="display:flex;gap:14px;align-items:center;margin-top:14px">${st.length?`<table style="flex:1 1 44%;border-collapse:collapse;font-size:16px">${st.map(r=>`<tr><td style="padding:5px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="padding:5px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:''}<img src="${img}" style="max-width:${st.length?'54%':'100%'};max-height:520px;border:1px solid #E6D6BC;margin:0 auto"></div>`:''}${secHtml(sec,'60%')}</div>`;
-    document.body.appendChild(h);
+    document.body.appendChild(hb);
     try{for(const im of h.querySelectorAll('img'))if(!im.complete)await new Promise(r=>{im.onload=im.onerror=r});
       const pgH=1123,pad=28,avail=pgH-2*pad,inner=h.firstElementChild,blocks=[...inner.children].filter(e=>e.offsetHeight>0);
       const hgt=e=>{const cs=getComputedStyle(e);return e.offsetHeight+parseFloat(cs.marginTop||0)+parseFloat(cs.marginBottom||0)};
@@ -6425,7 +6431,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
         h.appendChild(page);for(const im of page.querySelectorAll('img'))if(!im.complete)await new Promise(r=>{im.onload=im.onerror=r});
         const cv=await html2canvas(page,{scale:2,backgroundColor:'#ffffff',width:794,height:pgH,windowWidth:1200});out.push(await new Promise(r=>cv.toBlob(r,'image/jpeg',.9)));page.remove()}
       return out.length>1?out:out[0]}
-    finally{h.remove()}
+    finally{hb.remove()}
   }
   function prepJob(j){if(!j)return null;const key=j.id+'|'+((j.upd&&j.upd.at)||j.at);let p=jobPrep[j.id];if(p&&p.key===key)return p;
     p={key,blob:null};p.promise=jobImage(j).then(b=>{p.blob=b;return b}).catch(e=>{console.error(e);return null});jobPrep[j.id]=p;return p}
