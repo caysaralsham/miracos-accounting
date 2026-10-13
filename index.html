@@ -3556,7 +3556,7 @@ function downloadBlob(blob, fileName){
 const REVIEW_URL='https://search.google.com/local/writereview?placeid=ChIJu3qTTPixjxIR-CVe1wPfIYE';
 function shareMsg(title){
   let head=String(title||'').split(' — ')[0].trim();head=/#/.test(head)?head.replace(/\s*#\s*/,' رقم '):head.replace(/\s+(\S*\d\S*)$/,' رقم $1');
-  return 'السلام عليكم،\n'+head+'\n\nرأيك بيهمّنا 🌹 من فضلك قيّمنا على غوغل، ما بياخد غير دقيقة:\n'+REVIEW_URL+'\n\ncesar-alcham.com';
+  return 'السلام عليكم،\n'+head+'\n\nرأيك بيهمّنا 🌹 من فضلك قيّمنا على غوغل:\n'+REVIEW_URL+'\n\ncesar-alcham.com';
 }
 async function blobToPng(blob){
   const url=URL.createObjectURL(blob);
