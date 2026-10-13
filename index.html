@@ -467,11 +467,19 @@
   .ts-range input{max-width:150px;}
   .ts-period{font-size:13px; color:var(--text-dim); margin-bottom:12px; line-height:1.8;}
   .ts-period b{color:var(--ink);}
-  .ts-top{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px;}
+  .ts-top{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr)); gap:10px;}
   .ts-card{background:var(--marble-2); border-radius:10px; padding:12px 14px; border:1px solid var(--line);}
   .ts-card .ts-name{font-size:17px; font-weight:800; color:var(--brass-deep); margin-bottom:6px;}
   .ts-card div{font-size:13px; line-height:1.9;}
   .ts-card div b{color:var(--ink);}
+  .ts-rank{display:inline-block; min-width:24px; height:24px; line-height:24px; text-align:center; border-radius:50%; background:var(--brass); color:#fff; font-size:13px;}
+  .ts-sales{margin-top:8px; border-top:1px solid var(--line); padding-top:6px; max-height:260px; overflow-y:auto;}
+  .ts-card .ts-sale{display:flex; flex-wrap:wrap; justify-content:space-between; gap:2px 10px; font-size:12.5px; line-height:1.6; padding:4px 0; border-bottom:1px dashed var(--line);}
+  .ts-card .ts-sale:last-child{border-bottom:0;}
+  .ts-sale .ts-c{font-weight:700; color:var(--ink); flex:1 1 100%;}
+  .ts-sale span:not(.ts-c){color:var(--text-dim);}
+  #tsAll{overflow-x:hidden;}
+  .ts-top{min-width:0;} .ts-card{min-width:0; overflow-wrap:anywhere;}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -5844,22 +5852,23 @@ function renderTopSales(){
     (r.items||[]).forEach(it=>{
       if(!it || Number(it.amount) < 0 || tsNorm(it.desc).includes('خصم')) return;
       const c = tsCatOf(it.desc) || (it.md ? tabCat : ''); if(!c) return;
-      const s = stats[c] || (stats[c] = {name:c, count:0, amount:0, first:d, last:d});
+      const s = stats[c] || (stats[c] = {name:c, count:0, amount:0, sales:[]});
       s.amount += Number(it.amount)||0;
-      if(!seen.has(c)){ seen.add(c); s.count++; if(d < s.first) s.first = d; if(d > s.last) s.last = d; }
+      if(!seen.has(c)){ seen.add(c); s.count++; s.sales.push({cust:r.name||'—', no:r.no||'—', d}); }
     });
   });
   const list = Object.values(stats).sort((a,b)=> b.count-a.count || b.amount-a.amount);
   document.getElementById('tsPeriod').innerHTML = `الفترة: من <b>${fmtDateLatn(from)}</b> إلى <b>${fmtDateLatn(to)}</b> — المدة: <b>${tsSpanText(from,to)}</b><br>عدد الوصولات في هذه الفترة: <b>${inRange.length}</b>`;
   const medals = ['🥇','🥈','🥉'];
-  box.innerHTML = list.length ? list.slice(0,3).map((s,i)=>`<div class="ts-card">
-      <div class="ts-name">${medals[i]} ${s.name}</div>
+  const salesHtml = s => `<div class="ts-sales">${s.sales.slice().sort((x,y)=>y.d-x.d).map(x=>`<div class="ts-sale"><span class="ts-c">${escHtmlText(String(x.cust))}</span><span>وصل رقم <b>${escHtmlText(String(x.no))}</b></span><span>${fmtDateLatn(x.d)}</span></div>`).join('')}</div>`;
+  const cardHtml = (s, i, top) => `<div class="ts-card">
+      <div class="ts-name">${top ? medals[i] : `<span class="ts-rank">${i+1}</span>`} ${s.name}</div>
       <div>عدد مرات البيع: <b>${s.count}</b></div>
       <div>إجمالي المبيعات: <b>${fmt(s.amount)}</b></div>
-      <div>أول عملية بيع: <b>${fmtDateLatn(s.first)}</b></div>
-      <div>آخر عملية بيع: <b>${fmtDateLatn(s.last)}</b></div>
-    </div>`).join('') : '<div class="empty-state" style="padding:16px;">لا توجد مبيعات مسجّلة في هذه الفترة.</div>';
-  document.getElementById('tsAll').innerHTML = list.length ? `<table><thead><tr><th>الترتيب</th><th>المنتج</th><th>عدد مرات البيع</th><th>إجمالي المبيعات</th><th>أول بيع</th><th>آخر بيع</th></tr></thead><tbody>${list.map((s,i)=>`<tr><td>${i+1}</td><td>${s.name}</td><td>${s.count}</td><td>${fmt(s.amount)}</td><td>${fmtDateLatn(s.first)}</td><td>${fmtDateLatn(s.last)}</td></tr>`).join('')}</tbody></table>` : '';
+      ${salesHtml(s)}
+    </div>`;
+  box.innerHTML = list.length ? list.slice(0,3).map((s,i)=>cardHtml(s,i,true)).join('') : '<div class="empty-state" style="padding:16px;">لا توجد مبيعات مسجّلة في هذه الفترة.</div>';
+  document.getElementById('tsAll').innerHTML = list.length ? `<div class="ts-top">${list.map((s,i)=>cardHtml(s,i,false)).join('')}</div>` : '';
 }
 document.querySelectorAll('#tsChips [data-ts]').forEach(b=>b.addEventListener('click', ()=>{
   tsMode = b.dataset.ts;
