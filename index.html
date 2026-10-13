@@ -453,6 +453,25 @@
   /* شريط التمرير على اليمين دايماً */
   @media (min-width:900px) and (hover:hover){ html{direction:ltr} body{direction:rtl} }
   @media (min-width:900px) and (hover:hover){ .modal-body,.overlay{direction:ltr} .overlay>*,.modal-body>.mb-in{direction:rtl} }
+  .top-sales > summary{list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; font-size:16px; font-weight:800; color:var(--brass-deep);}
+  .top-sales > summary::-webkit-details-marker{display:none;}
+  .top-sales > summary::before{content:'◂'; margin-inline-end:8px; font-size:13px;}
+  .top-sales[open] > summary::before{content:'▾';}
+  .top-sales .ts-hint{font-size:12px; font-weight:600; color:var(--text-dim); margin-inline-start:auto;}
+  .top-sales[open] .ts-hint{display:none;}
+  .ts-body{margin-top:12px;}
+  .ts-chips{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+  .ts-chips button{border:1px solid var(--line); background:#fff; border-radius:999px; padding:6px 14px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; color:var(--text-dim);}
+  .ts-chips button.active{background:var(--brass); color:#fff; border-color:var(--brass);}
+  .ts-range{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; font-size:13px;}
+  .ts-range input{max-width:150px;}
+  .ts-period{font-size:13px; color:var(--text-dim); margin-bottom:12px; line-height:1.8;}
+  .ts-period b{color:var(--ink);}
+  .ts-top{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px;}
+  .ts-card{background:var(--marble-2); border-radius:10px; padding:12px 14px; border:1px solid var(--line);}
+  .ts-card .ts-name{font-size:17px; font-weight:800; color:var(--brass-deep); margin-bottom:6px;}
+  .ts-card div{font-size:13px; line-height:1.9;}
+  .ts-card div b{color:var(--ink);}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -742,6 +761,26 @@
           <tr style="font-weight:800;"><td>الرصيد الصافي (المقبوضات − العمولة − المصاريف)</td><td id="repNet">0 دج</td></tr>
         </table>
       </div>
+      <details class="panel top-sales" id="topSalesBox">
+        <summary class="ts-sum"><span>🏆 المنتجات الأكثر مبيعًا</span><span class="ts-hint">اضغط للفتح</span></summary>
+        <div class="ts-body">
+          <div class="ts-chips" id="tsChips">
+            <button type="button" data-ts="month">هذا الشهر</button>
+            <button type="button" data-ts="3m">آخر ثلاثة أشهر</button>
+            <button type="button" data-ts="year">هذه السنة</button>
+            <button type="button" data-ts="all" class="active">كامل المدة</button>
+            <button type="button" data-ts="custom">فترة محددة</button>
+          </div>
+          <div class="ts-range" id="tsRange" style="display:none;">
+            <label>من <input type="text" id="tsFrom" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></label>
+            <label>إلى <input type="text" id="tsTo" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></label>
+          </div>
+          <div class="ts-period" id="tsPeriod"></div>
+          <div class="ts-top" id="tsTop"></div>
+          <button type="button" class="btn btn-sm" id="tsAllBtn" style="margin-top:10px;">عرض الترتيب الكامل</button>
+          <div id="tsAll" style="display:none; margin-top:10px;"></div>
+        </div>
+      </details>
       <div class="panel">
         <div class="panel-head"><h2>المصاريف حسب الفئة</h2></div>
         <div id="expByCategory"></div>
@@ -5721,6 +5760,7 @@ function renderReports(){
   document.getElementById('repTotalDue').textContent = fmt(totalDue);
   document.getElementById('repTotalExp').textContent = fmt(totalExp);
   document.getElementById('repNet').textContent = fmt(totalCollected - commission - totalExp);
+  try{ renderTopSales(); }catch(e){ console.error(e); }
 
   const byCat = {};
   expenses.forEach(e=>{ byCat[e.category] = (byCat[e.category]||0) + e.amount; });
@@ -5742,6 +5782,96 @@ function renderReports(){
     `).join('');
   }
 }
+
+// ================== المنتجات الأكثر مبيعًا (بالتقارير) ==================
+const TS_CATS=[
+  ['جرن',['جرن','اجران','جرون']],
+  ['مدفأة (شمينيه)',['شمين','مدفا','مدفي','مدفئ']],
+  ['نافورة',['نافور','فسقي']],
+  ['درابزين',['درابزين','درابزون']],
+  ['لوحة (تابلو)',['تابلو','لوحه']],
+  ['مغسلة',['مغسل','لافابو','حوض']],
+  ['سبالة',['سبال','سبيل']],
+  ['عمود',['عامود','عمود','اعمده','عواميد']],
+  ['واجهة',['واجه','تغليف']],
+  ['درج',['درج','دروج','سلم']],
+  ['طاولة',['طاول','طربيز']],
+  ['كورنيش',['كورنيش','افريز']],
+  ['قوس ومحراب',['قوس','اقواس','محراب']],
+  ['مدخل',['مدخل','بوابه']],
+  ['نافذة',['نافذ','شباك','نوافذ']],
+  ['حمّام',['حمام']],
+  ['أرضية',['ارضي','بلاط']]
+];
+const TS_TAB={jurn:'جرن',fireplace:'مدفأة (شمينيه)',fountain:'نافورة',balus:'درابزين',tablo:'لوحة (تابلو)',wall:'لوحة (تابلو)',lavabo:'مغسلة',sabil:'سبالة',column:'عمود',facade:'واجهة',table:'طاولة',frame:'كورنيش',mosque:'قوس ومحراب',door:'مدخل',window:'نافذة',bath:'حمّام',floor:'أرضية'};
+function tsNorm(t){ return String(t||'').replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي'); }
+function tsCatOf(desc){ const d = tsNorm(desc); for(const [name, keys] of TS_CATS){ if(keys.some(k=>d.includes(k))) return name; } return ''; }
+function tsDate(s){
+  s = String(s||'').trim(); let m;
+  if((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return new Date(+m[1], +m[2]-1, +m[3]);
+  if((m = s.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/))) return new Date(+m[3], +m[2]-1, +m[1]);
+  const d = new Date(s); return isNaN(d) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+function tsSpanText(a, b){
+  const days = Math.round((b - a)/86400000) + 1;
+  let y = b.getFullYear()-a.getFullYear(), mo = b.getMonth()-a.getMonth(), dd = b.getDate()-a.getDate()+1;
+  if(dd < 0){ mo--; dd += new Date(b.getFullYear(), b.getMonth(), 0).getDate(); }
+  if(mo < 0){ y--; mo += 12; }
+  const part = (n, one, two, few, many)=> n===1 ? one : n===2 ? two : (n>=3 && n<=10) ? `${n} ${few}` : `${n} ${many}`;
+  const parts = [];
+  if(y) parts.push(part(y,'سنة واحدة','سنتان','سنوات','سنة'));
+  if(mo) parts.push(part(mo,'شهر واحد','شهران','أشهر','شهرًا'));
+  if(dd && (dd < 31)) parts.push(part(dd,'يوم واحد','يومان','أيام','يومًا'));
+  return (parts.join(' و') || 'يوم واحد') + ((y||mo) ? ` (${days} ${days>=3&&days<=10?'أيام':'يومًا'})` : '');
+}
+let tsMode = 'all';
+function renderTopSales(){
+  const box = document.getElementById('tsTop'); if(!box) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dated = receipts.map(r=>({r, d: tsDate(r.date)})).filter(x=>x.d);
+  const first = dated.length ? new Date(Math.min(...dated.map(x=>+x.d))) : today;
+  let from = first, to = today;
+  if(tsMode==='month') from = new Date(today.getFullYear(), today.getMonth(), 1);
+  else if(tsMode==='3m') from = new Date(today.getFullYear(), today.getMonth()-3, today.getDate()+1);
+  else if(tsMode==='year') from = new Date(today.getFullYear(), 0, 1);
+  else if(tsMode==='custom'){ from = tsDate(document.getElementById('tsFrom').value) || first; to = tsDate(document.getElementById('tsTo').value) || today; }
+  if(from > to){ const t = from; from = to; to = t; }
+  const inRange = dated.filter(x=>x.d >= from && x.d <= to);
+  const stats = {};
+  inRange.forEach(({r, d})=>{
+    const tabCat = r.mirsamDrawing && r.mirsamDrawing.mstate ? (TS_TAB[r.mirsamDrawing.mstate.tab]||'') : '';
+    const seen = new Set();
+    (r.items||[]).forEach(it=>{
+      if(!it || Number(it.amount) < 0 || tsNorm(it.desc).includes('خصم')) return;
+      const c = tsCatOf(it.desc) || (it.md ? tabCat : ''); if(!c) return;
+      const s = stats[c] || (stats[c] = {name:c, count:0, amount:0, first:d, last:d});
+      s.amount += Number(it.amount)||0;
+      if(!seen.has(c)){ seen.add(c); s.count++; if(d < s.first) s.first = d; if(d > s.last) s.last = d; }
+    });
+  });
+  const list = Object.values(stats).sort((a,b)=> b.count-a.count || b.amount-a.amount);
+  document.getElementById('tsPeriod').innerHTML = `الفترة: من <b>${fmtDateLatn(from)}</b> إلى <b>${fmtDateLatn(to)}</b> — المدة: <b>${tsSpanText(from,to)}</b><br>عدد الوصولات في هذه الفترة: <b>${inRange.length}</b>`;
+  const medals = ['🥇','🥈','🥉'];
+  box.innerHTML = list.length ? list.slice(0,3).map((s,i)=>`<div class="ts-card">
+      <div class="ts-name">${medals[i]} ${s.name}</div>
+      <div>عدد مرات البيع: <b>${s.count}</b></div>
+      <div>إجمالي المبيعات: <b>${fmt(s.amount)}</b></div>
+      <div>أول عملية بيع: <b>${fmtDateLatn(s.first)}</b></div>
+      <div>آخر عملية بيع: <b>${fmtDateLatn(s.last)}</b></div>
+    </div>`).join('') : '<div class="empty-state" style="padding:16px;">لا توجد مبيعات مسجّلة في هذه الفترة.</div>';
+  document.getElementById('tsAll').innerHTML = list.length ? `<table><thead><tr><th>الترتيب</th><th>المنتج</th><th>عدد مرات البيع</th><th>إجمالي المبيعات</th><th>أول بيع</th><th>آخر بيع</th></tr></thead><tbody>${list.map((s,i)=>`<tr><td>${i+1}</td><td>${s.name}</td><td>${s.count}</td><td>${fmt(s.amount)}</td><td>${fmtDateLatn(s.first)}</td><td>${fmtDateLatn(s.last)}</td></tr>`).join('')}</tbody></table>` : '';
+}
+document.querySelectorAll('#tsChips [data-ts]').forEach(b=>b.addEventListener('click', ()=>{
+  tsMode = b.dataset.ts;
+  document.querySelectorAll('#tsChips [data-ts]').forEach(x=>x.classList.toggle('active', x===b));
+  document.getElementById('tsRange').style.display = tsMode==='custom' ? '' : 'none';
+  renderTopSales();
+}));
+['tsFrom','tsTo'].forEach(id=>document.getElementById(id).addEventListener('input', ()=>{ if(tsMode==='custom') renderTopSales(); }));
+document.getElementById('tsAllBtn').addEventListener('click', e=>{
+  const el = document.getElementById('tsAll'), show = el.style.display==='none';
+  el.style.display = show ? '' : 'none'; e.currentTarget.textContent = show ? 'إخفاء الترتيب الكامل' : 'عرض الترتيب الكامل';
+});
 
 function renderCustomerReports(){
   const dWrap = document.getElementById('deliveryTrackWrap');
