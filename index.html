@@ -5785,7 +5785,7 @@ function renderReports(){
 
 // ================== المنتجات الأكثر مبيعًا (بالتقارير) ==================
 const TS_CATS=[
-  ['جرن',['جرن','اجران','جرون']],
+  ['جرن',['جرن','اجران','جرون','باسان','بسان','bassin','basin']],
   ['مدفأة (شمينيه)',['شمين','مدفا','مدفي','مدفئ']],
   ['نافورة',['نافور','فسقي']],
   ['درابزين',['درابزين','درابزون']],
@@ -5805,7 +5805,7 @@ const TS_CATS=[
 ];
 const TS_TAB={jurn:'جرن',fireplace:'مدفأة (شمينيه)',fountain:'نافورة',balus:'درابزين',tablo:'لوحة (تابلو)',wall:'لوحة (تابلو)',lavabo:'مغسلة',sabil:'سبالة',column:'عمود',facade:'واجهة',table:'طاولة',frame:'كورنيش',mosque:'قوس ومحراب',door:'مدخل',window:'نافذة',bath:'حمّام',floor:'أرضية'};
 function tsNorm(t){ return String(t||'').replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي'); }
-function tsCatOf(desc){ const d = tsNorm(desc); for(const [name, keys] of TS_CATS){ if(keys.some(k=>d.includes(k))) return name; } return ''; }
+function tsCatOf(desc){ const d = tsNorm(desc).toLowerCase(); for(const [name, keys] of TS_CATS){ if(keys.some(k=>d.includes(k))) return name; } return ''; }
 function tsDate(s){
   s = String(s||'').trim(); let m;
   if((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return new Date(+m[1], +m[2]-1, +m[3]);
