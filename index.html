@@ -3553,7 +3553,7 @@ function downloadBlob(blob, fileName){
   setTimeout(()=>URL.revokeObjectURL(url), 2000);
 }
 // رسالة المشاركة: رقم الوصل + طلب تقييم على غوغل + الموقع
-const REVIEW_URL='https://maps.app.goo.gl/g6wBPVBsZmQipM2j6';
+const REVIEW_URL='https://search.google.com/local/writereview?placeid=ChIJu3qTTPixjxIR-CVe1wPfIYE';
 function shareMsg(title){
   let head=String(title||'').split(' — ')[0].trim();head=/#/.test(head)?head.replace(/\s*#\s*/,' رقم '):head.replace(/\s+(\S*\d\S*)$/,' رقم $1');
   return 'السلام عليكم،\n'+head+'\n\nرأيك بيهمّنا 🌹 من فضلك قيّمنا على غوغل، ما بياخد غير دقيقة:\n'+REVIEW_URL+'\n\ncesar-alcham.com';
