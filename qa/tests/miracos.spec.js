@@ -18,8 +18,6 @@ test('البرنامج يفتح على شاشة الدخول بدون أخطاء
 });
 
 test('البرنامج غير مفهرس في محركات البحث', async ({ page }) => {
-  // خلل معروف: لا توجد علامة noindex، والبرنامج منشور على github.io فقد تظهر صفحة الدخول في غوغل
-  test.fail(true, 'خلل معروف: علامة noindex ناقصة');
   const robots = await page.$eval('meta[name="robots"]', e => e.content).catch(() => '');
   expect(robots).toMatch(/noindex/i);
 });
@@ -111,11 +109,15 @@ test.describe('حساب القياسات', () => {
     expect(t['زاوية']).toBeCloseTo(0.16, 9);
   });
 
-  test('العدد صفر لا يُحسب', async ({ page }) => {
-    // خلل معروف: كتابة 0 في خانة العدد تُحسب كأنها 1
-    test.fail(true, 'خلل معروف: العدد 0 يُحسب 1');
-    const t = await totals(page, [{ type: 'مربع', rows: [{ l: 2, w: 2, count: 0 }] }]);
-    expect(t['مربع']).toBe(0);
+  test('العدد صفر لا يُحسب، والخانة الفارغة تعني قطعة واحدة', async ({ page }) => {
+    const t = await totals(page, [{ type: 'مربع', rows: [{ l: 2, w: 2, count: 0 }, { l: 1, w: 1, count: '' }, { l: 1, w: 2, count: '3' }] }]);
+    expect(t['مربع']).toBeCloseTo(0 + 1 + 6, 9);
+  });
+
+  test('سطر عدده صفر لا يدخل ورقة المعمل', async ({ page }) => {
+    const pieces = await page.evaluate(() => calcToFactoryOrder([{ type: 'مربع', rows: [{ l: 2, w: 1, count: 0 }, { l: 1, w: 1, count: 2 }] }], '', '').pieces);
+    expect(pieces.length).toBe(1);
+    expect(Number(pieces[0].count)).toBe(2);
   });
 });
 
