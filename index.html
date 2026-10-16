@@ -481,6 +481,9 @@
   .ts-sale span:not(.ts-c){color:var(--text-dim);}
   #tsAll{overflow-x:hidden;}
   .ts-top{min-width:0;} .ts-card{min-width:0; overflow-wrap:anywhere;}
+
+/* البيان: الاتجاه من أول حرف، حتى تبقى الأقواس بمكانها الصحيح */
+.details-wrap, .fac-extra, .item-draw-cap, .desc-td textarea { unicode-bidi: plaintext; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -3200,6 +3203,20 @@ function computeDeliveryDate(receipt){
   d.setDate(d.getDate() + days);
   return localDate(d);
 }
+// أيام تأخر السداد: من تاريخ التسليم حتى اليوم (للزبائن المستلمين وعليهم دين)
+function daysSinceDelivery(r){
+  if(!r || !r.deliveredDate) return null;
+  const d = new Date(r.deliveredDate + 'T00:00:00');
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.max(0, Math.round((today - d) / 86400000));
+}
+function debtLateLabel(r){
+  const n = daysSinceDelivery(r);
+  if(n === null) return '<span style="color:var(--text-dim);" title="تاريخ التسليم غير مسجل">—</span>';
+  if(n === 0) return '<span style="color:#B8860B; font-weight:800;">سُلّم اليوم</span>';
+  return `<span style="color:var(--danger); font-weight:800;">⏱ متأخر ${n} يوم</span>`;
+}
+
 function daysUntilLabel(dateStr){
   if(!dateStr) return '<span style="color:var(--text-dim);">—</span>';
   const target = new Date(dateStr + 'T00:00:00');
@@ -3391,7 +3408,7 @@ function viewReceipt(id){
   if(!r) return;
   currentViewedReceiptId = id;
   const itemsRows = r.items.map((it,i)=>`
-    <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td>${escHtmlText(it.desc)}${itemMeasDrawingsHtml(it, r.measurementTables)}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+    <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td dir="auto">${escHtmlText(it.desc)}${itemMeasDrawingsHtml(it, r.measurementTables)}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
   `).join('');
   const payList = getReceiptPayments(r);
   const paymentsRows = payList.map(p=>`
@@ -4110,7 +4127,7 @@ function viewInvoice(id){
 
   if(isSimple){
     const itemsRowsAr = (inv.items||[]).map((it,i)=>`
-      <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td style="text-align:right;">${escHtmlText(it.desc)}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+      <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td dir="auto" style="text-align:right;">${escHtmlText(it.desc)}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
     `).join('');
     const paymentsRowsAr = (inv.payments||[]).map(p=>`
       <div class="totals-row"><span>دفعة بتاريخ ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
@@ -4166,7 +4183,7 @@ function viewInvoice(id){
 
   const docLabel = (inv.docType === 'facture') ? 'FACTURE' : 'DEVIS';
   const itemsRows = (inv.items||[]).map((it,i)=>`
-    <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td style="text-align:left;">${escHtmlText(it.desc)}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
+    <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td dir="auto" style="text-align:left;">${escHtmlText(it.desc)}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
   `).join('');
   const paymentsRows = (inv.payments||[]).map(p=>`
     <div class="totals-row"><span>Paiement du ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
@@ -4350,7 +4367,7 @@ function renderExpensesTable(){
   list.forEach(e=>{
     html += `<tr>
       <td>${e.date||''}</td>
-      <td>${escHtmlText(e.desc)}</td>
+      <td dir="auto">${escHtmlText(e.desc)}</td>
       <td>${escHtmlText(e.category)}</td>
       <td>${fmt(e.amount)}</td>
       <td>
@@ -5718,13 +5735,14 @@ function renderDashboard(){
     }</tbody></table>`;
   }
 
-  const deliveredDue = receipts.filter(r => r.delivered && r.remaining > 0);
+  const deliveredDue = receipts.filter(r => r.delivered && r.remaining > 0)
+    .sort((a,b)=> (daysSinceDelivery(b) ?? -1) - (daysSinceDelivery(a) ?? -1));
   const deliveredDueWrap = document.getElementById('deliveredDueList');
   if(deliveredDue.length===0){
     deliveredDueWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن مستلمين وعليهم دين 🎉</div>';
   } else {
-    deliveredDueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th><th style="width:90px"></th></tr></thead><tbody>${
-      deliveredDue.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td><button class="btn btn-sm btn-primary" data-dashboard-edit-receipt="${r.id}">تعديل</button></td></tr>`).join('')
+    deliveredDueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th><th>تأخر السداد</th><th style="width:90px"></th></tr></thead><tbody>${
+      deliveredDue.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td>${debtLateLabel(r)}</td><td><button class="btn btn-sm btn-primary" data-dashboard-edit-receipt="${r.id}">تعديل</button></td></tr>`).join('')
     }</tbody></table>`;
     deliveredDueWrap.querySelectorAll('[data-dashboard-edit-receipt]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
@@ -5934,7 +5952,7 @@ function renderCustomerReports(){
       delivered.map(r=>{
         const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
         const paymentStatus = r.remaining > 0
-          ? `<span style="color:var(--danger); font-weight:700;">دين</span>`
+          ? `<span style="color:var(--danger); font-weight:700;">دين</span><br>${debtLateLabel(r)}`
           : `<span style="color:var(--verdigris-deep); font-weight:700;">مدفوع</span>`;
         return `<tr>
           <td>${escHtmlText(r.name)}</td>
@@ -6792,6 +6810,37 @@ window.popBar=function(withPrint){
 </script>
 <script>
 document.addEventListener('click',function(e){var h=e.target.closest&&e.target.closest('.collapsible > .panel-head');if(!h||e.target.closest('button,input,a,select'))return;h.parentElement.classList.toggle('collapsed');});
+</script>
+<script id="latin-digits">/* أرقام لاتينية دائماً (0-9): أي رقم عربي ٠-٩ أو فارسي ۰-۹ يُكتب أو يُلصق في أي خانة يتحول فوراً */
+(function(){
+  var AR=/[٠-٩۰-۹]/, AR_G=/[٠-٩۰-۹]/g;
+  function fix(s, numeric){
+    s=String(s).replace(AR_G,function(c){var k=c.charCodeAt(0);return String(k>=0x06F0?k-0x06F0:k-0x0660);});
+    return numeric ? s.replace(/٫/g,'.').replace(/٬/g,'') : s;
+  }
+  function numericField(el){ return el.type==='number' || /^(decimal|numeric|tel)$/.test(el.inputMode||'') || el.type==='tel'; }
+  function editable(el){ return el && (el.tagName==='TEXTAREA' || (el.tagName==='INPUT' && !/^(file|checkbox|radio|button|submit|color|range)$/.test(el.type))); }
+  function insert(el, text){
+    if(document.execCommand && document.execCommand('insertText', false, text)) return;
+    try{ var a=el.selectionStart,b=el.selectionEnd; el.setRangeText(text,a,b,'end'); el.dispatchEvent(new Event('input',{bubbles:true})); }catch(_){ el.value+=text; el.dispatchEvent(new Event('input',{bubbles:true})); }
+  }
+  document.addEventListener('beforeinput', function(e){
+    var el=e.target; if(!editable(el) || !e.data || !(AR.test(e.data) || (numericField(el) && /[٫٬]/.test(e.data)))) return;
+    if(e.isComposing) return;
+    e.preventDefault(); insert(el, fix(e.data, numericField(el)));
+  }, true);
+  document.addEventListener('paste', function(e){
+    var el=e.target; if(!editable(el) || !e.clipboardData) return;
+    var t=e.clipboardData.getData('text'); if(!AR.test(t)) return;
+    e.preventDefault(); insert(el, fix(t, numericField(el)));
+  }, true);
+  // احتياط (لوحات مفاتيح تكتب بطريقة التركيب): تصحيح القيمة بعد الكتابة مع الحفاظ على مكان المؤشر
+  document.addEventListener('input', function(e){
+    var el=e.target; if(!editable(el) || el.type==='number' || !AR.test(el.value)) return;
+    var a=el.selectionStart,b=el.selectionEnd; el.value=fix(el.value, numericField(el)); try{el.setSelectionRange(a,b);}catch(_){}
+  }, true);
+  window.latinDigits = fix;
+})();
 </script>
 </body>
 </html>

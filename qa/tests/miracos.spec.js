@@ -167,3 +167,41 @@ test.describe('على الجوال', () => {
     expect(await horizontalOverflow(page)).toEqual([]);
   });
 });
+
+test.describe('الأرقام اللاتينية والأقواس وتأخر السداد', () => {
+  test('الأرقام العربية المكتوبة تتحول إلى 0-9 (نص ورقم عشري)', async ({ page }) => {
+    await page.evaluate(() => document.querySelectorAll('.view').forEach(v => v.classList.add('active')));
+    await page.locator('#customerSearch').focus();
+    await page.keyboard.type('هاتف ٠٥٥١٢');
+    expect(await page.locator('#customerSearch').inputValue()).toBe('هاتف 05512');
+    await page.locator('#rcpDiscount').evaluate(e => e.closest('[class*=overlay]')?.classList.add('show'));
+    await page.locator('#rcpDiscount').focus();
+    await page.keyboard.type('١٢٫٥');
+    expect(await page.locator('#rcpDiscount').inputValue()).toBe('12.5');
+  });
+
+  test('البيان يأخذ اتجاهه من أول حرف (الأقواس بمكانها)', async ({ page }) => {
+    const dir = await page.evaluate(() => {
+      receipts.push({ id: 'bidi', no: 5, name: 'س', date: '2026-10-16', items: [{ qty: 1, desc: 'نافورة (قطر 1.20 م)', price: 1, amount: 1 }], remaining: 0, payments: [] });
+      viewReceipt('bidi');
+      const td = [...document.querySelectorAll('#viewReceiptOverlay td')].find(t => t.textContent.includes('نافورة'));
+      return td && td.getAttribute('dir');
+    });
+    expect(dir).toBe('auto');
+  });
+
+  test('الزبون المستلم وعليه دين: يظهر عدد أيام التأخر، والأكثر تأخراً أولاً', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      const ago = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+      receipts.push({ id: 'a', no: 1, name: 'زبون جديد', delivered: true, deliveredDate: ago(2), total: 100, remaining: 50, items: [], payments: [] });
+      receipts.push({ id: 'b', no: 2, name: 'زبون قديم', delivered: true, deliveredDate: ago(30), total: 100, remaining: 80, items: [], payments: [] });
+      receipts.push({ id: 'c', no: 3, name: 'زبون مسدد', delivered: true, deliveredDate: ago(40), total: 100, remaining: 0, items: [], payments: [] });
+      renderDashboard();
+      return [...document.querySelectorAll('#deliveredDueList tbody tr')].map(tr => tr.innerText.replace(/\s+/g, ' ').trim());
+    });
+    expect(r.length).toBe(2);
+    expect(r[0]).toContain('زبون قديم');
+    expect(r[0]).toContain('متأخر 30 يوم');
+    expect(r[1]).toContain('متأخر 2 يوم');
+  });
+});
