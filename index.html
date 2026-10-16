@@ -2,6 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ميراكوس كنستريكسون — إدارة الحسابات</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -2630,6 +2631,8 @@ document.getElementById('btnResetAll').addEventListener('click', async ()=>{
 
 let currentItems = [];
 
+// عدد القطع في سطر القياس: الخانة الفارغة تعني 1، والصفر يعني 0 (السطر لا يُحسب)
+function measCount(v){ if(v===undefined||v===null||v==='') return 1; const n=Number(v); return Number.isFinite(n)&&n>=0 ? n : 1; }
 function measResultFor(type, l, w, h, h2){
   l = parseFloat(l)||0; w = parseFloat(w)||0; h = parseFloat(h)||0; h2 = parseFloat(h2)||0;
   if(type==='طول') return {value: l, label: l.toFixed(2)+' م.ط'};
@@ -3407,9 +3410,9 @@ function viewReceipt(id){
           const field = ['l','w','h','h2'][ci];
           return `<td>${measNumShow(row[field])}</td>`;
         }).join('');
-        const count = row.count===undefined || row.count===null || row.count==='' ? 1 : row.count;
+        const count = measCount(row.count);
         const base = measResultFor(tbl.type, row.l, row.w, row.h, row.h2);
-        const total = base.value * (Number(count)||1);
+        const total = base.value * count;
         const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
         const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
         const noteTd = measHasNote(tbl.type) ? `<td style="text-align:right;">${escHtmlText(row.note||'')}</td>` : '';
@@ -4387,7 +4390,7 @@ function computeMeasTotalsFrom(tables){
   const totals = {'مربع':0, 'طول':0, 'مكعب':0, 'عامود':0};
   tables.forEach(tbl=>{
     tbl.rows.forEach(r=>{
-      const count = r.count===undefined || r.count===null || r.count==='' ? 1 : (Number(r.count)||1);
+      const count = measCount(r.count);
       const base = measResultFor(tbl.type, r.l, r.w, r.h, r.h2);
       totals[tbl.type] = (totals[tbl.type]||0) + base.value * count;
     });
@@ -4693,12 +4696,12 @@ function measDrawsForType(tables, type){
   const tbls = (tables||[]).filter(t=>t.type===type);
   if(!tbls.length) return [];
   return calcToFactoryOrder(tbls, '', '').pieces.filter(p=>shapeHasDims(p))
-    .map(p=>({shape:p.shape, l:p.l, w:p.w, h:p.h||0, ...(p.h2 ? {h2:p.h2} : {}), count:Number(p.count)||1, edges:p.edges||{}, note:String(p.note||'').trim(), ...(p.dir ? {dir:p.dir} : {})}));
+    .map(p=>({shape:p.shape, l:p.l, w:p.w, h:p.h||0, ...(p.h2 ? {h2:p.h2} : {}), count:measCount(p.count), edges:p.edges||{}, note:String(p.note||'').trim(), ...(p.dir ? {dir:p.dir} : {})}));
 }
 function drawsHtml(pieces){
   if(!pieces || !pieces.length) return '';
   return `<div class="item-draws">${pieces.map(p=>{
-    const c = Number(p.count)||1;
+    const c = measCount(p.count);
     const cap = [c>1 ? `<b>العدد: ${c}</b>` : '', p.note ? escHtmlText(p.note) : ''].filter(Boolean).join(' · ');
     return `<div class="item-draw">${shapeSvg(p.shape, p.l, p.w, p.h, p.edges, {maxW:90, maxH:42, compact:true, dir:p.dir, c2:p.h2})}${cap?`<div class="item-draw-cap">${cap}</div>`:''}</div>`;
   }).join('')}</div>${edgeLegendHtml(edgeTypesOf(pieces)).replace('fac-legend','fac-legend item-legend')}`;
@@ -4714,7 +4717,7 @@ function factoryCardsHtml(piecesIn){
   const pieces = (piecesIn||[]).filter(p=> shapeHasDims(p) || String(p.note||'').trim());
   let hasEdges = false;
   const cards = pieces.map((p,i)=>{
-    const c = Number(p.count)||1;
+    const c = measCount(p.count);
     const dims = shapeHasDims(p) ? shapeDimsText(p) : '';
     if(p.edges && Object.values(p.edges).some(Boolean)) hasEdges = true;
     return `<div class="fac-card">
@@ -4731,7 +4734,7 @@ function calcToFactoryOrder(tablesArg, customerArg, dateArg){
   (tablesArg || measTables).forEach(tbl=>{
     tbl.rows.forEach(r=>{
       const l = parseFloat(r.l)||0, w = parseFloat(r.w)||0, h = parseFloat(r.h)||0;
-      const c = Number(r.count)||1, note = String(r.note||'').trim();
+      const c = measCount(r.count), note = String(r.note||'').trim(); if(c===0) return;
       const shape = shapeOfMeasType(tbl.type);
       if(shape !== 'rect'){
         const p = {shape, l:l*100, w:w*100, h:h*100, h2:(parseFloat(r.h2)||0)*100, count:c, note, edges: Object.assign({}, r.edges||{}), ...(shape==='corner' ? {dir: cornerDir(r.dir)} : {})};
@@ -5090,9 +5093,9 @@ function renderMeasTables(){
         return `<input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
       }).join('');
       const pad = measHasNote(tbl.type) ? measNoteInput(tbl, ti, ri, r) : (spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '');
-      const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
+      const count = measCount(r.count);
       const base = measResultFor(tbl.type, r.l, r.w, r.h, r.h2);
-      const total = base.value * (Number(count)||1);
+      const total = base.value * count;
       const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
       const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
       return `<div class="meas-row-grid">
@@ -5146,9 +5149,9 @@ function renderMeasTables(){
       if(clean !== e.target.value) e.target.value = clean;
       measTables[t].rows[r][f] = clean;
       const row = measTables[t].rows[r];
-      const count = row.count===undefined || row.count===null || row.count==='' ? 1 : row.count;
+      const count = measCount(row.count);
       const base = measResultFor(measTables[t].type, row.l, row.w, row.h, row.h2);
-      const total = base.value * (Number(count)||1);
+      const total = base.value * count;
       const unit = measTables[t].type==='طول' ? ' م.ط' : (measTables[t].type==='مكعب' ? ' م³' : ' م²');
       const resultEl = wrap.querySelector(`.meas-result[data-result-t="${t}"][data-result-r="${r}"]`);
       if(resultEl) resultEl.textContent = total.toFixed(measTables[t].type==='مكعب'?3:2) + unit;
@@ -5207,9 +5210,9 @@ function renderReceiptMeasTables(){
         return `<input type="text" inputmode="decimal" dir="ltr" style="text-align:right;" data-t="${ti}" data-r="${ri}" data-f="${field}" value="${r[field]||''}">`;
       }).join('');
       const pad = measHasNote(tbl.type) ? measNoteInput(tbl, ti, ri, r) : (spec.cols.length < 3 ? '<span></span>'.repeat(3-spec.cols.length) : '');
-      const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
+      const count = measCount(r.count);
       const base = measResultFor(tbl.type, r.l, r.w, r.h, r.h2);
-      const total = base.value * (Number(count)||1);
+      const total = base.value * count;
       const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
       const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
       return `<div class="meas-row-grid">
@@ -5261,9 +5264,9 @@ function renderReceiptMeasTables(){
       if(clean !== e.target.value) e.target.value = clean;
       receiptMeasTables[t].rows[r][f] = clean;
       const row = receiptMeasTables[t].rows[r];
-      const count = row.count===undefined || row.count===null || row.count==='' ? 1 : row.count;
+      const count = measCount(row.count);
       const base = measResultFor(receiptMeasTables[t].type, row.l, row.w, row.h, row.h2);
-      const total = base.value * (Number(count)||1);
+      const total = base.value * count;
       const unit = receiptMeasTables[t].type==='طول' ? ' م.ط' : (receiptMeasTables[t].type==='مكعب' ? ' م³' : ' م²');
       const resultEl = wrap.querySelector(`.meas-result[data-rcp-result-t="${t}"][data-rcp-result-r="${r}"]`);
       if(resultEl) resultEl.textContent = total.toFixed(receiptMeasTables[t].type==='مكعب'?3:2) + unit;
@@ -5375,7 +5378,7 @@ function measDetailsForType(tables, type){
     const note = String(r.note||'').trim();
     const hasDims = !!(parseFloat(r.l)||parseFloat(r.w)||parseFloat(r.h));
     if(!hasDims){ if(note) parts.push(note); return; }
-    const c = Number(r.count)||1;
+    const c = measCount(r.count); if(c===0) return;
     let d;
     if(type==='عامود'){
       const one = (parseFloat(r.l)||0)*3.14*(parseFloat(r.w)||0);
@@ -5577,9 +5580,9 @@ function renderMeasurementRecordInto(rec){
         const field = ['l','w','h','h2'][ci];
         return `<td>${measNumShow(r[field])}</td>`;
       }).join('');
-      const count = r.count===undefined || r.count===null || r.count==='' ? 1 : r.count;
+      const count = measCount(r.count);
       const base = measResultFor(tbl.type, r.l, r.w, r.h, r.h2);
-      const total = base.value * (Number(count)||1);
+      const total = base.value * count;
       const unit = tbl.type==='طول' ? ' م.ط' : (tbl.type==='مكعب' ? ' م³' : ' م²');
       const resLabel = total.toFixed(tbl.type==='مكعب'?3:2) + unit;
       const noteTd = measHasNote(tbl.type) ? `<td style="text-align:right;">${escHtmlText(r.note||'')}</td>` : '';

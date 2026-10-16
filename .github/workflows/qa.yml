@@ -1,0 +1,69 @@
+name: الفحص والاختبارات (QA)
+
+# يشتغل على كل طلب دمج (Pull Request) قبل الموافقة، وعلى كل تعديل يصل لـ main، ويدوياً متى أردت.
+# لا يتصل بـ Firebase ولا يكتب أي شيء في المستودع أو قاعدة البيانات: قراءة وتقارير فقط.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: اختبارات Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: qa
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: qa/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: تشغيل الاختبارات
+        run: npx playwright test
+      - name: حفظ التقرير عند الفشل
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: qa/playwright-report
+          retention-days: 14
+
+  semgrep:
+    name: فحص أمان الكود (Semgrep)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write   # لرفع النتائج إلى تبويب Security في GitHub
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v5
+      - name: استخراج السكربتات المضمّنة في صفحات HTML
+        run: python3 -I qa/tools/extract_scripts.py . _extracted
+      - name: الفحص
+        run: >
+          semgrep scan --metrics=off
+          --config p/javascript --config p/secrets --config p/html
+          --sarif --output semgrep.sarif
+          .
+        continue-on-error: true   # تقرير للمراجعة، لا يمنع الدمج
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
