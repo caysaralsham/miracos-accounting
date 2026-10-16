@@ -205,3 +205,10 @@ test.describe('الأرقام اللاتينية والأقواس وتأخر ا�
     expect(r[1]).toContain('متأخر 2 يوم');
   });
 });
+
+test('خانات الأرقام والتواريخ لغتها إنكليزية (أرقام 0-9 حتى على متصفح عربي)', async ({ page }) => {
+  const notLatn = await page.$$eval('input[type=number],input[type=date]', els => els.filter(e => e.getAttribute('lang') !== 'en').length);
+  expect(notLatn).toBe(0);
+  const later = await page.evaluate(async () => { const i = document.createElement('input'); i.type = 'number'; document.body.appendChild(i); await new Promise(r => setTimeout(r, 50)); return i.getAttribute('lang'); });
+  expect(later).toBe('en');
+});
