@@ -6840,6 +6840,10 @@ document.addEventListener('click',function(e){var h=e.target.closest&&e.target.c
     var a=el.selectionStart,b=el.selectionEnd; el.value=fix(el.value, numericField(el)); try{el.setSelectionRange(a,b);}catch(_){}
   }, true);
   window.latinDigits = fix;
+  // خانات الأرقام والتواريخ: المتصفح العربي يعرض أرقامها ٠١٢ حسب لغة الصفحة، فنعطيها لغة أرقام لاتينية
+  function latnLang(root){ (root.querySelectorAll ? root : document).querySelectorAll('input[type=number],input[type=date],input[type=time],input[type=datetime-local],input[type=month]').forEach(function(el){ if(el.getAttribute('lang')!=='en') el.setAttribute('lang','en'); }); }
+  function startLatn(){ latnLang(document); new MutationObserver(function(ms){ for(var i=0;i<ms.length;i++){ var m=ms[i]; for(var j=0;j<m.addedNodes.length;j++){ var n=m.addedNodes[j]; if(n.nodeType!==1) continue; if(n.tagName==='INPUT'){ if(/^(number|date|time|datetime-local|month)$/.test(n.type)&&n.getAttribute('lang')!=='en') n.setAttribute('lang','en'); } else if(n.querySelector&&n.querySelector('input')) latnLang(n); } } }).observe(document.documentElement,{childList:true,subtree:true}); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', startLatn); else startLatn();
 })();
 </script>
 </body>
