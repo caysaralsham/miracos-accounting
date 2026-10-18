@@ -748,7 +748,7 @@
           <button class="btn btn-primary" id="btnMeasSaveOnly">حفظ فقط</button>
           <button class="btn btn-primary" id="btnMeasSavePrint">حفظ وطباعة</button>
           <button class="btn btn-primary" id="btnMeasConvertReceipt" style="display:none;">تحويل لوصل دفع</button>
-          <button class="btn btn-primary" id="btnMeasConvertQuote" style="display:none;">تحويل لعرض سعر</button>
+          <button class="btn btn-primary" id="btnMeasConvertQuote" style="display:none;">تحويل لـ Devis</button>
           <span class="conv-wrap"><button type="button" class="btn btn-primary" id="btnConvCalc">⇄ تحويل إلى</button><div class="conv-menu"></div></span>
           <button class="btn" id="btnMeasShare">للمعمل (مشاركة / طباعة)</button>
         </div>
@@ -1012,7 +1012,7 @@
       <h3 id="receiptModalTitle">وصل دفع جديد</h3>
       <div style="display:flex; align-items:center; gap:8px;">
         <button class="btn btn-sm" id="btnReceiptEditToFactory" style="display:none; font-size:12px; padding:4px 10px;" title="ورقة القياسات للمعمل بدون أسعار">للمعمل</button>
-        <button class="btn btn-sm" id="btnReceiptToQuote" style="display:none;">➜📄 عرض سعر</button>
+        <button class="btn btn-sm" id="btnReceiptToQuote" style="display:none;">➜📄 Devis</button>
         <span class="conv-wrap"><button type="button" class="btn btn-sm" id="btnConvReceiptEdit" style="font-size:12px; padding:4px 10px;">⇄ تحويل</button><div class="conv-menu"></div></span>
         <button class="close-x" data-close="receiptOverlay">×</button>
       </div>
@@ -1137,7 +1137,7 @@
         <div class="field">
           <label>نوع المستند</label>
           <select id="invDocType">
-            <option value="simple">عرض سعر مبسط</option>
+            <option value="simple">Devis (عرض سعر مبسط)</option>
             <option value="devis">Facture proforma (عرض سعر رسمي)</option>
             <option value="facture">Facture (فاتورة)</option>
           </select>
@@ -1260,7 +1260,7 @@
       <div style="display:flex; gap:8px;">
         <button class="btn btn-sm" id="btnEditMeasurementsView">✏️ تعديل</button>
         <button class="btn btn-sm" id="btnMeasViewToReceipt" style="display:none;">تحويل لوصل</button>
-        <button class="btn btn-sm" id="btnMeasViewToQuote" style="display:none;">تحويل لعرض سعر</button>
+        <button class="btn btn-sm" id="btnMeasViewToQuote" style="display:none;">تحويل لـ Devis</button>
         <span class="conv-wrap"><button type="button" class="btn btn-sm" id="btnConvMeasView">⇄ تحويل</button><div class="conv-menu"></div></span>
         <button class="btn btn-sm" id="btnShareMeasurementsView">للمعمل</button>
         <button class="btn btn-sm" id="btnPrintMeasurementsView">
@@ -3005,7 +3005,7 @@ document.getElementById('btnReceiptEditToFactory').addEventListener('click', ()=
 function convertReceiptToQuote(){
   if(!document.getElementById('rcpId').value) return;
   const rcpNo = document.getElementById('rcpNo').value;
-  if(!confirm(`تحويل الوصل رقم ${rcpNo} إلى عرض سعر؟ الوصل الأصلي بيضل محفوظ متل ما هو.`)) return;
+  if(!confirm(`تحويل الوصل رقم ${rcpNo} إلى Devis؟ الوصل الأصلي بيضل محفوظ متل ما هو.`)) return;
   const items = [];
   document.querySelectorAll('#itemsBody tr').forEach(row=>{
     const qtyEl = row.querySelector('.it-qty');
@@ -3035,8 +3035,8 @@ function convertReceiptToQuote(){
   document.getElementById('receiptOverlay').classList.remove('show');
   openInvoiceModal(pseudoInvoice);
   document.getElementById('invId').value = '';
-  document.getElementById('invoiceModalTitle').textContent = `عرض سعر جديد (محوّل من وصل رقم ${rcpNo})`;
-  toast('عرض السعر جاهز — راجعه واحفظه');
+  document.getElementById('invoiceModalTitle').textContent = `Devis جديد (محوّل من وصل رقم ${rcpNo})`;
+  toast('الـ Devis جاهز — راجعه واحفظه');
 }
 document.getElementById('btnReceiptToQuote').addEventListener('click', convertReceiptToQuote);
 
@@ -3388,7 +3388,7 @@ function renderTrash(){
     </div>`;
   }).join('') + [...deletedInvoices].sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||'')).map(i=>{
     const delDate = i.deletedAt ? i.deletedAt.slice(0,10) : '—';
-    const label = i.docType==='devis' ? 'Facture proforma' : 'عرض سعر';
+    const label = i.docType==='devis' ? 'Facture proforma' : 'Devis';
     return `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
       <div style="font-size:13px;">
         <b>${escHtmlText(i.clientName||'')}</b> — ${label} ${escHtmlText(i.no||'')} — ${fmt(i.ttc)}
@@ -3595,7 +3595,7 @@ function prepShare(kind,id){
 }
 function shareInfo(kind){
   if(kind==='rcp'){const r=receipts.find(x=>x.id===currentViewedReceiptId);return r&&{id:r.id,phone:r.phone,title:`وصل #${r.no}`,file:`وصل-${r.no}.jpg`}}
-  const v=invoices.find(x=>x.id===currentViewedInvoiceId);if(!v)return null;const L=v.docType==='simple'?'عرض سعر':(v.docType==='facture'?'Facture':'Facture proforma');
+  const v=invoices.find(x=>x.id===currentViewedInvoiceId);if(!v)return null;const L=v.docType==='simple'?'Devis':(v.docType==='facture'?'Facture':'Facture proforma');
   return{id:v.id,phone:v.clientPhone,title:L+' '+v.no,file:(L+'-'+v.no+'.jpg').replace(/\s+/g,'-')};
 }
 function sendNow(blob,info){
@@ -3949,7 +3949,7 @@ async function buildAndSaveInvoiceFromForm(){
   }
   noteInvoiceNoUsed(data.no);
   saveInvoices();
-  logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Facture proforma':'عرض سعر'), docNo: data.no, details: (items||[]).map(it=>it.desc).filter(Boolean).join('، ')}, prevInvoice ? prevInvoice.payments : []);
+  logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Facture proforma':'Devis'), docNo: data.no, details: (items||[]).map(it=>it.desc).filter(Boolean).join('، ')}, prevInvoice ? prevInvoice.payments : []);
   renderInvoicesTable();
   renderDashboard();
   renderPaymentHistoryTable();
@@ -3988,7 +3988,7 @@ function renderInvoicesTable(){
   [...invoices].reverse().forEach(inv=>{
     const isFacture = inv.docType === 'facture';
     const isDevis = inv.docType === 'devis';
-    const typeTag = isFacture ? 'Facture' : (isDevis ? 'Facture proforma' : 'عرض مبسط');
+    const typeTag = isFacture ? 'Facture' : (isDevis ? 'Facture proforma' : 'Devis');
     const typeClass = isFacture ? 'tag-paid' : (isDevis ? 'tag-partial' : 'tag-due');
     html += `<tr${inv.cancelled?' style="opacity:.55"':''}>
       <td><span class="tag ${typeClass}">${typeTag}</span>${inv.cancelled?' <span class="tag tag-due">ملغاة</span>':''}${inv.convertedTo?` <span class="tag" title="انعمل منه وصل">تحوّل لوصل ${escHtmlText(inv.convertedTo.receiptNo||'')}</span>`:''}</td>
@@ -4055,7 +4055,7 @@ function convertInvoiceToReceipt(id){
     name: inv.clientName || '',
     phone: inv.clientPhone || '',
     address: inv.clientAddress || '',
-    note: `محوّل من ${inv.docType === 'facture' ? 'Facture' : (inv.docType === 'devis' ? 'Facture proforma' : 'عرض سعر')} رقم ${inv.no}`,
+    note: `محوّل من ${inv.docType === 'facture' ? 'Facture' : (inv.docType === 'devis' ? 'Facture proforma' : 'Devis')} رقم ${inv.no}`,
     items: (inv.items||[]).map(it=>({qty: it.qty, desc: it.desc, price: it.price, amount: it.amount, ...(it.measType ? {measType: it.measType} : {}), ...(it.draws && it.draws.length ? {draws: it.draws} : {})})),
     payments: []
   };
@@ -4147,7 +4147,7 @@ function viewInvoice(id){
               </div>
               <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
                 <div class="receipt-stamp">
-                  <div class="no">عرض سعر</div>
+                  <div class="no">Devis</div>
                   <div class="lbl">رقم ${inv.no}</div>
                 </div>
               </div>
@@ -4175,7 +4175,7 @@ function viewInvoice(id){
       ${inv.delay ? `<div class="field" style="margin-top:14px;"><label>مدة التسليم</label><div>${inv.delay}</div></div>` : ''}
       ${inv.note ? `<div class="field" style="margin-top:14px;"><label>ملاحظة</label><div>${escHtmlText(inv.note)}</div></div>` : ''}
     `;
-    document.getElementById('viewInvoiceTitle').textContent = 'عرض سعر مبسط';
+    document.getElementById('viewInvoiceTitle').textContent = 'Devis';
     markCancelledInvoiceView(inv);
     document.getElementById('viewInvoiceOverlay').classList.add('show');
     return;
@@ -4264,7 +4264,7 @@ async function shareInvoiceById(id){
   const inv = invoices.find(i=>i.id===id);
   if(!inv) return;
   const isSimple = inv.docType === 'simple';
-  const docLabel = isSimple ? 'عرض سعر' : (inv.docType === 'facture' ? 'Facture' : 'Facture proforma');
+  const docLabel = isSimple ? 'Devis' : (inv.docType === 'facture' ? 'Facture' : 'Facture proforma');
   const shareTitle = `${docLabel} ${inv.no} — ${inv.clientName}`;
 
   viewInvoice(id);
@@ -4894,7 +4894,7 @@ function applyItemMeas(){
 
 // ================== تحويل موحّد بين: وصل / عرض سعر / Devis / Facture / حاسبة القياسات ==================
 // الأصل بيضل محفوظ متل ما هو، والجديد بيفتح لتراجعه وتحفظه. كل التفاصيل والرسمات بتنتقل.
-const CONV_TARGETS = {receipt:'وصل', simple:'عرض سعر', devis:'Facture proforma', facture:'Facture', calc:'حاسبة القياسات'};
+const CONV_TARGETS = {receipt:'وصل', simple:'Devis', devis:'Facture proforma', facture:'Facture', calc:'حاسبة القياسات'};
 function cloneItem(it){
   return {qty: it.qty, desc: it.desc||'', unit: it.unit||'', price: it.price, amount: it.amount,
     ...(it.measType ? {measType: it.measType} : {}), ...(it.draws && it.draws.length ? {draws: JSON.parse(JSON.stringify(it.draws))} : {})};
@@ -4906,7 +4906,7 @@ function docFromReceipt(r){
     tables: r.measurementTables ? JSON.parse(JSON.stringify(r.measurementTables)) : null};
 }
 function docFromInvoice(inv){
-  const lbl = inv.docType==='facture' ? 'Facture' : inv.docType==='devis' ? 'Facture proforma' : 'عرض سعر';
+  const lbl = inv.docType==='facture' ? 'Facture' : inv.docType==='devis' ? 'Facture proforma' : 'Devis';
   return {md: inv.mirsamDrawing ? {...inv.mirsamDrawing, dirty:false} : null, kind: inv.docType||'simple', label:`${lbl} ${inv.no}`, name:inv.clientName||'', phone:inv.clientPhone||'', address:inv.clientAddress||'',
     rc:inv.clientRC||'', nif:inv.clientNIF||'', nis:inv.clientNIS||'', delay: inv.delay||'', duration: parseInt(inv.delay,10)||'',
     note: inv.note||'', items:(inv.items||[]).map(cloneItem), discount:0, tables:null};
@@ -5049,7 +5049,7 @@ wireConvertMenu('btnConvInvoiceEdit', ()=>document.getElementById('invDocType').
       ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {}), ...(row.dataset.md ? {md:1} : {})};
   }).filter(Boolean);
   const v = id => (document.getElementById(id)||{}).value || '';
-  const dt = v('invDocType'), lbl = dt==='facture' ? 'Facture' : dt==='devis' ? 'Facture proforma' : 'عرض سعر';
+  const dt = v('invDocType'), lbl = dt==='facture' ? 'Facture' : dt==='devis' ? 'Facture proforma' : 'Devis';
   return {md: window.__mdCurrent ? window.__mdCurrent('inv') : null, kind: dt, label: `${lbl} ${v('invNo')}`, name: v('invClientName').trim(), phone: v('invClientPhone').trim(), address: v('invClientAddress').trim(),
     rc: v('invClientRC'), nif: v('invClientNIF'), nis: v('invClientNIS'), delay: v('invDelay'), duration: parseInt(v('invDelay'),10)||'',
     note: v('invNote').trim(), items, discount:0, tables:null};
@@ -5444,8 +5444,8 @@ function convertMeasToQuote(rec){
   };
   openInvoiceModal(pseudoInvoice);
   document.getElementById('invId').value = '';
-  document.getElementById('invoiceModalTitle').textContent = 'عرض سعر جديد (محوّل من قياسات)';
-  toast('عبّي السعر لكل بند ثم احفظ عرض السعر');
+  document.getElementById('invoiceModalTitle').textContent = 'Devis جديد (محوّل من قياسات)';
+  toast('عبّي السعر لكل بند ثم احفظ الـ Devis');
 }
 
 document.getElementById('btnMeasConvertReceipt').addEventListener('click', ()=>{
@@ -5476,7 +5476,7 @@ function convertMeasToReceipt(rec){
   toast('عبّي السعر لكل بند ثم احفظ الوصل');
 }
 
-// أزرار نافذة القياسات المحفوظة: تعديل / تحويل لوصل / تحويل لعرض سعر
+// أزرار نافذة القياسات المحفوظة: تعديل / تحويل لوصل / تحويل لـ Devis
 function currentViewedMeasRec(){ return measurementsList.find(r=>r.id===currentViewedMeasurementId); }
 document.getElementById('btnMeasViewToReceipt').addEventListener('click', ()=>{
   const rec = currentViewedMeasRec(); if(!rec) return;
@@ -6033,7 +6033,7 @@ function computePaymentReconcile(rcpts, invs, hist){
   // 1) كل دفعة بالوصولات والفواتير — والدفعات القديمة بلا رقم بتاخد رقم جديد (بينحفظ بالوصل/الفاتورة)
   const docPays = new Map(), idFixes = [];
   const metaR = r=>({customerName:r.name, docType:'وصل', docNo:r.no, details:(r.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
-  const metaI = i=>({customerName:i.clientName, docType:i.docType==='facture'?'فاتورة':(i.docType==='devis'?'Facture proforma':'عرض سعر'), docNo:i.no, details:(i.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
+  const metaI = i=>({customerName:i.clientName, docType:i.docType==='facture'?'فاتورة':(i.docType==='devis'?'Facture proforma':'Devis'), docNo:i.no, details:(i.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
   const collect = (kind, d, list, meta)=>{
     let fix = null;
     list.forEach((p, idx)=>{
@@ -6335,7 +6335,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   function pickDoc(d){
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
     ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:340px;text-align:center"><b>وين بدك تحط الرسمة؟</b><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0 14px">${esc(d.name||d.title||'')}</div>
-      <button type="button" class="btn btn-primary" data-k="rcp" style="width:100%;margin-bottom:8px">🧾 وصل دفع جديد</button><button type="button" class="btn btn-primary" data-k="inv" style="width:100%;margin-bottom:8px">📄 عرض سعر جديد</button><button type="button" class="btn btn-primary" data-k="devis" style="width:100%;margin-bottom:8px">📑 Facture proforma جديدة</button>${FS_DOC!=='factory'?'<button type="button" class="btn" data-k="job" style="width:100%;margin-bottom:8px">🏭 طلبية للمعمل</button>':''}<button type="button" class="btn btn-ghost" data-k="" style="width:100%">إلغاء</button></div>`;
+      <button type="button" class="btn btn-primary" data-k="rcp" style="width:100%;margin-bottom:8px">🧾 وصل دفع جديد</button><button type="button" class="btn btn-primary" data-k="inv" style="width:100%;margin-bottom:8px">📄 Devis جديد</button><button type="button" class="btn btn-primary" data-k="devis" style="width:100%;margin-bottom:8px">📑 Facture proforma جديدة</button>${FS_DOC!=='factory'?'<button type="button" class="btn" data-k="job" style="width:100%;margin-bottom:8px">🏭 طلبية للمعمل</button>':''}<button type="button" class="btn btn-ghost" data-k="" style="width:100%">إلغاء</button></div>`;
     document.body.appendChild(ov);
     ov.addEventListener('click',async e=>{const b=e.target.closest('[data-k]');if(e.target!==ov&&!b)return;ov.remove();if(!b||!b.dataset.k)return;
       if(b.dataset.k==='job'){
