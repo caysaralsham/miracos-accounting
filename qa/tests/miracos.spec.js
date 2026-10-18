@@ -213,10 +213,8 @@ test('خانات الأرقام والتواريخ لغتها إنكليزية (
   expect(later).toBe('en');
 });
 
-test('اسم «Devis» صار «Facture proforma» بالواجهة (والبيانات القديمة نفس المفتاح devis)', async ({ page }) => {
-  const opt = await page.$eval('option[value="devis"]', o => o.textContent);
-  expect(opt).toContain('Facture proforma');
-  const txt = await page.evaluate(() => [...document.querySelectorAll('body *:not(script):not(style)')].map(e => [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(' ')).join(' '));
-  expect(txt).not.toMatch(/\bDevis\b/);
-  expect(await page.evaluate(() => CONV_TARGETS.devis)).toBe('Facture proforma');
+test('الأسماء: العرض المبسط اسمه Devis، والرسمي اسمه Facture proforma (المفاتيح بالبيانات كما هي)', async ({ page }) => {
+  expect(await page.$eval('option[value="simple"]', o => o.textContent)).toMatch(/^Devis/);
+  expect(await page.$eval('option[value="devis"]', o => o.textContent)).toContain('Facture proforma');
+  expect(await page.evaluate(() => [CONV_TARGETS.simple, CONV_TARGETS.devis])).toEqual(['Devis', 'Facture proforma']);
 });
