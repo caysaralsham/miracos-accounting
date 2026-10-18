@@ -1138,11 +1138,11 @@
           <label>نوع المستند</label>
           <select id="invDocType">
             <option value="simple">عرض سعر مبسط</option>
-            <option value="devis">Devis (عرض سعر رسمي)</option>
+            <option value="devis">Facture proforma (عرض سعر رسمي)</option>
             <option value="facture">Facture (فاتورة)</option>
           </select>
         </div>
-        <div class="field"><label id="invNoLabel">N° de devis</label><input type="text" id="invNo"></div>
+        <div class="field"><label id="invNoLabel">N° proforma</label><input type="text" id="invNo"></div>
         <div class="field"><label>Date</label><input type="text" id="invDate" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></div>
       </div>
       <div class="grid3">
@@ -3388,7 +3388,7 @@ function renderTrash(){
     </div>`;
   }).join('') + [...deletedInvoices].sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||'')).map(i=>{
     const delDate = i.deletedAt ? i.deletedAt.slice(0,10) : '—';
-    const label = i.docType==='devis' ? 'Devis' : 'عرض سعر';
+    const label = i.docType==='devis' ? 'Facture proforma' : 'عرض سعر';
     return `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
       <div style="font-size:13px;">
         <b>${escHtmlText(i.clientName||'')}</b> — ${label} ${escHtmlText(i.no||'')} — ${fmt(i.ttc)}
@@ -3595,7 +3595,7 @@ function prepShare(kind,id){
 }
 function shareInfo(kind){
   if(kind==='rcp'){const r=receipts.find(x=>x.id===currentViewedReceiptId);return r&&{id:r.id,phone:r.phone,title:`وصل #${r.no}`,file:`وصل-${r.no}.jpg`}}
-  const v=invoices.find(x=>x.id===currentViewedInvoiceId);if(!v)return null;const L=v.docType==='simple'?'عرض سعر':(v.docType==='facture'?'Facture':'Devis');
+  const v=invoices.find(x=>x.id===currentViewedInvoiceId);if(!v)return null;const L=v.docType==='simple'?'عرض سعر':(v.docType==='facture'?'Facture':'Facture proforma');
   return{id:v.id,phone:v.clientPhone,title:L+' '+v.no,file:(L+'-'+v.no+'.jpg').replace(/\s+/g,'-')};
 }
 function sendNow(blob,info){
@@ -3811,7 +3811,7 @@ function noteInvoiceNoUsed(no){
 function updateInvNoLabel(){
   const type = document.getElementById('invDocType').value;
   const isSimple = type === 'simple';
-  document.getElementById('invNoLabel').textContent = type === 'facture' ? 'N° de facture' : (type === 'devis' ? 'N° de devis' : 'رقم العرض');
+  document.getElementById('invNoLabel').textContent = type === 'facture' ? 'N° de facture' : (type === 'devis' ? 'N° proforma' : 'رقم العرض');
   document.getElementById('invClientLegalFields').style.display = isSimple ? 'none' : 'grid';
   document.getElementById('invTVARow').style.display = isSimple ? 'none' : 'flex';
   document.getElementById('invHTLabel').textContent = isSimple ? 'المجموع' : 'Montant HT';
@@ -3949,7 +3949,7 @@ async function buildAndSaveInvoiceFromForm(){
   }
   noteInvoiceNoUsed(data.no);
   saveInvoices();
-  logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Devis':'عرض سعر'), docNo: data.no, details: (items||[]).map(it=>it.desc).filter(Boolean).join('، ')}, prevInvoice ? prevInvoice.payments : []);
+  logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Facture proforma':'عرض سعر'), docNo: data.no, details: (items||[]).map(it=>it.desc).filter(Boolean).join('، ')}, prevInvoice ? prevInvoice.payments : []);
   renderInvoicesTable();
   renderDashboard();
   renderPaymentHistoryTable();
@@ -3988,7 +3988,7 @@ function renderInvoicesTable(){
   [...invoices].reverse().forEach(inv=>{
     const isFacture = inv.docType === 'facture';
     const isDevis = inv.docType === 'devis';
-    const typeTag = isFacture ? 'Facture' : (isDevis ? 'Devis' : 'عرض مبسط');
+    const typeTag = isFacture ? 'Facture' : (isDevis ? 'Facture proforma' : 'عرض مبسط');
     const typeClass = isFacture ? 'tag-paid' : (isDevis ? 'tag-partial' : 'tag-due');
     html += `<tr${inv.cancelled?' style="opacity:.55"':''}>
       <td><span class="tag ${typeClass}">${typeTag}</span>${inv.cancelled?' <span class="tag tag-due">ملغاة</span>':''}${inv.convertedTo?` <span class="tag" title="انعمل منه وصل">تحوّل لوصل ${escHtmlText(inv.convertedTo.receiptNo||'')}</span>`:''}</td>
@@ -4055,7 +4055,7 @@ function convertInvoiceToReceipt(id){
     name: inv.clientName || '',
     phone: inv.clientPhone || '',
     address: inv.clientAddress || '',
-    note: `محوّل من ${inv.docType === 'facture' ? 'Facture' : (inv.docType === 'devis' ? 'Devis' : 'عرض سعر')} رقم ${inv.no}`,
+    note: `محوّل من ${inv.docType === 'facture' ? 'Facture' : (inv.docType === 'devis' ? 'Facture proforma' : 'عرض سعر')} رقم ${inv.no}`,
     items: (inv.items||[]).map(it=>({qty: it.qty, desc: it.desc, price: it.price, amount: it.amount, ...(it.measType ? {measType: it.measType} : {}), ...(it.draws && it.draws.length ? {draws: it.draws} : {})})),
     payments: []
   };
@@ -4181,7 +4181,7 @@ function viewInvoice(id){
     return;
   }
 
-  const docLabel = (inv.docType === 'facture') ? 'FACTURE' : 'DEVIS';
+  const docLabel = (inv.docType === 'facture') ? 'FACTURE' : 'FACTURE PROFORMA';
   const itemsRows = (inv.items||[]).map((it,i)=>`
     <tr><td class="row-no">${i+1}</td><td>${it.qty}</td><td dir="auto" style="text-align:left;">${escHtmlText(it.desc)}${itemMeasDrawingsHtml(it)}</td><td>${it.unit||''}</td><td>${fmt(it.price)}</td><td>${fmt(it.amount)}</td></tr>
   `).join('');
@@ -4189,7 +4189,7 @@ function viewInvoice(id){
     <div class="totals-row"><span>Paiement du ${p.date||'—'}</span><span>${fmt(p.amount)}</span></div>
   `).join('') || '<div class="totals-row"><span>Aucun paiement enregistré</span><span>—</span></div>';
 
-  document.getElementById('viewInvoiceTitle').textContent = docLabel === 'FACTURE' ? 'Facture' : 'Devis';
+  document.getElementById('viewInvoiceTitle').textContent = docLabel === 'FACTURE' ? 'Facture' : 'Facture proforma';
   const clientLegalLine = `<div style="color:var(--text-dim); font-size:12px;">${inv.clientRC ? 'RC: '+inv.clientRC+' · ' : ''}${inv.clientNIF ? 'NIF: '+inv.clientNIF+' · ' : ''}${inv.clientNIS ? 'NIS: '+inv.clientNIS : ''}</div>`;
   document.getElementById('invoicePrintArea').innerHTML = `
     <table style="direction:ltr;">
@@ -4264,7 +4264,7 @@ async function shareInvoiceById(id){
   const inv = invoices.find(i=>i.id===id);
   if(!inv) return;
   const isSimple = inv.docType === 'simple';
-  const docLabel = isSimple ? 'عرض سعر' : (inv.docType === 'facture' ? 'Facture' : 'Devis');
+  const docLabel = isSimple ? 'عرض سعر' : (inv.docType === 'facture' ? 'Facture' : 'Facture proforma');
   const shareTitle = `${docLabel} ${inv.no} — ${inv.clientName}`;
 
   viewInvoice(id);
@@ -4894,7 +4894,7 @@ function applyItemMeas(){
 
 // ================== تحويل موحّد بين: وصل / عرض سعر / Devis / Facture / حاسبة القياسات ==================
 // الأصل بيضل محفوظ متل ما هو، والجديد بيفتح لتراجعه وتحفظه. كل التفاصيل والرسمات بتنتقل.
-const CONV_TARGETS = {receipt:'وصل', simple:'عرض سعر', devis:'Devis', facture:'Facture', calc:'حاسبة القياسات'};
+const CONV_TARGETS = {receipt:'وصل', simple:'عرض سعر', devis:'Facture proforma', facture:'Facture', calc:'حاسبة القياسات'};
 function cloneItem(it){
   return {qty: it.qty, desc: it.desc||'', unit: it.unit||'', price: it.price, amount: it.amount,
     ...(it.measType ? {measType: it.measType} : {}), ...(it.draws && it.draws.length ? {draws: JSON.parse(JSON.stringify(it.draws))} : {})};
@@ -4906,7 +4906,7 @@ function docFromReceipt(r){
     tables: r.measurementTables ? JSON.parse(JSON.stringify(r.measurementTables)) : null};
 }
 function docFromInvoice(inv){
-  const lbl = inv.docType==='facture' ? 'Facture' : inv.docType==='devis' ? 'Devis' : 'عرض سعر';
+  const lbl = inv.docType==='facture' ? 'Facture' : inv.docType==='devis' ? 'Facture proforma' : 'عرض سعر';
   return {md: inv.mirsamDrawing ? {...inv.mirsamDrawing, dirty:false} : null, kind: inv.docType||'simple', label:`${lbl} ${inv.no}`, name:inv.clientName||'', phone:inv.clientPhone||'', address:inv.clientAddress||'',
     rc:inv.clientRC||'', nif:inv.clientNIF||'', nis:inv.clientNIS||'', delay: inv.delay||'', duration: parseInt(inv.delay,10)||'',
     note: inv.note||'', items:(inv.items||[]).map(cloneItem), discount:0, tables:null};
@@ -5049,7 +5049,7 @@ wireConvertMenu('btnConvInvoiceEdit', ()=>document.getElementById('invDocType').
       ...(row.dataset.measType ? {measType: row.dataset.measType} : {}), ...(row.dataset.draws ? {draws: JSON.parse(row.dataset.draws)} : {}), ...(row.dataset.md ? {md:1} : {})};
   }).filter(Boolean);
   const v = id => (document.getElementById(id)||{}).value || '';
-  const dt = v('invDocType'), lbl = dt==='facture' ? 'Facture' : dt==='devis' ? 'Devis' : 'عرض سعر';
+  const dt = v('invDocType'), lbl = dt==='facture' ? 'Facture' : dt==='devis' ? 'Facture proforma' : 'عرض سعر';
   return {md: window.__mdCurrent ? window.__mdCurrent('inv') : null, kind: dt, label: `${lbl} ${v('invNo')}`, name: v('invClientName').trim(), phone: v('invClientPhone').trim(), address: v('invClientAddress').trim(),
     rc: v('invClientRC'), nif: v('invClientNIF'), nis: v('invClientNIS'), delay: v('invDelay'), duration: parseInt(v('invDelay'),10)||'',
     note: v('invNote').trim(), items, discount:0, tables:null};
@@ -6033,7 +6033,7 @@ function computePaymentReconcile(rcpts, invs, hist){
   // 1) كل دفعة بالوصولات والفواتير — والدفعات القديمة بلا رقم بتاخد رقم جديد (بينحفظ بالوصل/الفاتورة)
   const docPays = new Map(), idFixes = [];
   const metaR = r=>({customerName:r.name, docType:'وصل', docNo:r.no, details:(r.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
-  const metaI = i=>({customerName:i.clientName, docType:i.docType==='facture'?'فاتورة':(i.docType==='devis'?'Devis':'عرض سعر'), docNo:i.no, details:(i.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
+  const metaI = i=>({customerName:i.clientName, docType:i.docType==='facture'?'فاتورة':(i.docType==='devis'?'Facture proforma':'عرض سعر'), docNo:i.no, details:(i.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
   const collect = (kind, d, list, meta)=>{
     let fix = null;
     list.forEach((p, idx)=>{
@@ -6335,7 +6335,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   function pickDoc(d){
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
     ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:340px;text-align:center"><b>وين بدك تحط الرسمة؟</b><div style="font-size:12.5px;color:var(--text-dim);margin:4px 0 14px">${esc(d.name||d.title||'')}</div>
-      <button type="button" class="btn btn-primary" data-k="rcp" style="width:100%;margin-bottom:8px">🧾 وصل دفع جديد</button><button type="button" class="btn btn-primary" data-k="inv" style="width:100%;margin-bottom:8px">📄 عرض سعر جديد</button><button type="button" class="btn btn-primary" data-k="devis" style="width:100%;margin-bottom:8px">📑 Devis جديد</button>${FS_DOC!=='factory'?'<button type="button" class="btn" data-k="job" style="width:100%;margin-bottom:8px">🏭 طلبية للمعمل</button>':''}<button type="button" class="btn btn-ghost" data-k="" style="width:100%">إلغاء</button></div>`;
+      <button type="button" class="btn btn-primary" data-k="rcp" style="width:100%;margin-bottom:8px">🧾 وصل دفع جديد</button><button type="button" class="btn btn-primary" data-k="inv" style="width:100%;margin-bottom:8px">📄 عرض سعر جديد</button><button type="button" class="btn btn-primary" data-k="devis" style="width:100%;margin-bottom:8px">📑 Facture proforma جديدة</button>${FS_DOC!=='factory'?'<button type="button" class="btn" data-k="job" style="width:100%;margin-bottom:8px">🏭 طلبية للمعمل</button>':''}<button type="button" class="btn btn-ghost" data-k="" style="width:100%">إلغاء</button></div>`;
     document.body.appendChild(ov);
     ov.addEventListener('click',async e=>{const b=e.target.closest('[data-k]');if(e.target!==ov&&!b)return;ov.remove();if(!b||!b.dataset.k)return;
       if(b.dataset.k==='job'){

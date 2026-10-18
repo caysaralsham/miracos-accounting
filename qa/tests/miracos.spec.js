@@ -212,3 +212,11 @@ test('خانات الأرقام والتواريخ لغتها إنكليزية (
   const later = await page.evaluate(async () => { const i = document.createElement('input'); i.type = 'number'; document.body.appendChild(i); await new Promise(r => setTimeout(r, 50)); return i.getAttribute('lang'); });
   expect(later).toBe('en');
 });
+
+test('اسم «Devis» صار «Facture proforma» بالواجهة (والبيانات القديمة نفس المفتاح devis)', async ({ page }) => {
+  const opt = await page.$eval('option[value="devis"]', o => o.textContent);
+  expect(opt).toContain('Facture proforma');
+  const txt = await page.evaluate(() => [...document.querySelectorAll('body *:not(script):not(style)')].map(e => [...e.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(' ')).join(' '));
+  expect(txt).not.toMatch(/\bDevis\b/);
+  expect(await page.evaluate(() => CONV_TARGETS.devis)).toBe('Facture proforma');
+});
