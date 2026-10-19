@@ -6625,12 +6625,12 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       ${viewOnly?'':'<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>'}</body></html>`);w.document.close();
   }
   // ---- صفحة الطلبيات ----
-  let filter='open',q='';const openIds=new Set();
+  let filter='all',q='';const openIds=new Set();
   const ov=document.createElement('section');ov.className='view';ov.id='view-fjobs';
   ov.innerHTML=`<div class="topbar"><h1>🏭 الطلبيات</h1></div>
     <div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
       <input data-q placeholder="بحث بالاسم أو الرقم أو البند..." style="flex:1;min-width:180px;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:10px">
-      <select data-f style="font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);width:auto"><option value="open">الشغّالة</option><option value="بدون تنفيذ">⚪ بدون تنفيذ</option><option value="قيد التنفيذ">🟠 قيد التنفيذ</option><option value="تم التنفيذ">🟢 تم التنفيذ</option><option value="all">الكل</option></select></div>
+      <select data-f style="font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);width:auto"><option value="all">الكل</option><option value="open">الشغّالة</option><option value="بدون تنفيذ">⚪ بدون تنفيذ</option><option value="قيد التنفيذ">🟠 قيد التنفيذ</option><option value="تم التنفيذ">🟢 تم التنفيذ</option></select></div>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">مشتركة بين المعرض والمعمل، بلا أسعار ولا دفعات. أي تعديل بيوصل إشعار للطرف التاني.</div>
       <div data-list></div><input type="file" accept="image/*" data-photo hidden></div>`;
   {const lv=document.getElementById('view-settings');(lv?lv.parentElement:document.body).appendChild(ov)}
@@ -6758,8 +6758,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     }
   }
   // ---- رسمة جاية من مرسم ديكور (زر «↗ إلى ميراكوس»): البيانات بالرابط، والصورة بتترسم بمرسم مخفي ----
-  let MQ=new URLSearchParams(location.search).get('mirsam');
-  if(MQ){history.replaceState(null,'',location.pathname);
+  // نافذة وحدة بس: إذا البرنامج مفتوح، الرسمة الجاية من مرسم بتوصل لنفس النافذة (بلا ما تنفتح نافذة جديدة)
+  const handleMQ=MQ=>{if(!MQ||MQ===window.__mqDone)return;window.__mqDone=MQ;
     try{MQ=decodeURIComponent(MQ)}catch(_){}MQ=MQ.replace(/^web\+[a-z]+:(\/\/)?/,'');
     let P=null;try{const b=atob(MQ.replace(/-/g,'+').replace(/_/g,'/'));P=JSON.parse(new TextDecoder().decode(Uint8Array.from(b,c=>c.charCodeAt(0))))}catch(e){console.error(e)}
     if(P&&['rcp','inv','devis'].includes(P.k)){
@@ -6779,7 +6779,9 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
         addEventListener('message',on);document.body.appendChild(fr);
         setTimeout(()=>{if(!done){end();toast('ما قدرت جيب الرسمة من مرسم — تأكد من الإنترنت وجرّب مرة تانية')}},60000)},600);
     }
-  }
+  };
+  {const m=new URLSearchParams(location.search).get('mirsam');if(m){history.replaceState(null,'',location.pathname);handleMQ(m)}}
+  if('launchQueue' in window)try{launchQueue.setConsumer(lp=>{try{if(lp&&lp.targetURL)handleMQ(new URL(lp.targetURL).searchParams.get('mirsam'))}catch(e){}})}catch(e){}
 })();
 
 </script>

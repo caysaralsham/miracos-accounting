@@ -41,5 +41,11 @@
       "protocol": "web+miracos",
       "url": "./index.html?mirsam=%s"
     }
-  ]
+  ],
+  "launch_handler": {
+    "client_mode": [
+      "focus-existing",
+      "auto"
+    ]
+  }
 }

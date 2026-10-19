@@ -218,3 +218,15 @@ test('الأسماء: العرض المبسط اسمه Devis، والرسمي ا
   expect(await page.$eval('option[value="devis"]', o => o.textContent)).toContain('Facture proforma');
   expect(await page.evaluate(() => [CONV_TARGETS.simple, CONV_TARGETS.devis])).toEqual(['Devis', 'Facture proforma']);
 });
+
+test('الطلبيات: الافتراضي «الكل»', async ({ page }) => {
+  const sel = page.locator('#view-fjobs select[data-f]');
+  await expect(sel).toHaveCount(1);
+  expect(await sel.inputValue()).toBe('all');
+  expect(await sel.locator('option').first().getAttribute('value')).toBe('all');
+});
+
+test('البرنامج بيفتح بنافذة وحدة (ما بيفتح نافذة جديدة كل مرة)', async ({ request }) => {
+  const m = await (await request.get('/manifest.json')).json();
+  expect(m.launch_handler.client_mode[0]).toBe('focus-existing');
+});
