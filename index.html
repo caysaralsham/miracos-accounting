@@ -228,7 +228,7 @@
   }
   .receipt-top{display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid var(--ink); padding-bottom:14px; margin-bottom:16px;}
   .receipt-brand{display:flex; align-items:center; gap:12px;}
-  .receipt-brand img{width:88px; height:88px; object-fit:contain;}
+  .receipt-brand img{width:120px; height:120px; object-fit:contain;}
   .receipt-brand .name{font-size:24px; font-weight:800;}
   .receipt-brand .meta{font-size:14px; color:var(--text-dim); margin-top:4px;}
   .receipt-stamp{
@@ -239,8 +239,10 @@
   }
   .receipt-stamp .no{font-size:21px; font-weight:900; line-height:1;}
   .receipt-stamp .lbl{font-size:10px; font-weight:700; letter-spacing:.5px;}
-  .receipt-info-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px 24px; font-size:16px; margin-bottom:18px;}
+  .receipt-info-grid{display:grid; grid-template-columns:1fr 1fr 1.4fr; gap:8px 24px; font-size:17px; margin-bottom:18px;}
   .receipt-info-grid div span{color:var(--text-dim); font-size:14px;}
+  /* كل جداول الأوراق (وصل، Devis، Facture، قياسات، كشف...) بخط عريض */
+  .receipt-view tbody:not(.doc-intro) td{font-weight:700;}
   .receipt-view table{font-size:15.5px;}
   .receipt-view th{background:var(--ink); color:#EDEAE1;}
 
@@ -362,9 +364,10 @@
     body.print-multipage .overlay.show .modal{ page: multi; }
 
     .receipt-view .receipt-top{ padding-bottom:12px !important; margin-bottom:12px !important; }
-    .receipt-brand img{ width:80px !important; height:80px !important; }
+    .receipt-brand img{ width:130px !important; height:130px !important; }
     .receipt-brand .name{ font-size:26px !important; }
-    .receipt-info-grid{ font-size:18px !important; margin-bottom:12px !important; gap:6px 20px !important; }
+    .receipt-info-grid{ grid-template-columns:1fr 1fr 1.4fr !important; font-size:21px !important; font-weight:600; margin-bottom:12px !important; gap:8px 28px !important; }
+    .receipt-info-grid div span{ font-size:17px !important; font-weight:400; }
     .totals-box{ padding:12px 14px !important; margin-top:12px !important; }
     .totals-row{ padding:4px 0 !important; font-size:18px !important; }
 
@@ -372,7 +375,7 @@
     body.print-compact table{ font-size:10.5px; }
     body.print-compact th, body.print-compact td{ padding:3px 5px !important; }
     body.print-compact .receipt-view .receipt-top{ padding-bottom:6px !important; margin-bottom:6px !important; }
-    body.print-compact .receipt-brand img{ width:44px !important; height:44px !important; }
+    body.print-compact .receipt-brand img{ width:64px !important; height:64px !important; }
     body.print-compact .receipt-brand .name{ font-size:14px !important; }
     body.print-compact .receipt-info-grid{ font-size:11px !important; margin-bottom:6px !important; gap:3px 14px !important; }
     body.print-compact .totals-box{ padding:6px 8px !important; margin-top:6px !important; }
@@ -3470,7 +3473,6 @@ function viewReceipt(id){
               <img src="${settings.logo}">
               <div>
                 <div class="name">${settings.companyName}</div>
-                <div class="meta">${settings.companyDesc}</div>
                 <div class="meta">${escHtmlText(settings.address)} · ${escHtmlText(settings.phone)}</div>
               </div>
             </div>
@@ -3485,10 +3487,10 @@ function viewReceipt(id){
         <tr class="intro-row"><td colspan="5">
           <div class="receipt-info-grid">
             <div><span>الاسم: </span>${escHtmlText(r.name)}</div>
-            <div><span>التاريخ: </span>${r.date||''}</div>
             <div><span>الهاتف: </span>${escHtmlText(r.phone||'—')}</div>
-            <div><span>المدة: </span>${r.duration||'—'}</div>
             <div><span>العنوان: </span>${escHtmlText(r.address||'—')}</div>
+            <div><span>التاريخ: </span>${r.date||''}</div>
+            <div><span>المدة: </span>${r.duration||'—'}</div>
           </div>
         </td></tr>
         <tr><th class="row-no">#</th><th>العدد</th><th>النوع والتفاصيل</th><th>السعر</th><th>المبلغ</th></tr>
@@ -4141,7 +4143,7 @@ function viewInvoice(id){
               <div class="receipt-brand">
                 <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
                 <div>
-                  <div class="name" style="font-size:16px;">${settings.companyName} — ${settings.companyDesc}</div>
+                  <div class="name" style="font-size:16px;">${settings.companyName}</div>
                   <div class="meta" style="font-size:11px; line-height:1.5;">${escHtmlText(settings.address)} · ${escHtmlText(settings.phone)}</div>
                 </div>
               </div>
@@ -4158,9 +4160,10 @@ function viewInvoice(id){
           <tr class="intro-row"><td colspan="6">
             <div class="receipt-info-grid">
               <div><span>الاسم: </span>${escHtmlText(inv.clientName)}</div>
-              <div><span>التاريخ: </span>${inv.date||''}</div>
               <div><span>الهاتف: </span>${escHtmlText(inv.clientPhone||'—')}</div>
               <div><span>العنوان: </span>${escHtmlText(inv.clientAddress||'—')}</div>
+              <div><span>التاريخ: </span>${inv.date||''}</div>
+              ${inv.delay ? `<div><span>مدة التسليم: </span>${escHtmlText(String(inv.delay))}</div>` : ''}
             </div>
           </td></tr>
           <tr><th class="row-no">#</th><th>العدد</th><th>البيان</th><th>الوحدة</th><th>السعر</th><th>المجموع</th></tr>
@@ -4172,7 +4175,6 @@ function viewInvoice(id){
         <div style="margin-top:10px;">${paymentsRowsAr}</div>
         <div class="totals-row" style="color:var(--danger); font-weight:700;"><span>الباقي</span><span>${fmt(inv.remaining)}</span></div>
       </div>
-      ${inv.delay ? `<div class="field" style="margin-top:14px;"><label>مدة التسليم</label><div>${inv.delay}</div></div>` : ''}
       ${inv.note ? `<div class="field" style="margin-top:14px;"><label>ملاحظة</label><div>${escHtmlText(inv.note)}</div></div>` : ''}
     `;
     document.getElementById('viewInvoiceTitle').textContent = 'Devis';
@@ -4199,7 +4201,7 @@ function viewInvoice(id){
             <div class="receipt-brand">
               <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
               <div>
-                <div class="name" style="font-size:16px;">${settings.companyName} — ${settings.companyDesc}</div>
+                <div class="name" style="font-size:16px;">${settings.companyName}</div>
                 <div class="meta" style="font-size:10.5px; line-height:1.5;">${escHtmlText(settings.address)} · ${escHtmlText(settings.phone)} · RC: ${settings.rc||''} · NIF: ${settings.nif||''}</div>
                 <div class="meta" style="font-size:10.5px; line-height:1.5;">NIS: ${settings.nis||''} · Art: ${settings.article||''} · ${settings.bank||''} · ${settings.email||''}</div>
               </div>
@@ -5576,7 +5578,6 @@ function renderMeasurementRecordInto(rec){
         <img src="${settings.logo}">
         <div>
           <div class="name">${settings.companyName}</div>
-          <div class="meta">${settings.companyDesc}</div>
         </div>
       </div>
       <div class="receipt-stamp">
