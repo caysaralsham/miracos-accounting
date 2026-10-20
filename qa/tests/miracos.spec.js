@@ -230,3 +230,15 @@ test('البرنامج بيفتح بنافذة وحدة (ما بيفتح ناف�
   const m = await (await request.get('/manifest.json')).json();
   expect(m.launch_handler.client_mode[0]).toBe('focus-existing');
 });
+
+test('الطلبيات بالكل مرتّبة: بدون تنفيذ، بعدين قيد التنفيذ، بعدين تم التنفيذ', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const no = window.__fjobsTest([
+      { id: 'a', no: 1, status: 'تم التنفيذ', at: 5 }, { id: 'b', no: 2, status: 'قيد التنفيذ', at: 4 },
+      { id: 'c', no: 3, status: 'بدون تنفيذ', at: 3 }, { id: 'd', no: 4, status: 'قيد التنفيذ', at: 6 }, { id: 'e', no: 5, status: 'بدون تنفيذ', at: 7 },
+    ]);
+    return { no, hd: [...document.querySelectorAll('#view-fjobs [data-sthd]')].map(h => h.textContent) };
+  });
+  expect(r.hd.map(t => t.replace(/[^؀-ۿ ]/g, '').trim())).toEqual(['بدون تنفيذ', 'قيد التنفيذ', 'تم التنفيذ']);
+  expect(r.no.length).toBe(5);
+});
