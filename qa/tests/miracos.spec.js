@@ -242,3 +242,18 @@ test('الطلبيات بالكل مرتّبة: بدون تنفيذ، بعدين
   expect(r.hd.map(t => t.replace(/[^؀-ۿ ]/g, '').trim())).toEqual(['بدون تنفيذ', 'قيد التنفيذ', 'تم التنفيذ']);
   expect(r.no.length).toBe(5);
 });
+
+test('المشاركة: نافذة فيها «إرسال على واتساب» و«حفظ الصورة على الجهاز»، والحفظ بينزّل الصورة', async ({ page }) => {
+  await page.evaluate(() => {
+    receipts.push({ id: 'r1', no: 70, name: 'سفيان', phone: '', address: '', date: '2026-10-15', items: [], discount: 0, total: 0, paid: 0, remaining: 0, payments: [] });
+    viewReceipt('r1');
+    window.__sharePrep = { kind: 'rcp', id: 'r1', blob: new Blob(['x'], { type: 'image/jpeg' }), promise: Promise.resolve(null) };
+  });
+  await page.evaluate(() => document.getElementById('btnShareReceipt').click());
+  const ov = page.locator('#shareChoiceOverlay');
+  await expect(ov.getByText('إرسال على واتساب')).toBeVisible();
+  await page.evaluate(() => { window.__saved = []; const o = downloadBlob; window.downloadBlob = (bl, n) => { window.__saved.push(n); return o(bl, n); }; });
+  await Promise.all([page.waitForEvent('download'), ov.getByText('حفظ الصورة على الجهاز').click()]);
+  expect(await page.evaluate(() => window.__saved)).toEqual(['وصل-70.jpg']);
+  await expect(ov).toHaveCount(0);
+});
