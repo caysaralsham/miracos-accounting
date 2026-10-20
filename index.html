@@ -3620,6 +3620,28 @@ function sendNow(blob,info){
   if(navigator.canShare&&navigator.canShare({files})){navigator.share(text?{files,text}:{files}).catch(e=>{if(e&&e.name==='NotAllowedError')oneButton(blob,info)});return}
   bl.forEach((b,i)=>downloadBlob(b,nm(i)));openWA(waPhone(info.phone),text);toast(bl.length>1?'نزلوا '+bl.length+' صور — اسحبهم على محادثة واتساب':'نزلت الصورة — اسحبها على محادثة واتساب');
 }
+// حفظ الصورة على الجهاز: الآيفون بيفتح قائمة المشاركة (اختار «حفظ الصورة»)، الكمبيوتر والأندرويد بتنزل دغري
+function saveImages(blob,info){
+  const bl=Array.isArray(blob)?blob:[blob],nm=i=>bl.length>1?info.file.replace(/\.jpg$/,'-'+(i+1)+'.jpg'):info.file;
+  const files=bl.map((b,i)=>new File([b],nm(i),{type:'image/jpeg'}));
+  const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+  if(ios&&navigator.canShare&&navigator.canShare({files})){navigator.share({files}).catch(()=>{});toast('اختار «حفظ الصورة» من القائمة');return}
+  bl.forEach((b,i)=>downloadBlob(b,nm(i)));toast(bl.length>1?'انحفظوا '+bl.length+' صور على الجهاز':'انحفظت الصورة على الجهاز');
+}
+// نافذة الاختيار: إرسال على واتساب أو حفظ الصورة
+function shareChooser(src,info,sendFn){
+  const old=document.getElementById('shareChoiceOverlay');if(old)old.remove();
+  const ov=document.createElement('div');ov.id='shareChoiceOverlay';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px;';
+  ov.innerHTML='<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:18px;width:100%;max-width:320px;text-align:center;"><div data-msg style="font-size:13px;color:var(--text-dim);margin-bottom:10px;min-height:16px"></div><button type="button" class="btn" data-act="wa" style="width:100%;background:#25D366;color:#fff;border-color:#25D366;font-size:16px;margin-bottom:8px;">📲 إرسال على واتساب</button><button type="button" class="btn" data-act="save" style="width:100%;font-size:16px;margin-bottom:8px;">💾 حفظ الصورة على الجهاز</button><button type="button" class="btn btn-ghost" data-act="x" style="width:100%;">إلغاء</button></div>';
+  document.body.appendChild(ov);
+  const btns=[...ov.querySelectorAll('[data-act="wa"],[data-act="save"]')],msg=ov.querySelector('[data-msg]');
+  let blob=(src&&typeof src.then==='function')?null:src;
+  if(!blob){btns.forEach(b=>b.disabled=true);msg.textContent='ثانية، عم تتجهز الصورة…';
+    Promise.resolve(src).then(b=>{if(!document.body.contains(ov))return;if(!b){ov.remove();toast('تعذر إنشاء الصورة');return}blob=b;btns.forEach(x=>x.disabled=false);msg.textContent=''}).catch(()=>{ov.remove();toast('تعذر إنشاء الصورة')})}
+  ov.addEventListener('click',e=>{if(e.target===ov){ov.remove();return}
+    const a=e.target.closest('[data-act]');if(!a||a.disabled)return;ov.remove();
+    if(a.dataset.act==='wa')sendFn(blob);else if(a.dataset.act==='save')saveImages(blob,info)});
+}
 function oneButton(blob,info){
   const old=document.getElementById('shareChoiceOverlay');if(old)old.remove();
   const ov=document.createElement('div');ov.id='shareChoiceOverlay';ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:99999;padding:16px;';
@@ -3632,13 +3654,13 @@ document.addEventListener('click',async e=>{
   const kind=b.id==='btnShareReceipt'?'rcp':'inv',info=shareInfo(kind);if(!info)return;
   e.stopImmediatePropagation();e.preventDefault();
   let p=window.__sharePrep;if(!p||p.kind!==kind||p.id!==info.id){prepShare(kind,info.id);p=window.__sharePrep}
-  if(p.blob){sendNow(p.blob,info);return}
-  toast('ثانية، عم تتجهز الصورة…');const blob=await p.promise;
-  if(!blob){toast('تعذر إنشاء الصورة');return}
-  oneButton(blob,info);
+  shareChooser(p.blob||p.promise,info,b=>sendNow(b,info));
 },true);
 // المشاركة: على طول على واتساب (بلا قائمة). إذا المتصفح طلب كبسة جديدة، بيطلع زر واحد بس
 function shareImageChoice(blob, fileName, title, phone){
+  shareChooser(blob,{file:fileName,title},b=>shareImageSend(b,fileName,title,phone));
+}
+function shareImageSend(blob, fileName, title, phone){
   const text=shareMsg(title),file=new File([blob],fileName,{type:'image/jpeg'});
   const go=async()=>{
     // الجوال: قائمة المشاركة والصورة مرفقة
@@ -6620,8 +6642,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   function prepJob(j){if(!j)return null;const key=j.id+'|'+((j.upd&&j.upd.at)||j.at);let p=jobPrep[j.id];if(p&&p.key===key)return p;
     p={key,blob:null};p.promise=jobImage(j).then(b=>{p.blob=b;return b}).catch(e=>{console.error(e);return null});jobPrep[j.id]=p;return p}
   async function shareJob(j){if(!j)return;const p=prepJob(j),info={phone:'',title:'طلبية '+ordNo(j),file:('طلبية-'+ordNo(j)+'.jpg'),text:''};
-    if(p.blob)return sendNow(p.blob,info);
-    toast('ثانية، عم تتجهز الصورة…');const b=await p.promise;if(!b){toast('تعذر إنشاء الصورة');return}oneButton(b,info)}
+    shareChooser(p.blob||p.promise,info,b=>sendNow(b,info))}
   async function printJob(j,viewOnly){
     if(!j)return;const w=window.open('','_blank');if(!w){toast('اسمح بالنوافذ المنبثقة للطباعة');return}
     w.document.write('<p style="font-family:sans-serif">جاري التجهيز...</p>');
