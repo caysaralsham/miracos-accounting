@@ -365,6 +365,7 @@
 
     .receipt-view .receipt-top{ padding-bottom:12px !important; margin-bottom:12px !important; }
     .receipt-brand img{ width:130px !important; height:130px !important; }
+    .receipt-top[style*="ltr"] .receipt-brand img{ width:100px !important; height:100px !important; }
     .receipt-brand .name{ font-size:26px !important; }
     .receipt-info-grid{ grid-template-columns:1fr 1fr 1.4fr !important; font-size:21px !important; font-weight:600; margin-bottom:12px !important; gap:8px 28px !important; }
     .receipt-info-grid div span{ font-size:17px !important; font-weight:400; }
@@ -4211,20 +4212,21 @@ function viewInvoice(id){
       <thead>
         <tr class="print-head-row"><td colspan="6">
           <div class="receipt-top" style="direction:ltr; text-align:left;">
-            <div class="receipt-brand">
+            <div class="receipt-brand" style="flex:1; min-width:0;">
               <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
-              <div>
+              <div style="flex:1; min-width:0;">
                 <div class="name" style="font-size:16px;">${settings.companyName}</div>
-                <div class="meta" style="font-size:10.5px; line-height:1.5;">${escHtmlText(settings.address)} · ${escHtmlText(settings.phone)} · RC: ${settings.rc||''} · NIF: ${settings.nif||''}</div>
-                <div class="meta" style="font-size:10.5px; line-height:1.5;">NIS: ${settings.nis||''} · Art: ${settings.article||''} · ${settings.bank||''} · ${settings.email||''}</div>
+                <div class="meta" style="font-size:10.5px; line-height:1.5;">${escHtmlText(settings.address)} · ${escHtmlText(settings.phone)} · ${settings.email||''}</div>
+                <div class="meta" style="font-size:10.5px; line-height:1.5;">RC: ${settings.rc||''} · NIF: ${settings.nif||''} · NIS: ${settings.nis||''}</div>
+                <div class="meta" style="font-size:10.5px; line-height:1.5;">Art: ${settings.article||''} · ${settings.bank||''}</div>
               </div>
             </div>
-            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px; flex:none;">
               <div class="receipt-stamp">
-                <div class="no">${docLabel}</div>
+                <div class="no" style="font-size:${docLabel.length>8?13:docLabel.length>5?16:21}px; line-height:1.15">${docLabel}</div>
                 <div class="lbl">N° ${inv.no}</div>
               </div>
-              <div style="font-size:13px; font-weight:700; color:var(--text-dim);">Date: ${inv.date||''}</div>
+              <div style="font-size:13px; font-weight:700; color:var(--text-dim); white-space:nowrap;">Date: ${inv.date||''}</div>
             </div>
           </div>
         </td></tr>
