@@ -779,9 +779,9 @@
 
     <section class="view" id="view-reports">
       <div class="topbar"><h1>التقارير</h1></div>
-      <div class="panel">
-        <div class="panel-head"><h2>ملخص عام</h2></div>
-        <table>
+      <details class="panel top-sales" id="repSummaryBox">
+        <summary class="ts-sum"><span>ملخص عام</span><span class="ts-hint">اضغط للفتح</span></summary>
+        <table style="margin-top:12px;">
           <tr><td>إجمالي مبالغ الوصولات (المجموع الكلي للفواتير)</td><td id="repTotalInvoiced">0 دج</td></tr>
           <tr><td>إجمالي المقبوضات فعليًا (الدفعات)</td><td id="repTotalCollected">0 دج</td></tr>
           <tr><td>العمولة (<span id="repCommissionPercent">10</span>%)</td><td id="repCommission" style="color:var(--danger);">0 دج</td></tr>
@@ -789,7 +789,7 @@
           <tr><td>إجمالي المصاريف</td><td id="repTotalExp">0 دج</td></tr>
           <tr style="font-weight:800;"><td>الرصيد الصافي (المقبوضات − العمولة − المصاريف)</td><td id="repNet">0 دج</td></tr>
         </table>
-      </div>
+      </details>
       <details class="panel top-sales" id="topSalesBox">
         <summary class="ts-sum"><span>🏆 المنتجات الأكثر مبيعًا</span><span class="ts-hint">اضغط للفتح</span></summary>
         <div class="ts-body">
@@ -810,10 +810,10 @@
           <div id="tsAll" style="display:none; margin-top:10px;"></div>
         </div>
       </details>
-      <div class="panel">
-        <div class="panel-head"><h2>المصاريف حسب الفئة</h2></div>
-        <div id="expByCategory"></div>
-      </div>
+      <details class="panel top-sales" id="expByCategoryBox">
+        <summary class="ts-sum"><span>المصاريف حسب الفئة</span><span class="ts-hint">اضغط للفتح</span></summary>
+        <div id="expByCategory" style="margin-top:12px;"></div>
+      </details>
       <div class="panel">
         <div class="panel-head"><h2>دفتر الجرد السنوي</h2></div>
         <p style="font-size:13px; color:var(--text-dim); margin-top:0;">كل دفعة دخل أو مصروف بسطر واحد، بالتاريخ والتفاصيل — جاهز للطباعة الكاملة (مثال: 200 دفعة = 200 سطر).</p>
@@ -6752,42 +6752,65 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
      /* زر «اطلب تقييم» انشال — رابط التقييم صار بيروح مع الوصل بالمشاركة */}}
   if(typeof renderReceiptsTable==='function'){const _rr=renderReceiptsTable;renderReceiptsTable=function(){const r=_rr.apply(this,arguments);try{markRcpTable()}catch(e){}return r}}
 
-  // ================= 📊 تقرير الشهر (بقسم التقارير) =================
+  // ================= 📊 تقرير الشهر / 6 أشهر / سنة (بقسم التقارير) — مطوي افتراضياً =================
   {
     const rv=document.querySelector('#view-reports .topbar');
     if(rv){
-      const pn=document.createElement('div');pn.className='panel';
-      pn.innerHTML=`<div class="panel-head" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h2 style="margin:0">📊 تقرير الشهر</h2><span style="flex:1"></span><select data-m style="font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:auto"></select><button type="button" class="btn btn-sm" data-p>🖨 طباعة</button></div><div data-o></div>`;
+      const pn=document.createElement('details');pn.className='panel top-sales';pn.id='periodReportBox';
+      const selCss='font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;width:auto';
+      pn.innerHTML=`<summary class="ts-sum"><span data-t>📊 تقرير الشهر</span><span class="ts-hint">اضغط للفتح</span></summary>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0 10px">
+          <select data-k style="${selCss}"><option value="m">شهر</option><option value="6">6 أشهر</option><option value="y">سنة</option></select>
+          <select data-m style="${selCss}"></select>
+          <span data-r style="font-size:12px;color:var(--text-dim)"></span>
+          <span style="flex:1"></span><button type="button" class="btn btn-sm" data-p>🖨 طباعة</button></div><div data-o></div>`;
       rv.insertAdjacentElement('afterend',pn);
-      const mi=pn.querySelector('[data-m]');
-      // الشهر بالأرقام (10/2026) بدل الاسم: آخر 36 شهر + أي شهر فيه شغل
+      const ki=pn.querySelector('[data-k]'),mi=pn.querySelector('[data-m]');
+      const KN={m:'شهر',6:'6 أشهر',y:'سنة'};
+      // الشهر بالأرقام (10/2026): آخر 36 شهر + أي شهر فيه شغل
       const mLbl=v=>{const[y,mm]=String(v||'').split('-');return mm?mm+'/'+y:v};
-      const fillMonths=()=>{const cur=mi.value||localDate().slice(0,7);const set=new Set();const d=new Date();d.setDate(1);
-        for(let k=0;k<36;k++){set.add(localDate(d).slice(0,7));d.setMonth(d.getMonth()-1)}
+      const addM=(ym,k)=>{const[y,m]=ym.split('-').map(Number);const d=new Date(y,m-1+k,1);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+      let lastK=ki.value;
+      const fillSel=()=>{const k=ki.value;const set=new Set();const d=new Date();d.setDate(1);
+        for(let x=0;x<36;x++){set.add(localDate(d).slice(0,7));d.setMonth(d.getMonth()-1)}
         (typeof receipts!=='undefined'?receipts:[]).forEach(r=>{if(/^\d{4}-\d{2}/.test(r.date||''))set.add(r.date.slice(0,7))});
-        mi.innerHTML=[...set].sort().reverse().map(v=>`<option value="${v}">${mLbl(v)}</option>`).join('');mi.value=cur};
-      fillMonths();
+        let cur=mi.value;
+        if(k==='y'){const ys=[...new Set([...set].map(v=>v.slice(0,4)))].sort().reverse();
+          if(lastK!=='y'||!cur)cur=(cur||localDate()).slice(0,4);
+          mi.innerHTML=ys.map(y=>`<option value="${y}">${y}</option>`).join('');mi.value=ys.includes(cur)?cur:ys[0]}
+        else{const ms=[...set].sort().reverse();
+          if(lastK==='y'||!cur)cur=(cur&&cur.length===4&&cur!==localDate().slice(0,4))?cur+'-12':localDate().slice(0,7);
+          mi.innerHTML=ms.map(v=>`<option value="${v}">${mLbl(v)}</option>`).join('');mi.value=ms.includes(cur)?cur:ms[0]}
+        lastK=k};
+      // حدود الفترة (من/إلى بصيغة YYYY-MM): شهر = الشهر المختار، 6 أشهر = المختار و5 قبله، سنة = السنة كاملة
+      const range=()=>{const k=ki.value,v=mi.value;
+        if(k==='y')return[v+'-01',v+'-12'];if(k==='6')return[addM(v,-5),v];return[v,v]};
+      const pLbl=()=>{const k=ki.value,[a,b]=range();return k==='y'?'سنة '+mi.value:(k==='6'?'6 أشهر ('+mLbl(a)+' – '+mLbl(b)+')':'شهر '+mLbl(b))};
+      fillSel();
       const n=v=>Number(v)||0,F=v=>(typeof fmt==='function'?fmt(v):Math.round(v)+' دج');
-      const build=()=>{fillMonths();const m=mi.value;const inM=d=>String(d||'').slice(0,7)===m;
-        const rs=(typeof receipts!=='undefined'?receipts:[]).filter(r=>inM(r.date));
-        const tot=rs.reduce((a,r)=>a+n(r.total),0);
-        const paid=(typeof receipts!=='undefined'?receipts:[]).reduce((a,r)=>a+(r.payments||[]).filter(p=>inM(p.date)).reduce((b,p)=>b+n(p.amount),0),0);
-        const rem=rs.reduce((a,r)=>a+n(r.remaining),0);
-        const ex=(typeof expenses!=='undefined'?expenses:[]).filter(e=>inM(e.date)).reduce((a,e)=>a+n(e.amount),0);
+      const build=()=>{fillSel();const[a,b]=range();const inP=d=>{const m=String(d||'').slice(0,7);return m>=a&&m<=b};
+        const isM=ki.value==='m',P=isM?'الشهر':'الفترة';
+        pn.querySelector('[data-t]').textContent='📊 تقرير '+KN[ki.value];
+        pn.querySelector('[data-r]').textContent=isM?'':'من '+mLbl(a)+' إلى '+mLbl(b);
+        const rs=(typeof receipts!=='undefined'?receipts:[]).filter(r=>inP(r.date));
+        const tot=rs.reduce((x,r)=>x+n(r.total),0);
+        const paid=(typeof receipts!=='undefined'?receipts:[]).reduce((x,r)=>x+(r.payments||[]).filter(p=>inP(p.date)).reduce((y,p)=>y+n(p.amount),0),0);
+        const rem=rs.reduce((x,r)=>x+n(r.remaining),0);
+        const ex=(typeof expenses!=='undefined'?expenses:[]).filter(e=>inP(e.date)).reduce((x,e)=>x+n(e.amount),0);
         const kinds={};rs.forEach(r=>(r.items||[]).forEach(it=>{const w=String(it.desc||'').trim().split(/[\s—\-:،,(]+/)[0];if(w&&w.length>1)kinds[w]=(kinds[w]||0)+1}));
-        const top=Object.entries(kinds).sort((a,b)=>b[1]-a[1]).slice(0,6);
-        const js=(window.__ordersJobs||[]);const jm=js.filter(j=>localDate(new Date(j.at)).slice(0,7)===m);
+        const top=Object.entries(kinds).sort((x,y)=>y[1]-x[1]).slice(0,6);
+        const js=(window.__ordersJobs||[]);const jm=js.filter(j=>inP(localDate(new Date(j.at))));
         const done=jm.filter(j=>j.status==='تم التنفيذ').length,late=js.filter(j=>j.due&&j.status!=='تم التنفيذ'&&new Date(j.due+'T23:59')<Date.now()).length;
         const card=(t,v,c)=>`<div style="background:var(--marble-2,#f5ecdd);border-radius:10px;padding:10px 12px"><div style="font-size:12px;color:var(--text-dim)">${t}</div><div style="font-weight:800;font-size:17px;${c?'color:'+c:''}">${v}</div></div>`;
         pn.querySelector('[data-o]').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
-          ${card('عدد الوصولات',rs.length)}${card('مجموع الشغل',F(tot))}${card('المقبوض بالشهر',F(paid),'#1F8F55')}${card('الباقي على وصولات الشهر',F(rem),'#A6453D')}${card('المصاريف',F(ex),'#A6453D')}${card('الصافي (المقبوض − المصاريف)',F(paid-ex))}${card('طلبيات الشهر',jm.length+' (منفّذة '+done+')')}${card('طلبيات متأخرة الآن',late,late?'#C0392B':'')}</div>
+          ${card('عدد الوصولات',rs.length)}${card('مجموع الشغل',F(tot))}${card('المقبوض ب'+P,F(paid),'#1F8F55')}${card('الباقي على وصولات '+P,F(rem),'#A6453D')}${card('المصاريف',F(ex),'#A6453D')}${card('الصافي (المقبوض − المصاريف)',F(paid-ex))}${card('طلبيات '+P,jm.length+' (منفّذة '+done+')')}${card('طلبيات متأخرة الآن',late,late?'#C0392B':'')}</div>
           ${top.length?`<div style="margin-top:10px;font-size:13px"><b>أكتر الأشغال:</b> ${top.map(([k,v])=>esc(k)+' ('+v+')').join(' · ')}</div>`:''}`;};
-      mi.addEventListener('change',build);
+      ki.addEventListener('change',build);mi.addEventListener('change',build);
       // طباعة مباشرة من نفس الصفحة (بلا ما تفتح صفحة جديدة): نسخة مخفية عالشاشة وبتبيّن بالطباعة بس
       pn.querySelector('[data-p]').onclick=()=>{build();
         const old=document.getElementById('monthPrintOverlay');if(old)old.remove();
         const ov=document.createElement('div');ov.className='overlay show';ov.id='monthPrintOverlay';ov.style.display='none';
-        ov.innerHTML=`<div style="font-family:Cairo,Tahoma,sans-serif;color:#3B2414;padding:10mm;background:#fff"><h2>📊 تقرير شهر ${mLbl(mi.value)} — ${FS_DOC==='factory'?'المعمل':'المعرض'}</h2>${pn.querySelector('[data-o]').innerHTML}</div>`;
+        ov.innerHTML=`<div style="font-family:Cairo,Tahoma,sans-serif;color:#3B2414;padding:10mm;background:#fff"><h2>📊 تقرير ${pLbl()} — ${FS_DOC==='factory'?'المعمل':'المعرض'}</h2>${pn.querySelector('[data-o]').innerHTML}</div>`;
         document.body.appendChild(ov);
         const done=()=>{window.removeEventListener('afterprint',done);ov.remove()};
         window.addEventListener('afterprint',done);setTimeout(()=>{window.print();setTimeout(()=>{if(document.body.contains(ov))done()},60000)},50)};

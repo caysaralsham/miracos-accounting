@@ -257,3 +257,40 @@ test('المشاركة: نافذة فيها «إرسال على واتساب» �
   expect(await page.evaluate(() => window.__saved)).toEqual(['وصل-70.jpg']);
   await expect(ov).toHaveCount(0);
 });
+
+test('التقارير: تقرير الشهر وملخص عام والمصاريف حسب الفئة مطوية افتراضياً', async ({ page }) => {
+  for (const id of ['periodReportBox', 'repSummaryBox', 'expByCategoryBox']) {
+    const box = page.locator('#' + id);
+    await expect(box).toHaveCount(1);
+    expect(await box.evaluate(e => e.tagName === 'DETAILS' && !e.open), id).toBe(true);
+  }
+});
+
+test('التقارير: تقرير شهر / 6 أشهر / سنة يحسب الفترة الصحيحة', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const mk = (id, date, total, pay) => ({ id, no: 900, name: 'تجربة', date, items: [{ qty: 1, desc: 'رخام', price: total, amount: total }],
+      total, discount: 0, remaining: total - pay, payments: [{ date, amount: pay }] });
+    receipts.push(mk('q1', '2026-10-05', 1000, 400), mk('q2', '2026-06-10', 2000, 2000), mk('q3', '2026-02-01', 5000, 1000), mk('q4', '2025-12-20', 9000, 9000));
+    expenses.push({ id: 'e1', date: '2026-10-03', amount: 100 }, { id: 'e2', date: '2026-03-03', amount: 50 });
+    const box = document.getElementById('periodReportBox'); box.open = true;
+    const k = box.querySelector('[data-k]'), m = box.querySelector('[data-m]');
+    const read = () => [...box.querySelectorAll('[data-o] > div > div')].map(c => [...c.children].map(x => x.textContent));
+    const set = (sel, v) => { sel.value = v; sel.dispatchEvent(new Event('change')); };
+    const out = {};
+    set(k, 'm'); set(m, '2026-10'); out.m = read();
+    set(k, '6'); set(m, '2026-10'); out.six = read();
+    set(k, 'y'); out.yv = m.value; set(m, '2026'); out.y = read();
+    set(k, 'm'); out.back = m.value;
+    return out;
+  });
+  const val = (rows, label) => num(rows.find(x => x[0].startsWith(label))[1]);
+  expect(val(r.m, 'عدد الوصولات')).toBe(1);
+  expect(val(r.m, 'المقبوض')).toBe(400);
+  expect(val(r.six, 'عدد الوصولات')).toBe(2);       // 05/2026 → 10/2026
+  expect(val(r.six, 'مجموع الشغل')).toBe(3000);
+  expect(val(r.y, 'عدد الوصولات')).toBe(3);         // سنة 2026 كاملة
+  expect(val(r.y, 'المقبوض')).toBe(3400);
+  expect(val(r.y, 'المصاريف')).toBe(150);
+  expect(r.yv).toBe('2026');
+  expect(r.back).toMatch(/^\d{4}-\d{2}$/);
+});
