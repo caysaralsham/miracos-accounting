@@ -718,7 +718,10 @@
     <section class="view" id="view-measurements">
       <div class="topbar">
         <h1>حاسبة القياسات</h1>
-        <button type="button" class="btn btn-sm" id="btnBlankMeasSheet" title="ورقة فاضية للطباعة: بتاخدها عالموقع وبتكتب القياسات بإيدك قبل التنفيذ">🖨 ورقة قياس فاضية (30 سطر)</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm" id="btnBlankMeasSheet" title="ورقة فاضية للطباعة: بتاخدها عالموقع وبتكتب القياسات بإيدك قبل التنفيذ">🖨 ورقة قياس فاضية — متر مربع (30 سطر)</button>
+          <button type="button" class="btn btn-sm" id="btnBlankMeasSheetMl" title="ورقة فاضية للطباعة: بتاخدها عالموقع وبتكتب القياسات بإيدك قبل التنفيذ">🖨 ورقة قياس فاضية — متر طول (30 سطر)</button>
+        </div>
       </div>
 
       <div class="panel">
@@ -6917,11 +6920,11 @@ window.popBar=function(withPrint){
 </script>
 <script>
 // ورقة قياس فاضية (متر مربع، 30 سطر) — للتسجيل باليد عالموقع قبل التنفيذ. خانة النتيجة بتضل فاضية
-window.printBlankMeasSheet=function(){
+window.printBlankMeasSheet=function(type){const ml=type==='ml';
   const w=window.open('','_blank');if(!w){if(typeof toast==='function')toast('اسمح بالنوافذ المنبثقة للطباعة');return}
   const name=String(document.title||'').split(' — ')[0];
-  const rows=Array.from({length:30},(_,i)=>`<tr><td class="n">${i+1}</td><td></td><td></td><td></td><td></td><td></td></tr>`).join('');
-  w.document.open();w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ورقة قياس - متر مربع</title><style>
+  const rows=Array.from({length:30},(_,i)=>`<tr><td class="n">${i+1}</td><td></td><td></td>${ml?'':'<td></td>'}<td></td><td></td></tr>`).join('');
+  w.document.open();w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ورقة قياس - ${ml?'متر طول':'متر مربع'}</title><style>
     body{font-family:Cairo,Tahoma,Arial,sans-serif;color:#222;margin:0;background:#E9E4DA}
     .pg{width:210mm;min-height:297mm;margin:12px auto;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.18);box-sizing:border-box;padding:10mm}
     .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #9A6A3A;padding-bottom:5px;margin-bottom:8px}
@@ -6937,16 +6940,16 @@ window.printBlankMeasSheet=function(){
     @page{size:A4 portrait;margin:0}
     @media print{body{background:#fff}.pg{margin:0;box-shadow:none;width:210mm;height:297mm;min-height:0;overflow:hidden}.pop-bar{display:none!important}}
   </style></head><body>${window.popBar()}<div class="pg">
-    <div class="hd"><div><h1>ورقة قياس — متر مربع (م²)</h1><div class="co">${name.replace(/[<>&]/g,'')}</div></div><div style="font-size:12.5px;font-weight:700">ورقة رقم: ........</div></div>
+    <div class="hd"><div><h1>ورقة قياس — ${ml?'متر طول (م.ط)':'متر مربع (م²)'}</h1><div class="co">${name.replace(/[<>&]/g,'')}</div></div><div style="font-size:12.5px;font-weight:700">ورقة رقم: ........</div></div>
     <div class="info"><div>الزبون:<span></span></div><div>الهاتف:<span></span></div><div>العنوان:<span></span></div><div>التاريخ:<span></span></div></div>
-    <table><colgroup><col style="width:9mm"><col><col style="width:24mm"><col style="width:24mm"><col style="width:17mm"><col style="width:27mm"></colgroup>
-      <thead><tr><th>#</th><th>المكان / البيان</th><th>الطول (سم)</th><th>العرض (سم)</th><th>العدد</th><th>النتيجة (م²)</th></tr></thead>
+    <table><colgroup><col style="width:9mm"><col><col style="width:${ml?30:24}mm">${ml?'':'<col style="width:24mm">'}<col style="width:17mm"><col style="width:27mm"></colgroup>
+      <thead><tr><th>#</th><th>المكان / البيان</th><th>الطول (سم)</th>${ml?'':'<th>العرض (سم)</th>'}<th>العدد</th><th>النتيجة (${ml?'م.ط':'م²'})</th></tr></thead>
       <tbody>${rows}</tbody>
-      <tfoot><tr><th colspan="5" style="text-align:left;padding-left:8px">المجموع (م²)</th><td></td></tr></tfoot></table>
+      <tfoot><tr><th colspan="${ml?4:5}" style="text-align:left;padding-left:8px">المجموع (${ml?'م.ط':'م²'})</th><td></td></tr></tfoot></table>
     <div class="ft"><div>القائس:<span></span></div><div>ملاحظات:<span></span></div></div>
   </div></body></html>`);w.document.close();
 };
-document.addEventListener('click',function(e){if(e.target.closest&&e.target.closest('#btnBlankMeasSheet'))window.printBlankMeasSheet();});
+document.addEventListener('click',function(e){if(!e.target.closest)return;if(e.target.closest('#btnBlankMeasSheet'))window.printBlankMeasSheet('m2');else if(e.target.closest('#btnBlankMeasSheetMl'))window.printBlankMeasSheet('ml');});
 </script>
 <script>
 document.addEventListener('click',function(e){var h=e.target.closest&&e.target.closest('.collapsible > .panel-head');if(!h||e.target.closest('button,input,a,select'))return;h.parentElement.classList.toggle('collapsed');});

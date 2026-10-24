@@ -350,3 +350,16 @@ test('ورقة قياس فاضية: متر مربع، 30 سطر، النتيجة
   const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
   expect(pages).toBe(1);
 });
+
+test('ورقة قياس فاضية متر طول: بلا عمود العرض، 30 سطر، ورقة وحدة', async ({ page }) => {
+  const [pop] = await Promise.all([page.waitForEvent('popup'), page.evaluate(() => window.printBlankMeasSheet('ml'))]);
+  await pop.waitForLoadState();
+  const head = await pop.locator('thead').innerText();
+  expect(head).toContain('النتيجة (م.ط)');
+  expect(head).not.toContain('العرض');
+  expect(await pop.locator('tbody tr').count()).toBe(30);
+  expect(await pop.locator('tbody tr').first().locator('td').count()).toBe(5);
+  await pop.emulateMedia({ media: 'print' });
+  const pdf = await pop.pdf({ preferCSSPageSize: true, printBackground: true, path: process.env.SHEET_PDF || undefined });
+  expect((pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length).toBe(1);
+});
