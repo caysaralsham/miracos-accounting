@@ -338,3 +338,15 @@ test('الأكثر مبيعاً: بيعدّ الكمية المباعة (عدد 
   expect(list[0][0]).toBe('جرن');
   expect(list.some(x => x[0] === 'خصم')).toBe(false);
 });
+
+test('ورقة قياس فاضية: متر مربع، 30 سطر، النتيجة فاضية، وبتطلع ورقة A4 وحدة', async ({ page }) => {
+  const [pop] = await Promise.all([page.waitForEvent('popup'), page.evaluate(() => window.printBlankMeasSheet())]);
+  await pop.waitForLoadState();
+  expect(await pop.locator('tbody tr').count()).toBe(30);
+  expect(await pop.locator('thead').innerText()).toContain('النتيجة (م²)');
+  expect((await pop.locator('tbody').innerText()).replace(/[\s\d]/g, '')).toBe('');
+  await pop.emulateMedia({ media: 'print' });
+  const pdf = await pop.pdf({ preferCSSPageSize: true, printBackground: true, path: process.env.SHEET_PDF || undefined });
+  const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+  expect(pages).toBe(1);
+});
