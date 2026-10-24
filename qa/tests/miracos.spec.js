@@ -294,3 +294,23 @@ test('التقارير: تقرير شهر / 6 أشهر / سنة يحسب الف�
   expect(r.yv).toBe('2026');
   expect(r.back).toMatch(/^\d{4}-\d{2}$/);
 });
+
+test('الطلبيات: فتح الصفحة (من الجرس أو القائمة) بيشيل الرقم الأحمر، و«جديد» بيضل خلال الزيارة', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const other = 'xx-other', now = Date.now();
+    window.__fjobsTest([
+      { id: 'a', no: 1, at: now - 5000, status: 'بدون تنفيذ', upd: { by: other, at: now + 60000, txt: 'تعديل' } }, // ساعة الجهاز التاني متقدمة
+      { id: 'b', no: 2, at: now - 4000, status: 'قيد التنفيذ', upd: { by: other, at: now - 1000, txt: 'تعديل' } },
+    ]);
+    window.__fjobsShow();
+    const after = window.__fjobsBadge();
+    document.querySelector('.nav-item[data-view="reports"]').click();
+    window.__fjobsShow();
+    return { after, again: window.__fjobsBadge() };
+  });
+  expect(r.after.shown).toBe(false);
+  expect(r.after.fb).toBe(false);
+  expect(r.after.fresh).toBe(2);
+  expect(r.again.shown).toBe(false);
+  expect(r.again.fresh).toBe(0);
+});

@@ -6595,7 +6595,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       jobs=((d.exists&&d.data().jobs)||[]).map(j=>({...j,status:normSt(j.status),items:j.items||[],cust:j.cust||{},photos:j.photos||[]}));
       if(known)jobs.forEach(j=>{if(isUnseen(j)&&(!known[j.id]||known[j.id]<j.upd.at))notify(j)});
       known={};jobs.forEach(j=>known[j.id]=j.upd?j.upd.at:0);
-      window.__ordersJobs=jobs;updBadges();if(ov.classList.contains('active'))render();markRcpTable();},e=>console.warn(e))}catch(e){setTimeout(ostart,1500)}};
+      window.__ordersJobs=jobs;updBadges();if(ov.classList.contains('active')){jobs.filter(isUnseen).forEach(j=>freshIds.add(j.id));render();markAllSeen()}markRcpTable();},e=>console.warn(e))}catch(e){setTimeout(ostart,1500)}};
   const ow=setInterval(()=>{if(typeof db!=='undefined'&&db&&firebase.auth().currentUser){clearInterval(ow);ostart()}},1000);
   const lines=j=>j.items.map(x=>(x.qty?x.qty+' × ':'')+x.desc+(x.unit?' ('+x.unit+')':'')).join('\n');
   const parse=t=>t.split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const m=l.match(/^([\d.,]+)\s*[×x\*]\s*(.+)$/);return m?{qty:m[1],desc:m[2],unit:''}:{qty:'',desc:l,unit:''}});
@@ -6663,7 +6663,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   }
   // ---- صفحة الطلبيات ----
   let filter='all',q='';const openIds=new Set();
-  if(/^(127\.0\.0\.1|localhost)$/.test(location.hostname))window.__fjobsTest=a=>{jobs=a.map(j=>({items:[],cust:{},photos:[],...j}));render();return [...ov.querySelectorAll('[data-list] b[style*="brass"]')].map(b=>b.textContent)}; // للاختبارات المحلية فقط
+  if(/^(127\.0\.0\.1|localhost)$/.test(location.hostname)){window.__fjobsBadge=()=>{const ub=navA.querySelector('[data-u]');return {shown:ub.style.display!=='none',fb:fb.style.display!=='none',fresh:ov.querySelectorAll('[data-list] span').length?[...ov.querySelectorAll('[data-list] span')].filter(x=>x.textContent.includes('جديد')).length:0}};window.__fjobsShow=()=>showOrders();window.__fjobsTest=a=>{jobs=a.map(j=>({items:[],cust:{},photos:[],...j}));render();return [...ov.querySelectorAll('[data-list] b[style*="brass"]')].map(b=>b.textContent)}} // للاختبارات المحلية فقط
   const ov=document.createElement('section');ov.className='view';ov.id='view-fjobs';
   ov.innerHTML=`<div class="topbar"><h1>🏭 الطلبيات</h1></div>
     <div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
@@ -6675,8 +6675,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   function render(){
     const fl=jobs.filter(j=>filter==='all'||(filter==='open'&&j.status!=='تم التنفيذ')||j.status===filter)
       .filter(j=>!q||(ordNo(j)+' '+j.cust.name+' '+j.cust.phone+' '+lines(j)+' '+(j.note||'')).toLowerCase().includes(q));
-    const rk=j=>{const i=ST.indexOf(j.status);return i<0?0:i};const list=fl.slice().sort((a,b)=>(rk(a)-rk(b))||(isUnseen(b)-isUnseen(a))||b.at-a.at);
-    ov.querySelector('[data-list]').innerHTML=list.map((j,ji)=>{const st=j.status,op=openIds.has(j.id),un=isUnseen(j),du=dueInfo(j);const hd=(ji===0||list[ji-1].status!==st)&&ST.includes(filter)===false?`<div data-sthd style="font-weight:800;font-size:14px;color:${STC[st]};margin:${ji?14:2}px 2px 6px">${STI[st]} ${st} (${list.filter(x=>x.status===st).length})</div>`:'';return hd+`<div style="border:1px solid ${un?'#C0392B':'var(--line)'};border-inline-start:5px solid ${STC[st]};border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--marble,#fff)">
+    const rk=j=>{const i=ST.indexOf(j.status);return i<0?0:i};const list=fl.slice().sort((a,b)=>(rk(a)-rk(b))||((isUnseen(b)||freshIds.has(b.id))-(isUnseen(a)||freshIds.has(a.id)))||b.at-a.at);
+    ov.querySelector('[data-list]').innerHTML=list.map((j,ji)=>{const st=j.status,op=openIds.has(j.id),un=isUnseen(j)||freshIds.has(j.id),du=dueInfo(j);const hd=(ji===0||list[ji-1].status!==st)&&ST.includes(filter)===false?`<div data-sthd style="font-weight:800;font-size:14px;color:${STC[st]};margin:${ji?14:2}px 2px 6px">${STI[st]} ${st} (${list.filter(x=>x.status===st).length})</div>`:'';return hd+`<div style="border:1px solid ${un?'#C0392B':'var(--line)'};border-inline-start:5px solid ${STC[st]};border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--marble,#fff)">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:var(--brass-deep)">${ordNo(j)}</b><b>${esc(j.cust.name||'بدون اسم')}</b>${ME!=='factory'&&j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}
         <span style="background:${STC[st]};color:#fff;border-radius:20px;padding:1px 10px;font-size:12px;font-weight:700">${STI[st]} ${st}</span>${du?`<span style="color:${du.c};font-size:12px;font-weight:700">📅 ${du.t}</span>`:''}${un?'<span style="background:#C0392B;color:#fff;border-radius:20px;padding:1px 8px;font-size:11.5px">🔔 جديد</span>':''}<span style="flex:1"></span>
         <button type="button" class="btn btn-sm" data-ed="${j.id}">${op?'إخفاء':'✏️ تعديل'}</button><button type="button" class="btn btn-sm" data-vw="${j.id}">👁 إظهار الوصل</button><button type="button" class="btn btn-sm" data-wa="${j.id}" style="background:#25D366;color:#fff;border-color:#25D366">واتساب</button>${ME==='main'&&j.rcpId&&receipts.some(x=>x.id===j.rcpId)?`<button type="button" class="btn btn-sm" data-rv="${j.rcpId}" title="وصل الزبون الأصلي (مع الأسعار)">🧾 وصل الزبون</button>`:''}<button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" title="حذف الطلبية" style="color:#A6453D">🗑</button></div>
@@ -6698,10 +6698,19 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     ov.querySelectorAll('[data-wa]').forEach(b=>{const f=()=>prepJob(jobs.find(x=>x.id===b.dataset.wa));b.addEventListener('pointerenter',f,{once:true});b.addEventListener('focus',f,{once:true})});
     list.filter(j=>openIds.has(j.id)).forEach(j=>setTimeout(()=>prepJob(j),500));
   }
+  const seenAt=x=>Math.max(Date.now(),(x.upd&&x.upd.at)||0)+1;
   async function markSeen(id){const j=jobs.find(x=>x.id===id);if(!j||!isUnseen(j))return;
-    await osave(a=>a.map(x=>x.id===id?{...x,seen:{...(x.seen||{}),[ME]:Date.now()}}:x),false)}
+    await osave(a=>a.map(x=>x.id===id?{...x,seen:{...(x.seen||{}),[ME]:seenAt(x)}}:x),false)}
+  // فتح صفحة الطلبيات (من الجرس أو القائمة) = شفت كل التعديلات: الرقم الأحمر بيروح فوراً،
+  // و«🔔 جديد» بيضل على الطلبيات اللي تعدّلت لحد ما تطلع من الصفحة
+  const freshIds=new Set();
+  async function markAllSeen(){const ids=jobs.filter(isUnseen).map(j=>j.id);if(!ids.length)return;
+    ids.forEach(id=>freshIds.add(id));
+    jobs=jobs.map(x=>ids.includes(x.id)?{...x,seen:{...(x.seen||{}),[ME]:seenAt(x)}}:x);window.__ordersJobs=jobs;updBadges();
+    try{const d=await oref().get();const arr=(d.exists&&d.data().jobs)||[];  // حفظ صامت: بلا رسالة حتى لو النت ضعيف
+      await oref().set({jobs:arr.map(x=>ids.includes(x.id)&&x.upd&&x.upd.by!==ME?{...x,seen:{...(x.seen||{}),[ME]:seenAt(x)}}:x)},{merge:true})}catch(e){console.warn(e)}}
   const showOrders=()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i===navA));
-    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));ov.classList.add('active');render();updBadges();window.scrollTo(0,0);
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));ov.classList.add('active');freshIds.clear();jobs.filter(isUnseen).forEach(j=>freshIds.add(j.id));render();markAllSeen();window.scrollTo(0,0);
     try{if(window.Notification&&Notification.permission==='default')Notification.requestPermission()}catch(e){}};
   navA.addEventListener('click',showOrders);fb.onclick=showOrders;
   ov.addEventListener('input',e=>{if(e.target.dataset.q!==undefined){q=e.target.value.trim().toLowerCase();render()}});
