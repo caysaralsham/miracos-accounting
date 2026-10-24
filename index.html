@@ -815,14 +815,6 @@
         <div id="expByCategory" style="margin-top:12px;"></div>
       </details>
       <div class="panel">
-        <div class="panel-head"><h2>دفتر الجرد السنوي</h2></div>
-        <p style="font-size:13px; color:var(--text-dim); margin-top:0;">كل دفعة دخل أو مصروف بسطر واحد، بالتاريخ والتفاصيل — جاهز للطباعة الكاملة (مثال: 200 دفعة = 200 سطر).</p>
-        <div style="display:flex; gap:10px;">
-          <button class="btn btn-primary" id="btnPrintIncomeLedger">طباعة سجل الدخل</button>
-          <button class="btn btn-primary" id="btnPrintExpenseLedger">طباعة سجل المصروف</button>
-        </div>
-      </div>
-      <div class="panel">
         <div class="panel-head">
           <h2>سجل الدفعات (تاريخي)</h2>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
@@ -842,6 +834,14 @@
           </div>
         </div>
         <div id="paymentHistoryTableWrap"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>دفتر الجرد السنوي</h2></div>
+        <p style="font-size:13px; color:var(--text-dim); margin-top:0;">كل دفعة دخل أو مصروف بسطر واحد، بالتاريخ والتفاصيل — جاهز للطباعة الكاملة (مثال: 200 دفعة = 200 سطر).</p>
+        <div style="display:flex; gap:10px;">
+          <button class="btn btn-primary" id="btnPrintIncomeLedger">طباعة سجل الدخل</button>
+          <button class="btn btn-primary" id="btnPrintExpenseLedger">طباعة سجل المصروف</button>
+        </div>
       </div>
     </section>
 
@@ -5873,6 +5873,53 @@ const TS_CATS=[
 const TS_TAB={jurn:'جرن',fireplace:'مدفأة (شمينيه)',fountain:'نافورة',balus:'درابزين',tablo:'لوحة (تابلو)',wall:'لوحة (تابلو)',lavabo:'مغسلة',sabil:'سبالة',column:'عمود',facade:'واجهة',table:'طاولة',frame:'كورنيش',mosque:'قوس ومحراب',door:'مدخل',window:'نافذة',bath:'حمّام',floor:'أرضية'};
 function tsNorm(t){ return String(t||'').replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي'); }
 function tsCatOf(desc){ const d = tsNorm(desc).toLowerCase(); for(const [name, keys] of TS_CATS){ if(keys.some(k=>d.includes(k))) return name; } return ''; }
+// ---- الكمية المباعة لكل منتج (مش عدد الوصولات): العدد بالقطعة، والمتر المربع/الطولي/المكعب لحاله ----
+const TS_DEF_UNIT={'واجهة':'m2','أرضية':'m2','كورنيش':'ml'}; // إذا البند ما فيه وحدة
+const TS_MEAS_UNIT={'مربع':'m2','عامود':'m2','دائرة':'m2','زاوية':'m2','طول':'ml','مكعب':'m3'};
+function tsNum(v){ const t=String(v??'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(',','.'); const n=parseFloat(t); return isFinite(n)?n:0; }
+function tsUnitOf(it, cat){
+  if(it.measType && TS_MEAS_UNIT[it.measType]) return TS_MEAS_UNIT[it.measType];
+  const u=tsNorm(it.unit).toLowerCase().replace(/\s/g,'');
+  if(/^(m2|م2|م²|m²)$/.test(u)) return 'm2';
+  if(/^(ml|مط|م\.ط)$/.test(u)) return 'ml';
+  if(/^(m3|م3|م³|m³)$/.test(u)) return 'm3';
+  if(u) return 'pcs';
+  const d=tsNorm(it.desc).toLowerCase();
+  if(/متر\s*مكعب|م3|م³|\bm3\b/.test(d)) return 'm3';
+  if(/متر\s*طول|م\.?\s?ط(?![؀-ۿ])|\bml\b/.test(d)) return 'ml';
+  if(/متر\s*مربع|م2|م²|\bm2\b/.test(d)) return 'm2';
+  return TS_DEF_UNIT[cat] || 'pcs';
+}
+// اسم المنتج: من الأقسام المعروفة، أو من رسمة مرسم، أو أول كلمة بالبند (حتى ما يضيع ولا منتج)
+function tsProductOf(it, tabCat){
+  const c=tsCatOf(it.desc) || (it.md ? tabCat : ''); if(c) return c;
+  const w=String(it.desc||'').trim().split(/[\s—\-:،,(]+/).find(x=>x && x.length>1 && !/^[\d.,٠-٩]+$/.test(x));
+  return w || '';
+}
+function tsQtyText(q){
+  const n=v=>String(Math.round(v*100)/100);
+  const p=[]; if(q.pcs) p.push(n(q.pcs)+' قطعة'); if(q.m2) p.push(n(q.m2)+' م²'); if(q.ml) p.push(n(q.ml)+' م.ط'); if(q.m3) p.push(n(q.m3)+' م³');
+  return p.join(' + ') || '0';
+}
+// يجمع الكمية المباعة لكل منتج من وصولات (r مع d = تاريخه إن وجد)
+function tsAggregate(list){
+  const stats={};
+  list.forEach(({r, d})=>{
+    const tabCat = r.mirsamDrawing && r.mirsamDrawing.mstate ? (TS_TAB[r.mirsamDrawing.mstate.tab]||'') : '';
+    const per={};
+    (r.items||[]).forEach(it=>{
+      if(!it || Number(it.amount) < 0 || tsNorm(it.desc).includes('خصم')) return;
+      const c=tsProductOf(it, tabCat); if(!c) return;
+      let q=tsNum(it.qty); if(!(q>0)) q=(Number(it.amount)>0 || String(it.desc||'').trim()) ? 1 : 0; if(!q) return;
+      const u=tsUnitOf(it, c);
+      const s = stats[c] || (stats[c] = {name:c, pcs:0, m2:0, ml:0, m3:0, amount:0, sales:[]});
+      s[u]+=q; s.amount += Number(it.amount)||0;
+      const pr = per[c] || (per[c] = {pcs:0, m2:0, ml:0, m3:0}); pr[u]+=q;
+    });
+    Object.entries(per).forEach(([c,q])=>stats[c].sales.push({cust:r.name||'—', no:r.no||'—', d, q}));
+  });
+  return Object.values(stats).sort((a,b)=> b.pcs-a.pcs || (b.m2+b.ml+b.m3)-(a.m2+a.ml+a.m3) || b.amount-a.amount);
+}
 function tsDate(s){
   s = String(s||'').trim(); let m;
   if((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return new Date(+m[1], +m[2]-1, +m[3]);
@@ -5904,25 +5951,13 @@ function renderTopSales(){
   else if(tsMode==='custom'){ from = tsDate(document.getElementById('tsFrom').value) || first; to = tsDate(document.getElementById('tsTo').value) || today; }
   if(from > to){ const t = from; from = to; to = t; }
   const inRange = dated.filter(x=>x.d >= from && x.d <= to);
-  const stats = {};
-  inRange.forEach(({r, d})=>{
-    const tabCat = r.mirsamDrawing && r.mirsamDrawing.mstate ? (TS_TAB[r.mirsamDrawing.mstate.tab]||'') : '';
-    const seen = new Set();
-    (r.items||[]).forEach(it=>{
-      if(!it || Number(it.amount) < 0 || tsNorm(it.desc).includes('خصم')) return;
-      const c = tsCatOf(it.desc) || (it.md ? tabCat : ''); if(!c) return;
-      const s = stats[c] || (stats[c] = {name:c, count:0, amount:0, sales:[]});
-      s.amount += Number(it.amount)||0;
-      if(!seen.has(c)){ seen.add(c); s.count++; s.sales.push({cust:r.name||'—', no:r.no||'—', d}); }
-    });
-  });
-  const list = Object.values(stats).sort((a,b)=> b.count-a.count || b.amount-a.amount);
+  const list = tsAggregate(inRange);
   document.getElementById('tsPeriod').innerHTML = `الفترة: من <b>${fmtDateLatn(from)}</b> إلى <b>${fmtDateLatn(to)}</b> — المدة: <b>${tsSpanText(from,to)}</b><br>عدد الوصولات في هذه الفترة: <b>${inRange.length}</b>`;
   const medals = ['🥇','🥈','🥉'];
-  const salesHtml = s => `<div class="ts-sales">${s.sales.slice().sort((x,y)=>y.d-x.d).map(x=>`<div class="ts-sale"><span class="ts-c">${escHtmlText(String(x.cust))}</span><span>وصل رقم <b>${escHtmlText(String(x.no))}</b></span><span>${fmtDateLatn(x.d)}</span></div>`).join('')}</div>`;
+  const salesHtml = s => `<div class="ts-sales">${s.sales.slice().sort((x,y)=>y.d-x.d).map(x=>`<div class="ts-sale"><span class="ts-c">${escHtmlText(String(x.cust))}</span><span>وصل رقم <b>${escHtmlText(String(x.no))}</b></span><span><b>${tsQtyText(x.q)}</b></span><span>${fmtDateLatn(x.d)}</span></div>`).join('')}</div>`;
   const cardHtml = (s, i, top) => `<div class="ts-card">
-      <div class="ts-name">${top ? medals[i] : `<span class="ts-rank">${i+1}</span>`} ${s.name}</div>
-      <div>عدد مرات البيع: <b>${s.count}</b></div>
+      <div class="ts-name">${top ? medals[i] : `<span class="ts-rank">${i+1}</span>`} ${escHtmlText(s.name)}</div>
+      <div>الكمية المباعة: <b>${tsQtyText(s)}</b></div>
       <div>إجمالي المبيعات: <b>${fmt(s.amount)}</b></div>
       ${salesHtml(s)}
     </div>`;
@@ -6806,14 +6841,13 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
         const paid=(typeof receipts!=='undefined'?receipts:[]).reduce((x,r)=>x+(r.payments||[]).filter(p=>inP(p.date)).reduce((y,p)=>y+n(p.amount),0),0);
         const rem=rs.reduce((x,r)=>x+n(r.remaining),0);
         const ex=(typeof expenses!=='undefined'?expenses:[]).filter(e=>inP(e.date)).reduce((x,e)=>x+n(e.amount),0);
-        const kinds={};rs.forEach(r=>(r.items||[]).forEach(it=>{const w=String(it.desc||'').trim().split(/[\s—\-:،,(]+/)[0];if(w&&w.length>1)kinds[w]=(kinds[w]||0)+1}));
-        const top=Object.entries(kinds).sort((x,y)=>y[1]-x[1]).slice(0,6);
+        const top=tsAggregate(rs.map(r=>({r,d:null}))).slice(0,6); // الكمية المباعة (مش عدد الوصولات)
         const js=(window.__ordersJobs||[]);const jm=js.filter(j=>inP(localDate(new Date(j.at))));
         const done=jm.filter(j=>j.status==='تم التنفيذ').length,late=js.filter(j=>j.due&&j.status!=='تم التنفيذ'&&new Date(j.due+'T23:59')<Date.now()).length;
         const card=(t,v,c)=>`<div style="background:var(--marble-2,#f5ecdd);border-radius:10px;padding:10px 12px"><div style="font-size:12px;color:var(--text-dim)">${t}</div><div style="font-weight:800;font-size:17px;${c?'color:'+c:''}">${v}</div></div>`;
         pn.querySelector('[data-o]').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px">
           ${card('عدد الوصولات',rs.length)}${card('مجموع الشغل',F(tot))}${card('المقبوض ب'+P,F(paid),'#1F8F55')}${card('الباقي على وصولات '+P,F(rem),'#A6453D')}${card('المصاريف',F(ex),'#A6453D')}${card('الصافي (المقبوض − المصاريف)',F(paid-ex))}${card('طلبيات '+P,jm.length+' (منفّذة '+done+')')}${card('طلبيات متأخرة الآن',late,late?'#C0392B':'')}</div>
-          ${top.length?`<div style="margin-top:10px;font-size:13px"><b>أكتر الأشغال:</b> ${top.map(([k,v])=>esc(k)+' ('+v+')').join(' · ')}</div>`:''}`;};
+          ${top.length?`<div style="margin-top:10px;font-size:13px"><b>أكتر المنتجات مبيعاً (الكمية):</b> ${top.map(t=>esc(t.name)+' ('+tsQtyText(t)+')').join(' · ')}</div>`:''}`;};
       ki.addEventListener('change',build);mi.addEventListener('change',build);
       // طباعة مباشرة من نفس الصفحة (بلا ما تفتح صفحة جديدة): نسخة مخفية عالشاشة وبتبيّن بالطباعة بس
       pn.querySelector('[data-p]').onclick=()=>{build();

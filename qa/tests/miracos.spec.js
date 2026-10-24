@@ -314,3 +314,27 @@ test('الطلبيات: فتح الصفحة (من الجرس أو القائمة
   expect(r.again.shown).toBe(false);
   expect(r.again.fresh).toBe(0);
 });
+
+test('الأكثر مبيعاً: بيعدّ الكمية المباعة (عدد الجرون) مش عدد الوصولات، والمتر لحاله', async ({ page }) => {
+  const list = await page.evaluate(() => tsAggregate([
+    { r: { name: 'أ', no: 1, items: [
+      { qty: 3, desc: 'جرن رخام 60 سم', amount: 30000 },
+      { qty: 2, desc: 'باسان صغير', amount: 10000 },
+      { qty: 25.5, desc: 'تغليف واجهة حجر', amount: 50000 },
+      { qty: 1, desc: 'خصم', amount: -5000 } ] }, d: null },
+    { r: { name: 'ب', no: 2, items: [
+      { qty: '4', desc: 'جرن مربع', amount: 40000 },
+      { qty: 12, desc: 'كورنيش', unit: 'ml', amount: 12000 },
+      { qty: 2, desc: 'كورنيش زاوية', unit: 'Pièce', amount: 4000 },
+      { qty: 10, desc: 'بلاط رخام', measType: 'مربع', amount: 9000 },
+      { qty: 1, desc: 'نقل', amount: 3000 } ] }, d: null },
+  ]).map(s => [s.name, tsQtyText(s), s.sales.length]));
+  const get = n => list.find(x => x[0] === n);
+  expect(get('جرن')).toEqual(['جرن', '9 قطعة', 2]);        // 3 + 2 + 4 جرون، مش 2 وصل
+  expect(get('واجهة')[1]).toBe('25.5 م²');
+  expect(get('كورنيش')[1]).toBe('2 قطعة + 12 م.ط');
+  expect(get('أرضية')[1]).toBe('10 م²');
+  expect(get('نقل')[1]).toBe('1 قطعة');                   // حتى البنود بلا قسم بتنحسب
+  expect(list[0][0]).toBe('جرن');
+  expect(list.some(x => x[0] === 'خصم')).toBe(false);
+});
