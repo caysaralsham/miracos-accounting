@@ -363,3 +363,25 @@ test('ورقة قياس فاضية متر طول: بلا عمود العرض، 3
   const pdf = await pop.pdf({ preferCSSPageSize: true, printBackground: true, path: process.env.SHEET_PDF || undefined });
   expect((pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length).toBe(1);
 });
+
+test('حاسبة القياسات: الجداول تحت أزرار الحفظ، والإجمالي بس للجداول الموجودة', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const bar = document.getElementById('measActionsBar'), wrap = document.getElementById('measTablesWrap');
+    const after = !!(bar.compareDocumentPosition(wrap) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const el = document.createElement('div');
+    renderMeasTotals([{ type: 'مربع', rows: [{ l: '2', w: '1.5', count: '1' }] }], el);
+    const one = el.innerText;
+    renderMeasTotals([{ type: 'مربع', rows: [] }, { type: 'طول', rows: [] }], el);
+    const two = el.innerText;
+    renderMeasTotals([], el);
+    return { after, one, two, none: el.innerText.trim(), hidden: el.style.display };
+  });
+  expect(r.after).toBe(true);
+  expect(r.one).toContain('إجمالي متر مربع');
+  expect(r.one).not.toContain('متر طول');
+  expect(r.one).not.toContain('مكعب');
+  expect(r.two).toContain('متر طول');
+  expect(r.two).not.toContain('مكعب');
+  expect(r.none).toBe('');
+  expect(r.hidden).toBe('none');
+});

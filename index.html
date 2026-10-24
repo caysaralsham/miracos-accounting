@@ -753,8 +753,6 @@
           <label>ميلان الشطفة <input data-es="ang" inputmode="decimal"> °</label>
           <span style="font-size:12px;">— اختار، بعدين اكبس على الأضلاع بالرسمة</span>
         </div>
-        <div id="measTablesWrap"></div>
-        <div id="measTotalsSummary" style="display:flex; gap:14px; flex-wrap:wrap; margin-top:14px;"></div>
 
         <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
           <button class="btn" id="btnMeasAddSq">+ جدول متر مربع</button>
@@ -773,6 +771,9 @@
           <span class="conv-wrap"><button type="button" class="btn btn-primary" id="btnConvCalc">⇄ تحويل إلى</button><div class="conv-menu"></div></span>
           <button class="btn" id="btnMeasShare">للمعمل (مشاركة / طباعة)</button>
         </div>
+        <!-- الجداول تحت أزرار الحفظ وفوق «القياسات المحفوظة» -->
+        <div id="measTablesWrap" style="margin-top:16px;"></div>
+        <div id="measTotalsSummary" style="display:flex; gap:14px; flex-wrap:wrap; margin-top:14px;"></div>
       </div>
 
       <div class="panel">
@@ -4466,9 +4467,12 @@ function renderMeasTotals(tables, targetEl){
     <div style="font-size:11.5px; color:var(--text-dim); margin-bottom:4px;">${label}</div>
     <div style="font-size:16px; font-weight:800; color:var(--brass-deep);">${val.toFixed(unit==='م³'?3:2)} ${unit}</div>
   </div>`;
-  el.innerHTML = card('إجمالي متر مربع', totals['مربع'], 'م²')
-    + card('إجمالي متر طول', totals['طول'], 'م.ط')
-    + card('إجمالي متر مكعب', totals['مكعب'], 'م³')
+  // الإجمالي بيبيّن بس لنوع الجدول الموجود (ما في جدول = ما في إجمالي)
+  const has = t => tables.some(x=>x.type===t);
+  el.style.display = tables.length ? 'flex' : 'none';
+  el.innerHTML = (has('مربع') ? card('إجمالي متر مربع', totals['مربع'], 'م²') : '')
+    + (has('طول') ? card('إجمالي متر طول', totals['طول'], 'م.ط') : '')
+    + (has('مكعب') ? card('إجمالي متر مكعب', totals['مكعب'], 'م³') : '')
     + (tables.some(t=>t.type==='عامود') ? card('إجمالي العواميد', totals['عامود'], 'م²') : '')
     + (tables.some(t=>t.type==='دائرة') ? card('إجمالي الدوائر', totals['دائرة']||0, 'م²') : '')
     + (tables.some(t=>t.type==='زاوية') ? card('إجمالي الزوايا', totals['زاوية']||0, 'م²') : '');
