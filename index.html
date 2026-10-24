@@ -3425,6 +3425,15 @@ function renderTrash(){
 }
 let currentViewedReceiptId = null;
 let convertingFromInvoiceId = null;
+// باركود صفحة روابط الشركة (cesar-alcham.com/links) — يظهر في رأس الوصل والفواتير
+const DOC_QR_SRC = 'data:image/svg+xml;base64,PHN2ZyBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDMzIDMzIiBjbGFzcz0ic2Vnbm8iPjxwYXRoIGZpbGw9IiNmZmYiIGQ9Ik0wIDBoMzN2MzNoLTMzeiIvPjxwYXRoIGNsYXNzPSJxcmxpbmUiIHN0cm9rZT0iIzJlMWMxMCIgZD0iTTIgMi41aDdtMiAwaDNtMSAwaDFtMSAwaDJtMSAwaDNtMSAwaDdtLTI5IDFoMW01IDBoMW0xIDBoMW00IDBoNG01IDBoMW01IDBoMW0tMjkgMWgxbTEgMGgzbTEgMGgxbTEgMGgxbTIgMGgxbTIgMGgzbTEgMGgybTIgMGgxbTEgMGgzbTEgMGgxbS0yOSAxaDFtMSAwaDNtMSAwaDFtMyAwaDJtMiAwaDFtMSAwaDJtMSAwaDJtMSAwaDFtMSAwaDNtMSAwaDFtLTI5IDFoMW0xIDBoM20xIDBoMW0yIDBoMW0xIDBoMW0yIDBoM20yIDBoMW0yIDBoMW0xIDBoM20xIDBoMW0tMjkgMWgxbTUgMGgxbTMgMGg0bTEgMGgxbTEgMGg0bTEgMGgxbTUgMGgxbS0yOSAxaDdtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDdtLTE4IDFoMW0zIDBoM20tMTcgMWgzbTEgMGgybTIgMGgxbTEgMGgzbTIgMGg0bTYgMGgybS0yNyAxaDRtMiAwaDRtMSAwaDFtMiAwaDFtMiAwaDdtMSAwaDFtMSAwaDFtLTI3IDFoMW0zIDBoNm01IDBoMW0yIDBoMW0xIDBoMW0xIDBoMW0xIDBoMm0tMjcgMWgybTEgMGgxbTIgMGgxbTEgMGgzbTEgMGgxbTEgMGgybTEgMGgzbTcgMGgxbS0yOSAxaDFtMSAwaDFtMiAwaDRtMiAwaDJtMSAwaDFtMSAwaDJtMSAwaDFtMSAwaDFtMSAwaDFtMiAwaDNtLTI5IDFoMW03IDBoMW0xIDBoMW0yIDBoM20yIDBoMm0yIDBoMm0xIDBoMm0xIDBoMW0tMjkgMWgxbTIgMGgxbTEgMGgybTEgMGgybTEgMGgzbTEgMGgxbTEgMGgxbTEgMGgzbTEgMGgzbTEgMGgybS0yOSAxaDJtMiAwaDJtNCAwaDFtMiAwaDFtMSAwaDJtMiAwaDFtMiAwaDFtMSAwaDJtMiAwaDFtLTI3IDFoMm0yIDBoMW0xIDBoMW0zIDBoMm00IDBoMW0xIDBoMm0xIDBoM20tMjUgMWg0bTIgMGgxbTQgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTIgMGgxbTEgMGgxbS0yNiAxaDFtMiAwaDFtMSAwaDJtMyAwaDFtMSAwaDJtMSAwaDFtMSAwaDJtMSAwaDFtMSAwaDFtMiAwaDFtLTI0IDFoM200IDBoMm0xIDBoMW0xIDBoMW0yIDBoMW0xIDBoMW0xIDBoMm0xIDBoNW0tMjggMWg2bTEgMGgybTIgMGgybTIgMGgybTIgMGg4bS0yMCAxaDNtMSAwaDFtMyAwaDFtMSAwaDFtMSAwaDFtMyAwaDJtMSAwaDJtLTI5IDFoN20yIDBoM20xIDBoMm0xIDBoMW0yIDBoMm0xIDBoMW0xIDBoMW0xIDBoMm0tMjggMWgxbTUgMGgxbTEgMGgzbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTMgMGgxbTMgMGgxbS0yOSAxaDFtMSAwaDNtMSAwaDFtMiAwaDRtMiAwaDFtMSAwaDJtMSAwaDdtMSAwaDFtLTI5IDFoMW0xIDBoM20xIDBoMW0xIDBoMW0zIDBoMm01IDBoMW00IDBoMm0xIDBoMW0tMjggMWgxbTEgMGgzbTEgMGgxbTEgMGgybTIgMGgzbTMgMGgxbTEgMGgxbTIgMGgxbTQgMGgxbS0yOSAxaDFtNSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMyAwaDFtMSAwaDFtMSAwaDFtMiAwaDFtLTI4IDFoN20zIDBoMW0xIDBoNG0yIDBoMW0xIDBoMm0xIDBoMW0zIDBoMSIvPjwvc3ZnPgo=';
+function docQrHtml(lang){
+  const cap = lang === 'fr' ? 'Scannez-moi' : 'امسح الرمز';
+  return `<div class="doc-qr" style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;">
+    <img src="${DOC_QR_SRC}" alt="QR" style="width:2.1cm;height:2.1cm;display:block;image-rendering:pixelated;">
+    <div style="font-size:9.5px;font-weight:700;color:var(--text-dim);white-space:nowrap;">${cap}</div>
+  </div>`;
+}
 function viewReceipt(id){
   const r = receipts.find(r=>r.id===id);
   if(!r) return;
@@ -3495,9 +3504,12 @@ function viewReceipt(id){
                 <div class="meta">${escHtmlText(settings.address)} · ${escHtmlText(settings.phone)}</div>
               </div>
             </div>
-            <div class="receipt-stamp">
-              <div class="no">#${r.no}</div>
-              <div class="lbl">وصل دفع</div>
+            <div style="display:flex; align-items:center; gap:12px; flex:none;">
+              ${docQrHtml('ar')}
+              <div class="receipt-stamp">
+                <div class="no">#${r.no}</div>
+                <div class="lbl">وصل دفع</div>
+              </div>
             </div>
           </div>
         </td></tr>
@@ -4188,11 +4200,14 @@ function viewInvoice(id){
                   <div class="meta" style="font-size:11px; line-height:1.5;">${escHtmlText(settings.address)} · ${escHtmlText(settings.phone)}</div>
                 </div>
               </div>
+              <div style="display:flex; align-items:center; gap:12px; flex:none;">
+              ${docQrHtml('ar')}
               <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
                 <div class="receipt-stamp">
                   <div class="no">Devis</div>
                   <div class="lbl">رقم ${inv.no}</div>
                 </div>
+              </div>
               </div>
             </div>
           </td></tr>
@@ -4248,12 +4263,15 @@ function viewInvoice(id){
                 <div class="meta" style="font-size:10.5px; line-height:1.5;">Art: ${settings.article||''} · ${settings.bank||''}</div>
               </div>
             </div>
+            <div style="display:flex; align-items:center; gap:12px; flex:none;">
+            ${docQrHtml('fr')}
             <div style="display:flex; flex-direction:column; align-items:center; gap:8px; flex:none;">
               <div class="receipt-stamp">
                 <div class="no" style="font-size:${docLabel.length>8?13:docLabel.length>5?16:21}px; line-height:1.15">${docLabel}</div>
                 <div class="lbl">N° ${inv.no}</div>
               </div>
               <div style="font-size:13px; font-weight:700; color:var(--text-dim); white-space:nowrap;">Date: ${inv.date||''}</div>
+            </div>
             </div>
           </div>
         </td></tr>
