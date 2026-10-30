@@ -385,3 +385,43 @@ test('حاسبة القياسات: الجداول تحت أزرار الحفظ،
   expect(r.none).toBe('');
   expect(r.hidden).toBe('none');
 });
+
+// ---- الطباعة: لا ورقة تانية فاضية ولا «الباقي» لحاله (حتى لو المتصفح ما بعت حدث beforeprint متل سفاري الآيفون) ----
+const pdfPages = buf => (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+const fakeRcp = n => ({ id:'pp'+n, no:300+n, name:'زبون تجريبي', phone:'+213 550 12 34 56', address:'دالي ابراهيم', date:'2026-10-16', duration:15,
+  items:Array.from({length:n},(_,i)=>({qty:2,desc:'رخام كرارا '+(i+1),price:1500,amount:3000})), total:3000*n, discount:0, remaining:3000*n-1000,
+  payments:[{id:'pm',date:'2026-10-16',amount:1000}] });
+for (const [n, pages] of [[1,1],[18,1],[20,1],[21,2],[35,2]]) {
+  test(`طباعة وصل فيه ${n} بند = ${pages} ورقة، والمجموع والباقي ما بينقسموا`, async ({ page }) => {
+    await page.evaluate(r => { receipts.push(r); viewReceipt(r.id); }, fakeRcp(n));
+    await page.waitForTimeout(150);
+    await page.emulateMedia({ media: 'print' });
+    const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+    expect(pdfPages(pdf)).toBe(pages);
+    // صندوق المجموع بكامله على نفس الورقة (ما بينكسر بالنص)
+    expect(await page.evaluate(() => getComputedStyle(document.querySelector('#receiptPrintArea .totals-box')).breakInside)).toBe('avoid');
+  });
+}
+
+test.describe('الزبائن والفواتير على الجوال والكمبيوتر', () => {
+  for (const [w, h] of [[1366, 800], [390, 844], [360, 740]]) {
+    test(`بلا تحريك يمين/يسار بعرض ${w}، وكل المعلومات والأزرار موجودة، والهاتف ما بينقلب`, async ({ page }) => {
+      await page.setViewportSize({ width: w, height: h });
+      const out = await page.evaluate(() => {
+        document.getElementById('loginScreen').style.display = 'none';
+        for (let i = 1; i <= 3; i++) receipts.push({ id:'c'+i, no:400+i, name:'عبد الرحمن بن محمد الجزائري '+i, phone:'+213 550 12 34 5'+i, date:'2026-10-01', duration:20,
+          items:[{qty:2,desc:'نافورة رخام بيج مع حوض دائري قطر 120 سم وتفاصيل نحت',price:150000,amount:300000}], total:300000, discount:0, remaining:200000, payments:[] });
+        invoices.push({ id:'ci', docType:'devis', no:'D9', date:'2026-10-01', clientName:'زبون فاتورة', clientPhone:'0661 22 33 44', items:[], ttc:500000, remaining:500000, payments:[] });
+        document.querySelector('.nav-item[data-view="customers"]').click(); renderReceiptsTable(); renderInvoicesTable();
+        const w = document.getElementById('receiptsTableWrap'), iw = document.getElementById('invoicesTableWrap');
+        const ph = w.querySelector('bdi.ph');
+        return { rcp: w.scrollWidth - w.clientWidth, inv: iw.scrollWidth - iw.clientWidth, page: document.documentElement.scrollWidth - innerWidth,
+          text: w.innerText, buttons: w.querySelectorAll('.row-actions button').length, phDir: ph && getComputedStyle(ph).direction, phText: ph && ph.textContent };
+      });
+      expect(out.rcp).toBeLessThanOrEqual(1); expect(out.inv).toBeLessThanOrEqual(1); expect(out.page).toBeLessThanOrEqual(1);
+      for (const t of ['403', '300.000 دج', '200.000 دج']) expect(out.text).toContain(t);
+      expect(out.buttons).toBeGreaterThanOrEqual(12);
+      expect(out.phDir).toBe('ltr'); expect(out.phText).toBe('+213 550 12 34 53');
+    });
+  }
+});
