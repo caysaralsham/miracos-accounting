@@ -639,6 +639,7 @@ test.describe('البحث الشامل', () => {
 });
 
 test('لوحة واتساب: بتفرّق بين التواصلات والزبائن (نفس الرقم بأي كتابة = زبون واحد)، وبتقول بوضوح إنها مش من واتساب نفسه', async ({ page }) => {
+  test.skip(await page.evaluate(() => FS_DOC === 'factory'), 'المعمل ما بيشوف أرقام الزبائن — اللوحة بالمعرض بس');
   const r = await page.evaluate(() => {
     const today = localDate(), mo = today.slice(0, 7) + '-01' === today ? today : today.slice(0, 7) + '-01';
     const L = [
