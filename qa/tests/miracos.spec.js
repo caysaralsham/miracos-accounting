@@ -425,3 +425,80 @@ test.describe('الزبائن والفواتير على الجوال والكم�
     });
   }
 });
+
+// ---- صورة المنتج بالوصل وبالطلبية (بيانات وهمية، بلا سحابة) ----
+test.describe('صورة المنتج', () => {
+  // صورة PNG كبيرة (2400×1600) لتجربة الضغط والتصغير
+  const bigPng = async page => Buffer.from(await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 2400; c.height = 1600; const x = c.getContext('2d');
+    for (let i = 0; i < 40; i++) { x.fillStyle = `hsl(${i * 9},60%,50%)`; x.fillRect(i * 60, 0, 60, 1600); } return c.toDataURL('image/png').split(',')[1]; }), 'base64');
+  test('إضافة صورة → بتنحفظ مع الوصل، بتطلع بالورقة ≤ 10×10 سم مع اسم المنتج، والوصل القصير ورقة وحدة', async ({ page }) => {
+    await page.evaluate(() => { document.getElementById('loginScreen').style.display = 'none'; openReceiptModal(null);
+      document.getElementById('rcpName').value = 'زبون صورة'; const r = document.querySelector('#itemsBody tr');
+      r.querySelector('.it-desc').value = 'شمينة رخام بيج 180×120 سم'; r.querySelector('.it-qty').value = 1; r.querySelector('.it-price').value = 250000; recalcTotals(); });
+    const btn = page.locator('#receiptOverlay [data-ph-add]');
+    await expect(btn).toHaveText(/إضافة صورة/);
+    const [chooser] = await Promise.all([page.waitForEvent('filechooser'), btn.click()]);
+    await chooser.setFiles({ name: 'p.png', mimeType: 'image/png', buffer: await bigPng(page) });
+    await expect(page.locator('#receiptOverlay [data-ph-list] img')).toHaveCount(1);
+    // الاسم بينحط تلقائياً من أول بند، وبيقدر يعدّله
+    await expect(page.locator('#receiptOverlay [data-ph-cap="0"]')).toHaveValue('شمينة رخام بيج 180×120 سم');
+    await page.click('#btnSaveReceipt');
+    await expect(page.locator('#receiptOverlay')).not.toHaveClass(/show/);
+    const id = await page.evaluate(() => receipts.find(r => r.name === 'زبون صورة').id);
+    const saved = await page.evaluate(id => receipts.find(r => r.id === id).productPhotos, id);
+    expect(saved.length).toBe(1); expect(saved[0].id).toMatch(/^mirsam_drw_/);
+    // الصورة الكبيرة (2400×1600) انضغطت: أقل من 380KB
+    expect(await page.evaluate(() => document.querySelector('#receiptOverlay [data-ph-list] img').src.length)).toBeLessThan(380000);
+    await page.evaluate(id => viewReceipt(id), id);
+    const im = page.locator('#receiptPrintArea .prod-photo-block img');
+    await expect(im).toBeVisible();
+    await expect(page.locator('#receiptPrintArea .prod-photo-block .cap')).toHaveText('شمينة رخام بيج 180×120 سم');
+    await page.emulateMedia({ media: 'print' });
+    const box = await im.boundingBox();
+    expect(box.width).toBeLessThanOrEqual(378 + 1); expect(box.height).toBeLessThanOrEqual(378 + 1); // 100mm = 378px
+    expect(Math.abs(box.width / box.height - 1.5)).toBeLessThan(0.02); // بلا تشويه
+    const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+    expect(pdfPages(pdf)).toBe(1);
+    expect(pdf.toString('latin1')).toMatch(/\/Subtype\s*\/Image/);
+  });
+  test('تحويل الوصل لـ Devis وإرساله للمعمل: نفس الصورة (نفس الرقم) بلا نسخة جديدة', async ({ page }) => {
+    const out = await page.evaluate(() => {
+      const r = { id: 'pr1', no: 501, name: 'زبون', phone: '', date: '2026-10-20', items: [{ qty: 1, desc: 'نافورة', price: 1, amount: 1 }], total: 1, discount: 0, remaining: 1, payments: [],
+        productPhotos: [{ id: 'mirsam_drw_x1', caption: 'نافورة 120 سم' }] };
+      receipts.push(r);
+      const d = docFromReceipt(r); convertDocTo('simple', d);
+      return { doc: d.photos, form: [...document.querySelectorAll('#invoiceOverlay [data-ph-list] [data-ph-cap]')].map(t => t.value) };
+    });
+    expect(out.doc).toEqual([{ id: 'mirsam_drw_x1', caption: 'نافورة 120 سم' }]);
+    expect(out.form).toEqual(['نافورة 120 سم']);
+  });
+});
+
+test('حالات الطلبية الخمسة، وتأخر الاستلام بالأحمر حسب عدد الأيام بالإعدادات، والتسليم بيوقف العلامة', async ({ page }) => {
+  const day = 864e5, now = Date.now();
+  const r = await page.evaluate(({ day, now }) => {
+    settings.pickupLateDays = 5;
+    const no = window.__fjobsTest([
+      { id: 'a', no: 1, status: 'بدون تنفيذ', at: 1 },
+      { id: 'b', no: 2, status: 'قيد التنفيذ', at: 2 },
+      { id: 'c', no: 3, status: 'تم التنفيذ', at: 3, doneAt: now - 2 * day },                // خلصت من يومين: مش متأخرة
+      { id: 'd', no: 4, status: 'جاهزة للاستلام', at: 4, doneAt: now - 9 * day, notifiedAt: now - 6 * day, cust: { name: 'متأخر' } }, // انبلّغ من 6 أيام: متأخرة
+      { id: 'e', no: 5, status: 'تم التسليم', at: 5, doneAt: now - 30 * day, notifiedAt: now - 29 * day, deliveredAt: now - 1 * day }, // انسلّمت: لا
+    ]);
+    const late = [...document.querySelectorAll('#view-fjobs [data-late="1"]')].length;
+    const hd = [...document.querySelectorAll('#view-fjobs [data-sthd]')].map(h => h.textContent.replace(/[^؀-ۿ ]/g, '').trim());
+    const opts = [...document.querySelectorAll('#view-fjobs select[data-f] option')].map(o => o.value);
+    const panel = document.getElementById('latePickupPanel');
+    const st = window.__orderStatus;
+    return { late, hd, opts, panelShown: panel.style.display !== 'none', panelText: panel.innerText,
+      norm: ['جاهز', 'تم التسليم', 'تم التنفيذ', 'شي غلط'].map(st.normSt) };
+  }, { day, now });
+  expect(r.hd).toEqual(['بدون تنفيذ', 'قيد التنفيذ', 'تم التنفيذ', 'جاهزة للاستلام', 'تم التسليم']);
+  expect(r.late).toBe(1);
+  expect(r.panelShown).toBe(true);
+  expect(r.panelText).toContain('متأخر');
+  expect(r.panelText).toContain('من 6 يوم');
+  expect(r.opts).toEqual(expect.arrayContaining(['قيد التنفيذ', 'تم التنفيذ', 'جاهزة للاستلام', 'تم التسليم', 'late']));
+  // «تم التسليم» بتضل «تم التسليم» (ما بتنقلب «تم التنفيذ»)، و«جاهز» القديمة = جاهزة للاستلام
+  expect(r.norm).toEqual(['جاهزة للاستلام', 'تم التسليم', 'تم التنفيذ', 'بدون تنفيذ']);
+});
