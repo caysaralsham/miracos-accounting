@@ -2898,8 +2898,10 @@ function newPaymentRow(payment){
   if(!payment.id) payment.id = uid();
   const row = document.createElement('tr');
   row.dataset.pmId = payment.id;
+  if(payment.from) row.dataset.from = JSON.stringify(payment.from);
+  const fromLbl = payment.from ? `<div class="pm-from" style="font-size:11px;color:var(--verdigris-deep,#1F8F55);font-weight:700;margin-top:2px">↩ منقولة من ${escHtmlText(payment.from.label||'')} (نفس الدفعة، مش دفعة جديدة)</div>` : '';
   row.innerHTML = `
-    <td><input type="text" class="pm-date date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric" value="${payment.date||''}"></td>
+    <td><input type="text" class="pm-date date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric" value="${payment.date||''}">${fromLbl}</td>
     <td><input type="number" class="pm-amount" value="${payment.amount||''}" min="0"></td>
     <td><select class="pm-method">${paymentMethodOptions(payment.method||'نقدي')}</select></td>
     <td><button class="btn btn-ghost btn-sm pm-remove">✕</button></td>
@@ -3159,7 +3161,7 @@ async function buildAndSaveReceiptFromForm(){
     const amount = Number(row.querySelector('.pm-amount').value)||0;
     const method = row.querySelector('.pm-method') ? row.querySelector('.pm-method').value : 'نقدي';
     const pid = row.dataset.pmId || uid();
-    if(amount) payments.push({id: pid, date, amount, method});
+    if(amount) payments.push({id: pid, date, amount, method, ...(row.dataset.from ? {from: JSON.parse(row.dataset.from)} : {})});
   });
   const paid = payments.reduce((s,p)=>s+p.amount,0);
   if(paid > total && !confirm(`المدفوع (${fmt(paid)}) أكبر من الإجمالي (${fmt(total)}) بـ ${fmt(paid-total)}.\nالباقي رح يصير بالسالب. متأكد بدك تحفظ؟`)) return null;
@@ -3205,11 +3207,10 @@ async function buildAndSaveReceiptFromForm(){
   saveReceipts();
   logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no, details: items.map(it=>it.desc).filter(Boolean).join('، ')}, prevReceipt ? prevReceipt.payments : []);
   if(convertingFromInvoiceId){
-    const src = invoices.find(i=>i.id===convertingFromInvoiceId);
-    if(src){ src.convertedTo = {receiptNo: data.no, at: new Date().toISOString()}; }
-    saveInvoices();
+    const srcId = convertingFromInvoiceId; convertingFromInvoiceId = null;
+    const mut = moveInvoicePaymentsMutator(srcId, data);
+    if(!(await saveInvoicesTx(mut))){ invoices = mut(invoices); await saveInvoices(); }
     renderInvoicesTable();
-    convertingFromInvoiceId = null;
   }
   renderReceiptsTable();
   renderDashboard();
@@ -4007,7 +4008,7 @@ async function buildAndSaveInvoiceFromForm(){
     const amount = Number(row.querySelector('.inv-pm-amount').value)||0;
     const method = row.querySelector('.inv-pm-method') ? row.querySelector('.inv-pm-method').value : 'نقدي';
     const pid = row.dataset.pmId || uid();
-    if(amount) payments.push({id: pid, date, amount, method});
+    if(amount) payments.push({id: pid, date, amount, method, ...(row.dataset.from ? {from: JSON.parse(row.dataset.from)} : {})});
   });
   const paid = payments.reduce((s,p)=>s+p.amount,0);
   if(paid > ttc && !confirm(`المدفوع (${fmt(paid)}) أكبر من الإجمالي (${fmt(ttc)}) بـ ${fmt(paid-ttc)}.\nالباقي رح يصير بالسالب. متأكد بدك تحفظ؟`)) return null;
@@ -4135,6 +4136,37 @@ function duplicateInvoice(id){
   toast('نسخة جديدة جاهزة — عدّل نوع البضاعة/الأسعار زي ما بدك واحفظ');
 }
 
+// تحويل Devis/Facture proforma/Facture لوصل: الدفعات المسجلة على الأصل بتنتقل للوصل بنفس رقمها وتاريخها وطريقتها
+// (مش دفعة جديدة)، وبعد حفظ الوصل بتنشال من الأصل وبيتسجّل عليه إنها انتقلت — فالمجموع بلوحة التحكم ما بيتغير
+// والدفعة ما بتنحسب مرتين. الدفعة اللي صارت بوصل من قبل (تحويل سابق) ما بتنقل مرة تانية.
+function invDocLabel(inv){ return `${inv.docType === 'facture' ? 'Facture' : (inv.docType === 'devis' ? 'Facture proforma' : 'Devis')} رقم ${inv.no}`; }
+function carryInvoicePayments(inv){
+  if(!inv) return [];
+  const inReceipts = new Set();
+  receipts.forEach(r=>getReceiptPayments(r).forEach(p=>{ if(p && p.id) inReceipts.add(p.id); }));
+  return (inv.payments||[]).filter(p=>p && Number(p.amount)>0 && !(p.id && inReceipts.has(p.id)))
+    .map(p=>({id: p.id || uid(), date: p.date||'', amount: Number(p.amount), method: p.method||'نقدي',
+      from: {invId: inv.id, invNo: inv.no, label: invDocLabel(inv), ...(p.id ? {} : {legacy:true})}}));
+}
+// بعد حفظ الوصل: شيل الدفعات المنقولة من الأصل (معاملة على آخر نسخة بالسيرفر) وسجّل لوين راحت
+function moveInvoicePaymentsMutator(invId, receipt){
+  const moved = (receipt.payments||[]).filter(p=>p.from && p.from.invId===invId);
+  const at = new Date().toISOString();
+  const matchOf = p=>moved.find(m=> p && (p.id ? p.id===m.id : (m.from.legacy && Number(p.amount)===Number(m.amount) && (p.date||'')===(m.date||''))));
+  return arr=>arr.map(inv=>{
+    if(inv.id!==invId) return inv;
+    const keep = (inv.payments||[]).filter(p=>!matchOf(p));
+    const gone = (inv.payments||[]).filter(p=>matchOf(p));
+    const out = {...inv, convertedTo: {receiptNo: receipt.no, receiptId: receipt.id, at}};
+    if(gone.length){
+      const total = Number(inv.ttc!=null ? inv.ttc : inv.total)||0;
+      out.payments = keep;
+      out.remaining = total - keep.reduce((s,p)=>s+(Number(p.amount)||0),0);
+      out.movedPayments = [...(inv.movedPayments||[]), ...gone.map(p=>({...p, id: matchOf(p).id, toReceiptId: receipt.id, toReceiptNo: receipt.no, at}))];
+    }
+    return out;
+  });
+}
 function convertInvoiceToReceipt(id){
   const inv = invoices.find(i=>i.id===id);
   if(!inv) return;
@@ -4150,7 +4182,7 @@ function convertInvoiceToReceipt(id){
     address: inv.clientAddress || '',
     note: `محوّل من ${inv.docType === 'facture' ? 'Facture' : (inv.docType === 'devis' ? 'Facture proforma' : 'Devis')} رقم ${inv.no}`,
     items: (inv.items||[]).map(it=>({qty: it.qty, desc: it.desc, price: it.price, amount: it.amount, ...(it.measType ? {measType: it.measType} : {}), ...(it.draws && it.draws.length ? {draws: it.draws} : {})})),
-    payments: []
+    payments: carryInvoicePayments(inv)
   };
   openReceiptModal(pseudoReceipt);
   document.getElementById('rcpId').value = '';
@@ -4273,6 +4305,7 @@ function viewInvoice(id){
     `;
     document.getElementById('viewInvoiceTitle').textContent = 'Devis';
     markCancelledInvoiceView(inv);
+    markMovedPaymentsView(inv);
     document.getElementById('viewInvoiceOverlay').classList.add('show');
     return;
   }
@@ -4346,7 +4379,15 @@ function viewInvoice(id){
     </div>
   `;
   markCancelledInvoiceView(inv);
+  markMovedPaymentsView(inv);
   document.getElementById('viewInvoiceOverlay').classList.add('show');
+}
+function markMovedPaymentsView(inv){
+  const mv = (inv && inv.movedPayments) || []; if(!mv.length) return;
+  const box = document.querySelector('#invoicePrintArea .totals-box'); if(!box) return;
+  const rows = box.querySelectorAll('.totals-row'); const last = rows[rows.length-1];
+  const html = mv.map(p=>`<div class="totals-row moved-pay" style="color:var(--text-dim)"><span>دفعة ${escHtmlText(p.date||'')} انتقلت للوصل رقم ${escHtmlText(String(p.toReceiptNo||''))}</span><span>(${fmt(p.amount)})</span></div>`).join('');
+  if(last) last.insertAdjacentHTML('beforebegin', html); else box.insertAdjacentHTML('beforeend', html);
 }
 function markCancelledInvoiceView(inv){
   if(!inv || !inv.cancelled) return;
@@ -5012,7 +5053,7 @@ function docFromInvoice(inv){
   const lbl = inv.docType==='facture' ? 'Facture' : inv.docType==='devis' ? 'Facture proforma' : 'Devis';
   return {md: inv.mirsamDrawing ? {...inv.mirsamDrawing, dirty:false} : null, kind: inv.docType||'simple', label:`${lbl} ${inv.no}`, name:inv.clientName||'', phone:inv.clientPhone||'', address:inv.clientAddress||'',
     rc:inv.clientRC||'', nif:inv.clientNIF||'', nis:inv.clientNIS||'', delay: inv.delay||'', duration: parseInt(inv.delay,10)||'',
-    note: inv.note||'', items:(inv.items||[]).map(cloneItem), discount:0, tables:null};
+    note: inv.note||'', items:(inv.items||[]).map(cloneItem), discount:0, tables:null, srcInvoiceId: inv.id};
 }
 // جداول قياسات من رسمات البنود (لما نرجع للحاسبة من مستند ما فيه جداول)
 function tablesFromDocItems(items){
@@ -5032,7 +5073,8 @@ function convertDocTo(target, doc){
   const from = doc.label ? ` (محوّل من ${doc.label})` : '';
   if(target === 'receipt'){
     openReceiptModal({id:'', no:getNextReceiptNo(), date:today, duration: doc.duration||'', name:doc.name, phone:doc.phone, address:doc.address,
-      note: doc.note||'', items: doc.items.map(cloneItem), discount: doc.discount||0, payments:[], ...(doc.tables ? {measurementTables: doc.tables} : {})});
+      note: doc.note||'', items: doc.items.map(cloneItem), discount: doc.discount||0, payments: doc.srcInvoiceId ? carryInvoicePayments(invoices.find(i=>i.id===doc.srcInvoiceId)) : [], ...(doc.tables ? {measurementTables: doc.tables} : {})});
+    if(doc.srcInvoiceId) convertingFromInvoiceId = doc.srcInvoiceId;
     document.getElementById('rcpId').value = '';
     if(document.getElementById('rcpDiscount')){ document.getElementById('rcpDiscount').value = doc.discount||0; document.getElementById('rcpDiscount').dispatchEvent(new Event('input')); }
     document.getElementById('receiptModalTitle').textContent = 'وصل جديد' + from;

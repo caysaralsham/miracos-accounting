@@ -502,3 +502,58 @@ test('حالات الطلبية الخمسة، وتأخر الاستلام با�
   // «تم التسليم» بتضل «تم التسليم» (ما بتنقلب «تم التنفيذ»)، و«جاهز» القديمة = جاهزة للاستلام
   expect(r.norm).toEqual(['جاهزة للاستلام', 'تم التسليم', 'تم التنفيذ', 'بدون تنفيذ']);
 });
+
+// ---- تحويل Devis لوصل: الدفعة بتنتقل (ما بتختفي وما بتنحسب مرتين) ----
+test.describe('تحويل Devis إلى وصل مع الدفعات', () => {
+  const run = (page, paid) => page.evaluate(async paid => {
+    document.getElementById('loginScreen').style.display = 'none';
+    const inv = { id: 'dv1', docType: 'simple', no: 'S0099', date: '2026-10-01', clientName: 'زبون الدوفي', clientPhone: '0550', clientAddress: '',
+      items: [{ qty: 1, desc: 'نافورة رخام', unit: '', price: 100000, amount: 100000 }], ht: 100000, tva: 0, ttc: 100000,
+      payments: paid ? [{ id: 'pmD', date: '2026-10-02', amount: paid, method: 'نقدي' }] : [], remaining: 100000 - paid };
+    invoices.push(inv);
+    if (paid) paymentHistory.push({ id: 'h1', paymentId: 'pmD', loggedAt: '2026-10-02T10:00:00Z', date: '2026-10-02', customerName: 'زبون الدوفي', amount: paid, method: 'نقدي', docType: 'Devis', docNo: 'S0099' });
+    const sumAll = () => receipts.reduce((s, r) => s + getReceiptPayments(r).reduce((a, p) => a + Number(p.amount), 0), 0) + invoices.reduce((s, i) => s + (i.payments || []).reduce((a, p) => a + Number(p.amount), 0), 0);
+    const before = sumAll();
+    window.confirm = () => true;
+    convertInvoiceToReceipt('dv1');
+    const formRemaining = document.getElementById('paymentsBody').querySelectorAll('tr').length;
+    const fromLabel = (document.querySelector('#paymentsBody .pm-from') || {}).textContent || '';
+    // ضغط الحفظ مرتين بسرعة
+    document.getElementById('btnSaveReceipt').click(); document.getElementById('btnSaveReceipt').click();
+    await new Promise(r => setTimeout(r, 400));
+    const rcps = receipts.filter(r => r.name === 'زبون الدوفي');
+    const r = rcps[0], v = invoices.find(i => i.id === 'dv1');
+    // تحويل تاني لنفس الدوفي: ما في دفعات بتنتقل مرة تانية
+    convertInvoiceToReceipt('dv1');
+    const second = document.getElementById('paymentsBody').querySelectorAll('tr').length;
+    document.getElementById('receiptOverlay').classList.remove('show');
+    viewInvoice('dv1');
+    return { receipts: rcps.length, rPays: getReceiptPayments(r), rRemaining: r.remaining, vPays: v.payments, vMoved: (v.movedPayments || []).map(p => [p.id, p.amount, p.date, p.toReceiptNo]),
+      conv: v.convertedTo && v.convertedTo.receiptNo === r.no, before, after: sumAll(), hist: paymentHistory.filter(h => h.paymentId === 'pmD').map(h => [h.docType, h.amount, h.date]),
+      formRemaining, fromLabel, second, invView: document.getElementById('invoicePrintArea').innerText };
+  }, paid);
+
+  test('دوفي 100,000 عليه دفعة 30,000 → الوصل: الدفعة نفسها والباقي 70,000، والمجموع ما تغيّر', async ({ page }) => {
+    const r = await run(page, 30000);
+    expect(r.receipts).toBe(1);                       // ضغطتين على الحفظ = وصل واحد
+    expect(r.rPays.length).toBe(1);
+    expect(r.rPays[0]).toMatchObject({ id: 'pmD', date: '2026-10-02', amount: 30000, method: 'نقدي' });
+    expect(r.rRemaining).toBe(70000);
+    expect(r.vPays).toEqual([]);                      // ما بتنحسب مرتين
+    expect(r.vMoved).toEqual([['pmD', 30000, '2026-10-02', r.vMoved[0][3]]]);
+    expect(r.conv).toBe(true);
+    expect(r.after).toBe(r.before);                   // مجموع المقبوضات بلوحة التحكم نفسه
+    expect(r.hist).toEqual([['وصل', 30000, '2026-10-02']]); // سطر واحد بالسجل، صار يشاور عالوصل
+    expect(r.fromLabel).toContain('Devis رقم S0099');
+    expect(r.second).toBe(0);                         // التحويل التاني ما بينقل الدفعة مرة تانية
+    expect(r.invView).toContain('انتقلت للوصل رقم');
+  });
+  test('دوفي بلا دفعة → وصل بلا دفعات والباقي 100,000', async ({ page }) => {
+    const r = await run(page, 0);
+    expect(r.rPays).toEqual([]); expect(r.rRemaining).toBe(100000); expect(r.after).toBe(r.before);
+  });
+  test('دوفي مدفوع بالكامل → الوصل مدفوع بالكامل والباقي 0', async ({ page }) => {
+    const r = await run(page, 100000);
+    expect(r.rPays.length).toBe(1); expect(r.rRemaining).toBe(0); expect(r.vPays).toEqual([]); expect(r.after).toBe(r.before);
+  });
+});
