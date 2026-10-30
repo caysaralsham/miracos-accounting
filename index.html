@@ -6305,6 +6305,58 @@ document.getElementById('btnReconcilePayments').addEventListener('click', async 
   toast(`✓ تم: ${rec.updates.length} تعديل، ${rec.adds.length} إضافة، ${rec.removes.length} حذف`);
 });
 
+// ================= 🔍 البحث الشامل (داخل البرنامج بس، للمستخدم المسجّل دخوله) =================
+// بيدوّر بالوصولات وعروض الأسعار والفواتير والطلبيات وحاسبة القياسات وقائمة الأسعار: رقم الموديل، اسم المنتج،
+// اسم الزبون، الهاتف، العنوان، رقم الدوفي/الوصل/الطلبية، التفاصيل والملاحظات. بيقبل الأرقام العربية (٠١٢) والإنكليزية،
+// وما بيتأثر بالمسافات أو الهمزات أو التاء المربوطة، والهاتف بيلاقيه بـ 0 أو بـ 213+.
+function gsNorm(t){ return String(t==null?'':t).replace(/[٠-٩]/g,d=>String(d.charCodeAt(0)-1632)).replace(/[۰-۹]/g,d=>String(d.charCodeAt(0)-1776))
+  .replace(/[ً-ْـ]/g,'').replace(/[أإآٱ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/ؤ/g,'و').replace(/ئ/g,'ي').toLowerCase().replace(/\s+/g,' ').trim(); }
+function gsDigits(t){ let d = gsNorm(t).replace(/\D/g,''); if(d.startsWith('00213')) d = d.slice(5); else if(d.startsWith('213') && d.length>=11) d = d.slice(3); if(d.startsWith('0')) d = d.slice(1); return d; }
+function gsMatch(q, fields){
+  const nq = gsNorm(q), sq = nq.replace(/[\s\-_./]+/g,''), words = nq.split(' ').filter(Boolean), dq = gsDigits(q);
+  const hay = gsNorm(fields.join(' | ')), hayNoSp = hay.replace(/[\s\-_./]+/g,'');
+  if(words.every(w=>hay.includes(w)) || (sq.length>=3 && hayNoSp.includes(sq))) return true;
+  if(dq.length>=4 && /^[\d\s+\-().]+$/.test(nq) && fields.some(f=>gsDigits(f).includes(dq))) return true;
+  return false;
+}
+function globalSearch(q){
+  q = String(q||'').trim(); if(gsNorm(q).length<1) return [];
+  const out = [], itemsTxt = it=>(it||[]).map(x=>[x.desc, x.unit, x.measType].filter(Boolean).join(' ')).join(' | ');
+  const lbl = i => i.docType==='facture' ? 'Facture' : (i.docType==='devis' ? 'Facture proforma' : 'Devis');
+  receipts.forEach(r=>{ if(gsMatch(q,[r.no, 'وصل '+r.no, r.name, r.phone, r.address, itemsTxt(r.items), r.note, (r.productPhotos||[]).map(p=>p.caption).join(' ')]))
+    out.push({type:'وصل', icon:'🧾', id:r.id, title:`وصل ${r.no} — ${r.name||''}`, sub:[r.date, r.phone, itemsTxt(r.items)].filter(Boolean).join(' · '), extra:`الباقي ${fmt(r.remaining)}`, open:()=>viewReceipt(r.id), date:r.date}); });
+  invoices.forEach(i=>{ if(gsMatch(q,[i.no, lbl(i)+' '+i.no, i.clientName, i.clientPhone, i.clientAddress, itemsTxt(i.items), i.note, i.clientRC, i.clientNIF]))
+    out.push({type:lbl(i), icon:'📄', id:i.id, title:`${lbl(i)} ${i.no} — ${i.clientName||''}`, sub:[i.date, i.clientPhone, itemsTxt(i.items)].filter(Boolean).join(' · '), extra:`الباقي ${fmt(i.remaining)}`, open:()=>viewInvoice(i.id), date:i.date}); });
+  (window.__ordersJobs||[]).forEach(j=>{ const no = j.no ? 'ط-'+String(j.no).padStart(3,'0') : '';
+    if(gsMatch(q,[no, j.no, j.cust&&j.cust.name, FS_DOC==='factory'?'':(j.cust&&j.cust.phone), j.cust&&j.cust.addr, itemsTxt(j.items), j.note, j.rcpNo?'وصل '+j.rcpNo:'', (j.prodPhotos||[]).map(p=>p.caption).join(' ')]))
+      out.push({type:'طلبية', icon:'🏭', id:j.id, title:`طلبية ${no} — ${(j.cust&&j.cust.name)||''}`, sub:[j.status, itemsTxt(j.items)].filter(Boolean).join(' · '), open:()=>{ const n=[...document.querySelectorAll('.nav-item')].find(a=>/الطلبيات/.test(a.textContent)); if(n) n.click(); const qi=document.querySelector('#view-fjobs [data-q]'); if(qi){ qi.value=no||q; qi.dispatchEvent(new Event('input',{bubbles:true})); } }, date:j.at?localDate(new Date(j.at)):''}); });
+  (typeof measurementsList!=='undefined'?measurementsList:[]).forEach(m=>{ if(gsMatch(q,[m.customerName, m.customerPhone, m.note, m.who]))
+    out.push({type:'قياسات', icon:'📏', id:m.id, title:`قياسات — ${m.customerName||''}`, sub:[m.date, m.customerPhone].filter(Boolean).join(' · '), open:()=>viewMeasurementRecord(m.id), date:m.date}); });
+  (typeof priceList!=='undefined'?priceList:[]).forEach(p=>{ const cat=(priceCategories||[]).find(c=>c.id===p.categoryId); if(gsMatch(q,[p.type, p.measurement, p.color, cat&&cat.name]))
+    out.push({type:'منتج / موديل', icon:'🏷️', id:p.id, title:[p.type, p.measurement, p.color].filter(Boolean).join(' — '), sub:cat?cat.name:'', extra:p.price?fmt(p.price):'', open:()=>{ const n=document.querySelector('.nav-item[data-view="pricelist"]'); if(n) n.click(); }}); });
+  return out;
+}
+window.globalSearch = globalSearch;
+{
+  const box = document.createElement('div'); box.className = 'panel'; box.id = 'globalSearchBox';
+  box.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><span style="font-size:18px">🔍</span>
+    <input type="search" id="globalSearchInput" placeholder="بحث شامل: رقم موديل، منتج، زبون، هاتف، عنوان، رقم دوفي أو وصل أو طلبية..." autocomplete="off" style="flex:1;min-width:0;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px"></div>
+    <div id="globalSearchResults" style="margin-top:8px"></div>`;
+  const tb = document.querySelector('#view-dashboard .topbar'); if(tb) tb.insertAdjacentElement('afterend', box);
+  let t = null, last = [];
+  const run = ()=>{ const q = document.getElementById('globalSearchInput').value; const res = document.getElementById('globalSearchResults');
+    if(!q.trim()){ res.innerHTML=''; last=[]; return; }
+    last = globalSearch(q);
+    if(!last.length){ res.innerHTML = '<div style="color:var(--text-dim);padding:6px">ما في نتائج.</div>'; return; }
+    const groups = {}; last.forEach((x,i)=>{ (groups[x.type]=groups[x.type]||[]).push(i); });
+    res.innerHTML = `<div style="font-size:12.5px;color:var(--text-dim);margin-bottom:6px">${last.length} نتيجة</div>` + Object.keys(groups).map(g=>`<div style="font-weight:800;font-size:13px;margin:8px 2px 4px">${escHtmlText(g)} (${groups[g].length})</div>`+
+      groups[g].slice(0,30).map(i=>{ const x=last[i]; return `<button type="button" data-gs="${i}" style="display:flex;gap:10px;align-items:flex-start;width:100%;text-align:right;font:inherit;background:var(--marble,#fff);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;cursor:pointer">
+        <span style="font-size:18px">${x.icon}</span><span style="flex:1;min-width:0"><b style="display:block;overflow-wrap:anywhere">${escHtmlText(x.title)}</b><span style="display:block;font-size:12.5px;color:var(--text-dim);overflow-wrap:anywhere">${escHtmlText(x.sub||'')}</span></span>${x.extra?`<span style="font-size:12.5px;white-space:nowrap">${escHtmlText(x.extra)}</span>`:''}</button>`; }).join('')).join('');
+  };
+  box.addEventListener('input', e=>{ if(e.target.id==='globalSearchInput'){ clearTimeout(t); t=setTimeout(run,150); } });
+  box.addEventListener('click', e=>{ const b=e.target.closest('[data-gs]'); if(b && last[+b.dataset.gs]) last[+b.dataset.gs].open(); });
+}
+
 // ================= 🧾 تقرير الدفعات المشكوك فيها (قراءة فقط — ما بيحذف ولا بيدمج ولا بيعدّل شي) =================
 // «مؤكد» = نفس الدفعة (نفس الرقم الداخلي) محسوبة بمكانين فعلاً. «مشتبه» = يحتاج مراجعتك: تشابه المبلغ أو التاريخ لحاله
 // مش دليل إنها مكررة، فبيطلع للمراجعة بس. الدفعة نفسها لما تبيّن بسجل الدفعات + بالوصل هي عرض للمتابعة، مش تكرار.

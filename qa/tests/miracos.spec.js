@@ -592,3 +592,48 @@ test('تقرير الدفعات المشكوك فيها: بيلقط التكرا
   const head = await page.locator('#paymentAuditOverlay').innerText();
   for (const t of ['رقم السجل', 'اسم الزبون', 'رقم الدوفي', 'رقم الوصل', 'قيمة الدفعة', 'تاريخ الدفعة', 'سبب الاشتباه', 'قراءة فقط']) expect(head).toContain(t);
 });
+
+test.describe('البحث الشامل', () => {
+  const seed = page => page.evaluate(() => {
+    document.getElementById('loginScreen').style.display = 'none';
+    receipts.push({ id: 'g1', no: 321, name: 'عبد الرحمن بلقاسم', phone: '0550 12 34 56', address: 'الشراقة', date: '2026-10-01', items: [{ qty: 1, desc: 'نافورة موديل F-204 رخام بيج', price: 1, amount: 1 }], total: 1, remaining: 0, payments: [] });
+    receipts.push({ id: 'g2', no: 322, name: 'فاطمة الزهراء', phone: '+213 661 00 11 22', address: 'دالي ابراهيم', date: '2026-10-02', items: [{ qty: 1, desc: 'شمينة رخام', price: 1, amount: 1 }], total: 1, remaining: 0, payments: [] });
+    invoices.push({ id: 'g3', docType: 'simple', no: 'S0450', date: '2026-10-03', clientName: 'عبدالرحمن بلقاسم', clientPhone: '0550123456', clientAddress: '', items: [{ qty: 1, desc: 'جرن حمام', unit: '', price: 1, amount: 1 }], ttc: 1, remaining: 1, payments: [] });
+    priceCategories.push({ id: 'c1', name: 'نوافير' }); priceList.push({ id: 'p1', categoryId: 'c1', type: 'نافورة F-204', measurement: '120 سم', color: 'بيج', price: 90000 });
+  });
+  const titles = (page, q) => page.evaluate(q => globalSearch(q).map(x => x.type + ':' + x.title), q);
+
+  test('رقم الموديل بيجيب المنتج والوصل المرتبطين فيه', async ({ page }) => {
+    await seed(page);
+    const r = await titles(page, 'f204');
+    expect(r.some(t => t.startsWith('وصل:وصل 321'))).toBe(true);
+    expect(r.some(t => t.startsWith('منتج / موديل:'))).toBe(true);
+  });
+  test('الهاتف بأي كتابة (مسافات، 0 أو 213+، أرقام عربية) بيجيب الوصل والدوفي', async ({ page }) => {
+    await seed(page);
+    for (const q of ['0550123456', '550 12 34 56', '+213550123456', '٠٥٥٠١٢٣٤٥٦']) {
+      const r = await titles(page, q);
+      expect(r.some(t => t.includes('وصل 321')), q).toBe(true);
+      expect(r.some(t => t.includes('Devis S0450')), q).toBe(true);
+    }
+    expect((await titles(page, '661001122')).some(t => t.includes('وصل 322'))).toBe(true);
+  });
+  test('الاسم مع اختلاف المسافات والهمزة، ورقم الدوفي والوصل والعنوان', async ({ page }) => {
+    await seed(page);
+    const r = await titles(page, 'عبدالرحمن');
+    expect(r.some(t => t.includes('وصل 321'))).toBe(true); expect(r.some(t => t.includes('S0450'))).toBe(true);
+    expect((await titles(page, 'فاطمه')).some(t => t.includes('وصل 322'))).toBe(true);
+    expect((await titles(page, 's0450')).length).toBe(1);
+    expect((await titles(page, '٣٢٢')).some(t => t.includes('وصل 322'))).toBe(true);
+    expect((await titles(page, 'دالي إبراهيم')).some(t => t.includes('وصل 322'))).toBe(true);
+  });
+  test('خانة البحث على لوحة التحكم بتعرض النتائج وبتفتح الوصل، وبلا تمرير أفقي على الجوال', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    await seed(page);
+    await page.fill('#globalSearchInput', 'بلقاسم');
+    await expect(page.locator('#globalSearchResults [data-gs]')).toHaveCount(2);
+    await page.locator('#globalSearchResults [data-gs]').first().click();
+    await expect(page.locator('#viewReceiptOverlay.show, #viewInvoiceOverlay.show')).toHaveCount(1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  });
+});
