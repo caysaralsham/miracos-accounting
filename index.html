@@ -7402,5 +7402,10 @@ document.addEventListener('click',function(e){var h=e.target.closest&&e.target.c
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', startLatn); else startLatn();
 })();
 </script>
+<script>
+// لما البرنامج يفتح جوّا «أدواتي» (cesar-alcham.com/my): منبلّغ الصفحة الأم إنه انفتح، حتى تشيل شاشة التحميل
+// (وإذا ما وصلها هالخبر بتعرض «إعادة المحاولة» بدل الصفحة البيضا)
+(function(){ if(window.parent===window) return; try{ window.parent.postMessage({type:'miracos-ready'}, 'https://cesar-alcham.com'); }catch(e){} })();
+</script>
 </body>
 </html>
