@@ -6357,6 +6357,60 @@ window.globalSearch = globalSearch;
   box.addEventListener('click', e=>{ const b=e.target.closest('[data-gs]'); if(b && last[+b.dataset.gs]) last[+b.dataset.gs].open(); });
 }
 
+// ================= 📱 لوحة واتساب على الصفحة الرئيسية =================
+// البرنامج مش مربوط بواتساب (ما في WhatsApp Business Platform)، فما منقدر نعرف العدد الحقيقي لحاله.
+// هون بتسجّل بإيدك كل زبون تواصل معك على واتساب (ثانيتين: الرقم والاسم)، واللوحة بتعدّ:
+// «تواصلات» = كل تسجيل، «زبائن» = أرقام مختلفة (نفس الزبون إذا راسل كذا مرة بينعدّ زبون واحد).
+// التسجيلات بمستند لحالها بالسحابة (مش مع الحسابات)، وما في أي رسالة بتنبعت لحالها.
+function waStats(list, now){
+  now = now || new Date();
+  const day = localDate(now), month = day.slice(0,7);
+  const uniq = arr => new Set(arr.map(x=>gsDigits(x.phone)||('#'+gsNorm(x.name)))).size;
+  const inDay = list.filter(x=>x.date===day), inMonth = list.filter(x=>(x.date||'').slice(0,7)===month);
+  return {dayContacts:inDay.length, dayCustomers:uniq(inDay), monthContacts:inMonth.length, monthCustomers:uniq(inMonth), allContacts:list.length, allCustomers:uniq(list)};
+}
+window.waStats = waStats;
+if(FS_DOC!=='factory'){ // المعمل ما بيشوف أرقام الزبائن
+  let waList = [];
+  const waRef = ()=>db.collection(FS_COLLECTION).doc(FS_DOC + '_whatsapp');
+  const box = document.createElement('div'); box.className='panel'; box.id='waPanel';
+  box.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b style="font-size:16px">📱 زبائن واتساب</b><span style="flex:1"></span><button type="button" class="btn btn-sm btn-primary" data-wa-add>+ سجّل زبون تواصل</button></div>
+    <div style="font-size:12px;color:var(--text-dim);margin:4px 0 8px">⚠️ البرنامج مش مربوط بواتساب، فهالأرقام من اللي بتسجّله إنت بس — مش العدد الحقيقي من واتساب. «زبائن» = أرقام مختلفة، «تواصلات» = كل تسجيل.</div>
+    <div data-wa-stats style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px"></div>
+    <form data-wa-form style="display:none;margin-top:10px;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="tel" dir="ltr" data-wa-phone placeholder="رقم الواتساب" required style="flex:1 1 140px;min-width:0;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px">
+      <input data-wa-name placeholder="الاسم (اختياري)" style="flex:1 1 140px;min-width:0;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px">
+      <input data-wa-note placeholder="شو طلب؟ (اختياري)" style="flex:2 1 180px;min-width:0;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px">
+      <button type="submit" class="btn btn-sm btn-primary">حفظ</button></form>
+    <details style="margin-top:8px"><summary style="cursor:pointer;font-size:13px">آخر التسجيلات</summary><div data-wa-list></div></details>`;
+  const gs = document.getElementById('globalSearchBox'); if(gs) gs.insertAdjacentElement('afterend', box);
+  const card=(t,v,sub)=>`<div style="background:var(--marble-2,#f5ecdd);border-radius:10px;padding:8px 10px"><div style="font-size:12px;color:var(--text-dim)">${t}</div><div style="font-weight:800;font-size:18px">${v}</div><div style="font-size:11.5px;color:var(--text-dim)">${sub}</div></div>`;
+  function waRender(){
+    const st = waStats(waList);
+    box.querySelector('[data-wa-stats]').innerHTML = card('اليوم', st.dayCustomers+' زبون', st.dayContacts+' تواصل') + card('هالشهر', st.monthCustomers+' زبون', st.monthContacts+' تواصل') + card('الكل', st.allCustomers+' زبون', st.allContacts+' تواصل');
+    box.querySelector('[data-wa-list]').innerHTML = waList.slice().sort((a,b)=>(b.at||0)-(a.at||0)).slice(0,15).map(x=>`<div style="display:flex;gap:8px;align-items:center;font-size:13px;border-bottom:1px dashed var(--line);padding:5px 0;flex-wrap:wrap">
+      <span>${escHtmlText(x.date||'')}</span><bdi dir="ltr" class="ph">${escHtmlText(x.phone||'')}</bdi><b>${escHtmlText(x.name||'')}</b><span style="color:var(--text-dim);flex:1;min-width:0">${escHtmlText(x.note||'')}</span>
+      <button type="button" class="btn btn-ghost btn-sm" data-wa-find="${escHtmlText(x.phone||x.name||'')}" title="شوف وصولاته وطلبياته">🔍 سجلّه</button><button type="button" class="btn btn-ghost btn-sm" data-wa-del="${escHtmlText(x.id)}" title="حذف هالتسجيل">✕</button></div>`).join('') || '<div style="font-size:13px;color:var(--text-dim);padding:6px 0">ما في تسجيلات بعد.</div>';
+  }
+  window.__waTest = list=>{ waList = list; waRender(); };
+  box.addEventListener('click', async e=>{
+    if(e.target.closest('[data-wa-add]')){ const f=box.querySelector('[data-wa-form]'); f.style.display = f.style.display==='flex'?'none':'flex'; if(f.style.display==='flex') f.querySelector('[data-wa-phone]').focus(); return; }
+    const fd = e.target.closest('[data-wa-find]'); if(fd){ const gi=document.getElementById('globalSearchInput'); gi.value=fd.dataset.waFind; gi.dispatchEvent(new Event('input',{bubbles:true})); gi.scrollIntoView({block:'center'}); return; }
+    const dl = e.target.closest('[data-wa-del]'); if(dl){ const x=waList.find(y=>y.id===dl.dataset.waDel); if(!x||!confirm('حذف هالتسجيل من عدّاد واتساب؟'))return;
+      try{ await waRef().set({contacts: firebase.firestore.FieldValue.arrayRemove(x)}, {merge:true}); }catch(err){ toast('ما انحذف — تأكد من الإنترنت'); } }
+  });
+  box.querySelector('[data-wa-form]').addEventListener('submit', async e=>{
+    e.preventDefault(); const f=e.target, phone=f.querySelector('[data-wa-phone]').value.trim();
+    if(gsDigits(phone).length<8){ toast('اكتب رقم واتساب صحيح'); return; }
+    const x = {id:uid(), phone, name:f.querySelector('[data-wa-name]').value.trim(), note:f.querySelector('[data-wa-note]').value.trim(), date:localDate(), at:Date.now()};
+    waList = [...waList, x]; waRender(); f.reset(); f.style.display='none';
+    try{ await Promise.race([waRef().set({contacts: firebase.firestore.FieldValue.arrayUnion(x)}, {merge:true}), new Promise(r=>setTimeout(r,8000))]); toast('✓ انسجّل'); }catch(err){ console.error(err); toast('ما انحفظ بالسحابة — تأكد من الإنترنت'); }
+  });
+  const start = ()=>{ try{ waRef().onSnapshot(d=>{ waList = (d.exists && d.data().contacts) || []; waRender(); }, e=>console.warn(e)); }catch(e){} };
+  const w = setInterval(()=>{ if(typeof db!=='undefined' && db && firebase.auth().currentUser){ clearInterval(w); start(); } }, 1000);
+  waRender();
+}
+
 // ================= 🧾 تقرير الدفعات المشكوك فيها (قراءة فقط — ما بيحذف ولا بيدمج ولا بيعدّل شي) =================
 // «مؤكد» = نفس الدفعة (نفس الرقم الداخلي) محسوبة بمكانين فعلاً. «مشتبه» = يحتاج مراجعتك: تشابه المبلغ أو التاريخ لحاله
 // مش دليل إنها مكررة، فبيطلع للمراجعة بس. الدفعة نفسها لما تبيّن بسجل الدفعات + بالوصل هي عرض للمتابعة، مش تكرار.

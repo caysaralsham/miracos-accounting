@@ -637,3 +637,23 @@ test.describe('البحث الشامل', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   });
 });
+
+test('لوحة واتساب: بتفرّق بين التواصلات والزبائن (نفس الرقم بأي كتابة = زبون واحد)، وبتقول بوضوح إنها مش من واتساب نفسه', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const today = localDate(), mo = today.slice(0, 7) + '-01' === today ? today : today.slice(0, 7) + '-01';
+    const L = [
+      { id: 'a', phone: '0550 12 34 56', name: 'أحمد', date: today, at: 3 },
+      { id: 'b', phone: '+213550123456', name: 'أحمد', date: today, at: 2 },   // نفس الزبون
+      { id: 'c', phone: '0661 00 11 22', name: 'سمير', date: mo, at: 1 },
+      { id: 'd', phone: '0770 99 88 77', name: 'قديم', date: '2025-01-05', at: 0 },
+    ];
+    window.__waTest(L);
+    return { st: waStats(L), text: document.getElementById('waPanel').innerText };
+  });
+  expect(r.st.allContacts).toBe(4); expect(r.st.allCustomers).toBe(3);
+  expect(r.st.dayContacts).toBe(r.st.dayCustomers === 1 ? 2 : r.st.dayContacts); expect(r.st.dayCustomers).toBeGreaterThanOrEqual(1);
+  expect(r.st.monthCustomers).toBeGreaterThanOrEqual(1);
+  expect(r.text).toContain('مش العدد الحقيقي');
+  expect(r.text).toContain('3 زبون');
+  expect(r.text).toContain('4 تواصل');
+});
