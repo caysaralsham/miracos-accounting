@@ -783,6 +783,9 @@
           <button class="btn" id="btnMeasAddLen">+ جدول متر طول</button>
           <button class="btn" id="btnMeasAddCube">+ جدول متر مكعب</button>
           <button class="btn" id="btnMeasAddCol">+ جدول عامود</button>
+          <button class="btn" id="btnMeasAddHCol">+ نص عامود</button>
+          <button class="btn" id="btnMeasAddHBase">+ نص قاعدة</button>
+          <button class="btn" id="btnMeasAddHCap">+ نص تاج</button>
           <button class="btn" id="btnMeasAddCircle">+ جدول دوائر</button>
           <button class="btn" id="btnMeasAddCorner">+ جدول زوايا</button>
         </div>
@@ -1125,6 +1128,9 @@
         <button type="button" class="btn btn-sm" id="btnRcpMeasAddLen">+ جدول متر طول</button>
         <button type="button" class="btn btn-sm" id="btnRcpMeasAddCube">+ جدول متر مكعب</button>
         <button type="button" class="btn btn-sm" id="btnRcpMeasAddCol">+ جدول عامود</button>
+        <button type="button" class="btn btn-sm" id="btnRcpMeasAddHCol">+ نص عامود</button>
+        <button type="button" class="btn btn-sm" id="btnRcpMeasAddHBase">+ نص قاعدة</button>
+        <button type="button" class="btn btn-sm" id="btnRcpMeasAddHCap">+ نص تاج</button>
       </div>
       </div>
     </div>
@@ -2693,12 +2699,16 @@ let currentItems = [];
 
 // عدد القطع في سطر القياس: الخانة الفارغة تعني 1، والصفر يعني 0 (السطر لا يُحسب)
 function measCount(v){ if(v===undefined||v===null||v==='') return 1; const n=Number(v); return Number.isFinite(n)&&n>=0 ? n : 1; }
+const HALF_COL_T = ['نص عامود','نص قاعدة','نص تاج'];
+function isHalfColT(t){ return HALF_COL_T.includes(t); }
 function measResultFor(type, l, w, h, h2){
   l = parseFloat(l)||0; w = parseFloat(w)||0; h = parseFloat(h)||0; h2 = parseFloat(h2)||0;
   if(type==='طول') return {value: l, label: l.toFixed(2)+' م.ط'};
   if(type==='مكعب') return {value: l*w*h, label: (l*w*h).toFixed(3)+' م³'};
   // عامود: القطر بالمتر (l) × 3.14 × الارتفاع بالمتر (w) = م²
   if(type==='عامود'){ const a = l*3.14*w; return {value: a, label: a.toFixed(2)+' م²'}; }
+  // نص عامود / نص قاعدة / نص تاج (ملصوقين عالحيط): نص مساحة العامود = القطر × 3.14 × الارتفاع ÷ 2
+  if(isHalfColT(type)){ const a = l*3.14*w/2; return {value: a, label: a.toFixed(2)+' م²'}; }
   // دائرة: بتنحسب بالقطر البراني متل ما هو (1.20 = 1.20 م²) — القطر الجواني للرسمة والمعمل فقط
   if(type==='دائرة'){ return {value: l, label: l.toFixed(2)+' م²'}; }
   // زاوية: بتنحسب من برا = الطول × العرض (مثلاً 0.40 × 0.40 = 0.16 م²) — الأضلاع للرسمة والمعمل بس
@@ -3519,6 +3529,8 @@ function viewReceipt(id){
         ${t['طول']>0 ? `<div><b>إجمالي متر طول:</b> ${t['طول'].toFixed(2)} م.ط</div>` : ''}
         ${t['مكعب']>0 ? `<div><b>إجمالي متر مكعب:</b> ${t['مكعب'].toFixed(3)} م³</div>` : ''}
         ${t['عامود']>0 ? `<div><b>إجمالي العواميد:</b> ${t['عامود'].toFixed(2)} م²</div>` : ''}
+      ${HALF_COL_T.map(k=>t[k]>0 ? `<div><b>إجمالي ${k}:</b> ${t[k].toFixed(2)} م²</div>` : '').join('')}
+        ${HALF_COL_T.map(k=>t[k]>0 ? `<div><b>إجمالي ${k}:</b> ${t[k].toFixed(2)} م²</div>` : '').join('')}
         ${t['دائرة']>0 ? `<div><b>إجمالي الدوائر:</b> ${t['دائرة'].toFixed(2)} م²</div>` : ''}
         ${t['زاوية']>0 ? `<div><b>إجمالي الزوايا:</b> ${t['زاوية'].toFixed(2)} م²</div>` : ''}
       </div>`;
@@ -4541,12 +4553,15 @@ const MEAS_SPECS = {
   'طول': {label:'متر طول', cols:['طول (م)','العرض (مرجعي، م)']},
   'مكعب': {label:'متر مكعب', cols:['طول (م)','عرض (م)','سماكة (م)']},
   'عامود': {label:'عامود (القطر × 3.14 × الارتفاع = م²)', cols:['القطر (م)','الارتفاع (م)']},
+  'نص عامود': {label:'نص عامود — ملصوق عالحيط (القطر × 3.14 × الارتفاع ÷ 2 = م²)', cols:['القطر (م)','الارتفاع (م)']},
+  'نص قاعدة': {label:'نص قاعدة عامود (القطر × 3.14 × الارتفاع ÷ 2 = م²)', cols:['القطر (م)','الارتفاع (م)']},
+  'نص تاج': {label:'نص تاج عامود (القطر × 3.14 × الارتفاع ÷ 2 = م²)', cols:['القطر (م)','الارتفاع (م)']},
   'دائرة': {label:'دائرة', cols:['القطر برا (م)','القطر جوا (م)']},
   'زاوية': {label:'زاوية (بتنحسب الطول × العرض من برا)', cols:['الطول (م)','العرض (م)','الضلع 1 (م)','الضلع 2 (م)']}
 };
 
 function computeMeasTotalsFrom(tables){
-  const totals = {'مربع':0, 'طول':0, 'مكعب':0, 'عامود':0};
+  const totals = {'مربع':0, 'طول':0, 'مكعب':0, 'عامود':0, 'نص عامود':0, 'نص قاعدة':0, 'نص تاج':0};
   tables.forEach(tbl=>{
     tbl.rows.forEach(r=>{
       const count = measCount(r.count);
@@ -4572,6 +4587,7 @@ function renderMeasTotals(tables, targetEl){
     + (has('طول') ? card('إجمالي متر طول', totals['طول'], 'م.ط') : '')
     + (has('مكعب') ? card('إجمالي متر مكعب', totals['مكعب'], 'م³') : '')
     + (tables.some(t=>t.type==='عامود') ? card('إجمالي العواميد', totals['عامود'], 'م²') : '')
+    + HALF_COL_T.map(k=>tables.some(t=>t.type===k) ? card('إجمالي '+k, totals[k]||0, 'م²') : '').join('')
     + (tables.some(t=>t.type==='دائرة') ? card('إجمالي الدوائر', totals['دائرة']||0, 'م²') : '')
     + (tables.some(t=>t.type==='زاوية') ? card('إجمالي الزوايا', totals['زاوية']||0, 'م²') : '');
 }
@@ -4605,7 +4621,7 @@ function wireMeasToggles(wrap, tables){
 function measNumShow(v){ const n = parseFloat(v); return (v===''||v==null||isNaN(n)) ? '—' : String(Number(n.toFixed(3))); }
 function emptyMeasRow(){ return {l:'', w:'', h:'', count:1, note:''}; }
 // خانة "التفاصيل" (اختيارية) بجدول متر مربع ومتر طول
-const MEAS_NOTE_TYPES = ['مربع','طول','عامود','دائرة'];
+const MEAS_NOTE_TYPES = ['مربع','طول','عامود','نص عامود','نص قاعدة','نص تاج','دائرة'];
 function measHasNote(type){ return MEAS_NOTE_TYPES.includes(type); }
 function measRowFilled(r){ return !!((r.l!=='' && r.l!=null) || (r.w!=='' && r.w!=null) || (r.h!=='' && r.h!=null) || String(r.note||'').trim()); }
 function measNoteInput(tbl, ti, ri, r){
@@ -4767,12 +4783,12 @@ function shapeSvg(shape, a, b, c, edges, opts){
   if(shape==='column') return columnSvg(a, b, edges, opts);
   return pieceSvg(a, b, edges, opts);
 }
-function shapeOfMeasType(type){ return type==='دائرة' ? 'circle' : type==='زاوية' ? 'corner' : type==='عامود' ? 'column' : 'rect'; }
+function shapeOfMeasType(type){ return type==='دائرة' ? 'circle' : type==='زاوية' ? 'corner' : (type==='عامود' || isHalfColT(type)) ? 'column' : 'rect'; }
 function shapeDimsText(p){
   const L = fmtCm(p.l), W = fmtCm(p.w), C = fmtCm(p.h);
   if(p.shape==='circle') return Number(p.w)>0 ? `دائرة: برا ${L} جوا ${W} سم` : `دائرة: قطر ${L} سم`;
   if(p.shape==='corner'){ const C2 = Number(p.h2) && Number(p.h2)!==Number(p.h) ? fmtCm(p.h2) : ''; return `زاوية ${CORNER_DIR_TXT[cornerDir(p.dir)]}: ${L} × ${W}، ${C2 ? `الضلعين ${C} و ${C2}` : `الضلع ${C}`} سم`; }
-  if(p.shape==='column') return `عامود: قطر ${L}، ارتفاع ${W} سم`;
+  if(p.shape==='column') return `${isHalfColT(p.mt)?p.mt:'عامود'}: قطر ${L}، ارتفاع ${W} سم`;
   return (Number(p.l)>0 && Number(p.w)>0) ? `${L} × ${W} سم` : '';
 }
 function shapeHasDims(p){
@@ -4786,7 +4802,7 @@ function shapeHasDims(p){
 function measDrawable(type){ return !!MEAS_SPECS[type]; }
 function calcRowDrawHtml(type, r){
   const l = parseFloat(r.l)||0, w = parseFloat(r.w)||0, h = parseFloat(r.h)||0;
-  const p = {shape: shapeOfMeasType(type), l:l*100, w:w*100, h:h*100, h2:(parseFloat(r.h2)||0)*100};
+  const p = {shape: shapeOfMeasType(type), mt:type, l:l*100, w:w*100, h:h*100, h2:(parseFloat(r.h2)||0)*100};
   if(p.shape==='corner' && p.l>0 && p.w>0 && p.h>0 && (p.h >= p.w || (p.h2||p.h) >= p.l)){
     return `<div class="meas-warn">الضلع لازم يكون أصغر من الطول والعرض — كل الخانات بالمتر، مثلاً 20 سم = <b>0.20</b></div>`;
   }
@@ -5352,6 +5368,9 @@ document.getElementById('btnMeasAddSq').addEventListener('click', ()=>addMeasTab
 document.getElementById('btnMeasAddLen').addEventListener('click', ()=>addMeasTable('طول'));
 document.getElementById('btnMeasAddCube').addEventListener('click', ()=>addMeasTable('مكعب'));
 document.getElementById('btnMeasAddCol').addEventListener('click', ()=>addMeasTable('عامود'));
+document.getElementById('btnMeasAddHCol').addEventListener('click', ()=>addMeasTable('نص عامود'));
+document.getElementById('btnMeasAddHBase').addEventListener('click', ()=>addMeasTable('نص قاعدة'));
+document.getElementById('btnMeasAddHCap').addEventListener('click', ()=>addMeasTable('نص تاج'));
 document.getElementById('btnMeasAddCircle').addEventListener('click', ()=>addMeasTable('دائرة'));
 document.getElementById('btnMeasAddCorner').addEventListener('click', ()=>addMeasTable('زاوية'));
 
@@ -5464,6 +5483,9 @@ document.getElementById('btnRcpMeasAddSq').addEventListener('click', ()=>addRece
 document.getElementById('btnRcpMeasAddLen').addEventListener('click', ()=>addReceiptMeasTable('طول'));
 document.getElementById('btnRcpMeasAddCube').addEventListener('click', ()=>addReceiptMeasTable('مكعب'));
 document.getElementById('btnRcpMeasAddCol').addEventListener('click', ()=>addReceiptMeasTable('عامود'));
+document.getElementById('btnRcpMeasAddHCol').addEventListener('click', ()=>addReceiptMeasTable('نص عامود'));
+document.getElementById('btnRcpMeasAddHBase').addEventListener('click', ()=>addReceiptMeasTable('نص قاعدة'));
+document.getElementById('btnRcpMeasAddHCap').addEventListener('click', ()=>addReceiptMeasTable('نص تاج'));
 
 function buildMeasurementRecord(allowNoName){
   const name = document.getElementById('measCustomerName').value.trim();
@@ -5543,9 +5565,9 @@ function measDetailsForType(tables, type){
     if(!hasDims){ if(note) parts.push(note); return; }
     const c = measCount(r.count); if(c===0) return;
     let d;
-    if(type==='عامود'){
-      const one = (parseFloat(r.l)||0)*3.14*(parseFloat(r.w)||0);
-      d = `قطر ${n(r.l)} × ارتفاع ${n(r.w)} (العامود ${one.toFixed(2)} م²)`;
+    if(type==='عامود' || isHalfColT(type)){
+      const one = (parseFloat(r.l)||0)*3.14*(parseFloat(r.w)||0)*(type==='عامود'?1:0.5);
+      d = `قطر ${n(r.l)} × ارتفاع ${n(r.w)} (${type==='عامود'?'العامود':type} ${one.toFixed(2)} م²)`;
       parts.push(`${d} — العدد: ${c}${note ? ' ' + note : ''}`);
       return;
     }
@@ -5566,6 +5588,7 @@ function measItemsFromTotals(totals, tables){
   if(totals['طول'] > 0 || measDetailsForType(tables,'طول')) items.push({qty: Number(totals['طول'].toFixed(2)), desc: desc('متر طول','طول'), price:'', measType:'طول'});
   if(totals['مكعب'] > 0) items.push({qty: Number(totals['مكعب'].toFixed(3)), desc: desc('متر مكعب','مكعب'), price:'', measType:'مكعب'});
   if(totals['عامود'] > 0) items.push({qty: Number(totals['عامود'].toFixed(2)), desc: desc('عامود (م²)','عامود'), price:'', measType:'عامود'});
+  HALF_COL_T.forEach(k=>{ if((totals[k]||0) > 0) items.push({qty: Number(totals[k].toFixed(2)), desc: desc(k+' (م²)',k), price:'', measType:k}); });
   if(totals['دائرة'] > 0) items.push({qty: Number(totals['دائرة'].toFixed(2)), desc: desc('دوائر (م²)','دائرة'), price:'', measType:'دائرة'});
   if(totals['زاوية'] > 0) items.push({qty: Number(totals['زاوية'].toFixed(2)), desc: desc('زوايا (م²)','زاوية'), price:'', measType:'زاوية'});
   return items.map(it=> it.measType ? Object.assign(it, {draws: measDrawsForType(tables, it.measType)}) : it);
@@ -5770,6 +5793,7 @@ function renderMeasurementRecordInto(rec){
       ${t['طول']>0 ? `<div><b>إجمالي متر طول:</b> ${t['طول'].toFixed(2)} م.ط</div>` : ''}
       ${t['مكعب']>0 ? `<div><b>إجمالي متر مكعب:</b> ${t['مكعب'].toFixed(3)} م³</div>` : ''}
       ${t['عامود']>0 ? `<div><b>إجمالي العواميد:</b> ${t['عامود'].toFixed(2)} م²</div>` : ''}
+      ${HALF_COL_T.map(k=>t[k]>0 ? `<div><b>إجمالي ${k}:</b> ${t[k].toFixed(2)} م²</div>` : '').join('')}
       ${t['دائرة']>0 ? `<div><b>إجمالي الدوائر:</b> ${t['دائرة'].toFixed(2)} م²</div>` : ''}
       ${t['زاوية']>0 ? `<div><b>إجمالي الزوايا:</b> ${t['زاوية'].toFixed(2)} م²</div>` : ''}
     </div>`;
@@ -5997,7 +6021,7 @@ function tsNorm(t){ return String(t||'').replace(/[ً-ْـ]/g,'').replace(/[أإ
 function tsCatOf(desc){ const d = tsNorm(desc).toLowerCase(); for(const [name, keys] of TS_CATS){ if(keys.some(k=>d.includes(k))) return name; } return ''; }
 // ---- الكمية المباعة لكل منتج (مش عدد الوصولات): العدد بالقطعة، والمتر المربع/الطولي/المكعب لحاله ----
 const TS_DEF_UNIT={'واجهة':'m2','أرضية':'m2','كورنيش':'ml'}; // إذا البند ما فيه وحدة
-const TS_MEAS_UNIT={'مربع':'m2','عامود':'m2','دائرة':'m2','زاوية':'m2','طول':'ml','مكعب':'m3'};
+const TS_MEAS_UNIT={'مربع':'m2','عامود':'m2','نص عامود':'m2','نص قاعدة':'m2','نص تاج':'m2','دائرة':'m2','زاوية':'m2','طول':'ml','مكعب':'m3'};
 function tsNum(v){ const t=String(v??'').replace(/[٠-٩]/g,d=>'٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/[۰-۹]/g,d=>'۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(',','.'); const n=parseFloat(t); return isFinite(n)?n:0; }
 function tsUnitOf(it, cat){
   if(it.measType && TS_MEAS_UNIT[it.measType]) return TS_MEAS_UNIT[it.measType];

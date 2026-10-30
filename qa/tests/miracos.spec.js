@@ -100,6 +100,17 @@ test.describe('حساب القياسات', () => {
     expect(t['عامود']).toBeCloseTo(0.3 * 3.14 * 2.5, 9);
   });
 
+  test('نص عامود ونص قاعدة ونص تاج = نص مساحة العامود', async ({ page }) => {
+    const t = await totals(page, [
+      { type: 'نص عامود', rows: [{ l: 0.3, w: 2.5, count: 2 }] },
+      { type: 'نص قاعدة', rows: [{ l: 0.5, w: 0.25 }] },
+      { type: 'نص تاج', rows: [{ l: 0.5, w: 0.3 }] },
+    ]);
+    expect(t['نص عامود']).toBeCloseTo(0.3 * 3.14 * 2.5 / 2 * 2, 9);
+    expect(t['نص قاعدة']).toBeCloseTo(0.5 * 3.14 * 0.25 / 2, 9);
+    expect(t['نص تاج']).toBeCloseTo(0.5 * 3.14 * 0.3 / 2, 9);
+  });
+
   test('الدائرة بالقطر البراني والزاوية الطول × العرض', async ({ page }) => {
     const t = await totals(page, [
       { type: 'دائرة', rows: [{ l: 1.2, w: 0.8 }] },
