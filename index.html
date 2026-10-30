@@ -173,10 +173,9 @@
     table.rt-cards tbody td.rt-actions{ border-top:1px dashed var(--line); padding-top:6px !important; margin-top:2px; }
     table.rt-cards .details-wrap{ width:auto; max-width:none; min-width:0; }
   }
-  /* البيان بالجداول — كمبيوتر: سطرين بالأكتر والباقي "..." (التفاصيل الكاملة بفتح الوصل)، والجدول بيساع بدون تحريك يمين/يسار */
-  .details-wrap{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; white-space:normal; overflow-wrap:break-word; word-break:normal; min-width:140px; line-height:1.5; cursor:pointer; }
-  /* كبسة على البيان بتفتح كل التفاصيل، وكبسة تانية بترجعه سطرين */
-  .details-wrap.expanded{ display:block; -webkit-line-clamp:unset; overflow:visible; }
+  /* البيان (النوع والتفاصيل) بالجداول — متل الجوال: سطر واحد والباقي "..."، كبسة عليه بتفتح كل التفاصيل وكبسة تانية بتسكّره */
+  .details-wrap{ display:block; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; min-width:140px; max-width:280px; line-height:1.5; cursor:pointer; }
+  .details-wrap.expanded{ white-space:normal; overflow:visible; overflow-wrap:break-word; word-break:normal; }
   @media (min-width: 701px){
     #receiptsTableWrap th, #receiptsTableWrap td{ padding:10px 7px; }
   }
@@ -6394,7 +6393,7 @@ function waStats(list, now){
   return {dayContacts:inDay.length, dayCustomers:uniq(inDay), monthContacts:inMonth.length, monthCustomers:uniq(inMonth), allContacts:list.length, allCustomers:uniq(list)};
 }
 window.waStats = waStats;
-if(FS_DOC!=='factory'){ // المعمل ما بيشوف أرقام الزبائن
+if(false && FS_DOC!=='factory'){ // ملغاة بطلب صاحب البرنامج (في قسم «زبائن» بيكفي) — التسجيلات القديمة ضلّت بالسحابة ما انحذفت
   let waList = [];
   const waRef = ()=>db.collection(FS_COLLECTION).doc(FS_DOC + '_whatsapp');
   const box = document.createElement('div'); box.className='panel'; box.id='waPanel';

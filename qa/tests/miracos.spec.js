@@ -649,23 +649,18 @@ test.describe('البحث الشامل', () => {
   });
 });
 
-test('لوحة واتساب: بتفرّق بين التواصلات والزبائن (نفس الرقم بأي كتابة = زبون واحد)، وبتقول بوضوح إنها مش من واتساب نفسه', async ({ page }) => {
-  test.skip(await page.evaluate(() => FS_DOC === 'factory'), 'المعمل ما بيشوف أرقام الزبائن — اللوحة بالمعرض بس');
+test('لوحة «زبائن واتساب» ملغاة من الصفحة الرئيسية (في قسم «زبائن» بيكفي)', async ({ page }) => {
+  expect(await page.locator('#waPanel').count()).toBe(0);
+});
+
+test('البيان بجدول الوصولات: سطر واحد والباقي "..."، وكبسة بتفتحه كامل وكبسة تانية بتسكّره', async ({ page }) => {
   const r = await page.evaluate(() => {
-    const today = localDate(), mo = today.slice(0, 7) + '-01' === today ? today : today.slice(0, 7) + '-01';
-    const L = [
-      { id: 'a', phone: '0550 12 34 56', name: 'أحمد', date: today, at: 3 },
-      { id: 'b', phone: '+213550123456', name: 'أحمد', date: today, at: 2 },   // نفس الزبون
-      { id: 'c', phone: '0661 00 11 22', name: 'سمير', date: mo, at: 1 },
-      { id: 'd', phone: '0770 99 88 77', name: 'قديم', date: '2025-01-05', at: 0 },
-    ];
-    window.__waTest(L);
-    return { st: waStats(L), text: document.getElementById('waPanel').innerText };
+    const d = document.createElement('div'); d.className = 'details-wrap'; d.textContent = 'رخام كرارة '.repeat(40);
+    document.body.appendChild(d);
+    const h1 = d.getBoundingClientRect().height; d.click(); const h2 = d.getBoundingClientRect().height; d.click(); const h3 = d.getBoundingClientRect().height;
+    d.remove(); return { h1, h2, h3, lh: parseFloat(getComputedStyle(document.body).fontSize) * 1.5 };
   });
-  expect(r.st.allContacts).toBe(4); expect(r.st.allCustomers).toBe(3);
-  expect(r.st.dayContacts).toBe(r.st.dayCustomers === 1 ? 2 : r.st.dayContacts); expect(r.st.dayCustomers).toBeGreaterThanOrEqual(1);
-  expect(r.st.monthCustomers).toBeGreaterThanOrEqual(1);
-  expect(r.text).toContain('مش العدد الحقيقي');
-  expect(r.text).toContain('3 زبون');
-  expect(r.text).toContain('4 تواصل');
+  expect(r.h1).toBeLessThanOrEqual(r.lh * 1.6);
+  expect(r.h2).toBeGreaterThan(r.h1 * 2);
+  expect(r.h3).toBe(r.h1);
 });
