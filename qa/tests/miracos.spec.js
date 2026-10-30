@@ -557,3 +557,38 @@ test.describe('تحويل Devis إلى وصل مع الدفعات', () => {
     expect(r.rPays.length).toBe(1); expect(r.rRemaining).toBe(0); expect(r.vPays).toEqual([]); expect(r.after).toBe(r.before);
   });
 });
+
+test('تقرير الدفعات المشكوك فيها: بيلقط التكرار الحقيقي والمشتبه، وما بيعدّل أي بيانات', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const R = [
+      { id: 'r1', no: 10, name: 'أحمد', total: 100000, remaining: 70000, payments: [{ id: 'P1', date: '2026-10-02', amount: 30000 }] },          // نفس P1 على الدوفي كمان
+      { id: 'r2', no: 11, name: 'سمير', total: 50000, remaining: 20000, payments: [{ id: 'P2', date: '2026-10-03', amount: 30000 }] },          // تحويل قديم: انعادت كتابتها
+      { id: 'r3', no: 12, name: 'كريم', total: 40000, remaining: 0, payments: [{ id: 'P3', date: '2026-10-05', amount: 20000 }, { id: 'P4', date: '2026-10-05', amount: 20000 }] },
+      { id: 'r4', no: 13, name: 'نظيف', total: 10000, remaining: 5000, payments: [{ id: 'P5', date: '2026-10-06', amount: 5000 }] },
+      { id: 'r5', no: 14, name: 'غلط بالباقي', total: 10000, remaining: 10000, payments: [{ id: 'P6', date: '2026-10-07', amount: 4000 }] },
+    ];
+    const I = [
+      { id: 'i1', docType: 'simple', no: 'S1', clientName: 'أحمد', ttc: 100000, remaining: 70000, payments: [{ id: 'P1', date: '2026-10-02', amount: 30000 }] },
+      { id: 'i2', docType: 'simple', no: 'S2', clientName: 'سمير', ttc: 50000, remaining: 20000, convertedTo: { receiptNo: 11 }, payments: [{ id: 'Q2', date: '2026-10-01', amount: 30000 }] },
+    ];
+    const H = [...R, ...I].flatMap(d => d.payments.map(p => ({ id: 'h' + p.id + d.id, paymentId: p.id, amount: p.amount, date: p.date, customerName: d.name || d.clientName, docType: d.no && d.clientName ? 'Devis' : 'وصل', docNo: d.no })));
+    const snap = JSON.stringify([R, I, H]);
+    const out = computePaymentAudit(R, I, H);
+    return { out, untouched: snap === JSON.stringify([R, I, H]) };
+  });
+  expect(r.untouched).toBe(true);
+  const has = (lvl, name, rx) => r.out.some(x => x.level === lvl && x.name === name && rx.test(x.why));
+  expect(has('مؤكد', 'أحمد', /نفس الدفعة/)).toBe(true);
+  expect(has('مشتبه', 'سمير', /تحوّل للوصل 11/)).toBe(true);
+  expect(has('مشتبه', 'كريم', /نفس المبلغ ونفس التاريخ مرتين/)).toBe(true);
+  expect(has('غير مطابق', 'غلط بالباقي', /الباقي المحفوظ/)).toBe(true);
+  expect(r.out.some(x => x.name === 'نظيف')).toBe(false);
+  // كل سطر فيه الأعمدة المطلوبة
+  for (const x of r.out) for (const k of ['ref', 'name', 'devNo', 'rcpNo', 'amount', 'date', 'why']) expect(x).toHaveProperty(k);
+  // الواجهة بتفتح وفيها العناوين المطلوبة
+  await page.evaluate(() => { receipts.push({ id: 'ux', no: 90, name: 'س', total: 10, remaining: 0, payments: [{ id: 'D', date: '2026-10-01', amount: 10 }] });
+    invoices.push({ id: 'uy', docType: 'simple', no: 'S9', clientName: 'س', ttc: 10, remaining: 0, payments: [{ id: 'D', date: '2026-10-01', amount: 10 }] });
+    document.getElementById('btnPaymentAudit').click(); });
+  const head = await page.locator('#paymentAuditOverlay').innerText();
+  for (const t of ['رقم السجل', 'اسم الزبون', 'رقم الدوفي', 'رقم الوصل', 'قيمة الدفعة', 'تاريخ الدفعة', 'سبب الاشتباه', 'قراءة فقط']) expect(head).toContain(t);
+});

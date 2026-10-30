@@ -847,6 +847,7 @@
         <div class="panel-head">
           <h2>سجل الدفعات (تاريخي)</h2>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" id="btnPaymentAudit" title="فحص كامل للدفعات بكل الوصولات وعروض الأسعار والفواتير والسجل — قراءة فقط، ما بيعدّل شي">🧾 تقرير الدفعات المشكوك فيها</button>
             <button class="btn btn-ghost btn-sm" id="btnReconcilePayments" title="يصحّح السجل حتى يطابق الدفعات الموجودة فعلاً بالوصولات والفواتير">🔎 مطابقة مع الوصولات</button>
             <button class="btn btn-primary btn-sm" id="btnPrintPaymentHistory">طباعة السجل</button>
           </div>
@@ -6303,6 +6304,86 @@ document.getElementById('btnReconcilePayments').addEventListener('click', async 
   renderPaymentHistoryTable(); renderDashboard(); renderReports(); renderReceiptsTable(); renderInvoicesTable();
   toast(`✓ تم: ${rec.updates.length} تعديل، ${rec.adds.length} إضافة، ${rec.removes.length} حذف`);
 });
+
+// ================= 🧾 تقرير الدفعات المشكوك فيها (قراءة فقط — ما بيحذف ولا بيدمج ولا بيعدّل شي) =================
+// «مؤكد» = نفس الدفعة (نفس الرقم الداخلي) محسوبة بمكانين فعلاً. «مشتبه» = يحتاج مراجعتك: تشابه المبلغ أو التاريخ لحاله
+// مش دليل إنها مكررة، فبيطلع للمراجعة بس. الدفعة نفسها لما تبيّن بسجل الدفعات + بالوصل هي عرض للمتابعة، مش تكرار.
+function computePaymentAudit(rcpts, invs, hist){
+  const out = [];
+  const lbl = i => i.docType==='facture' ? 'Facture' : (i.docType==='devis' ? 'Facture proforma' : 'Devis');
+  const norm = t => String(t||'').replace(/[ً-ْـ]/g,'').replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/\s+/g,' ').trim().toLowerCase();
+  const sum = list => (list||[]).reduce((a,p)=>a+(Number(p&&p.amount)||0),0);
+  const add = (level, why, o) => out.push({level, why, ...o});
+  const docs = [];
+  (rcpts||[]).forEach(r=>docs.push({kind:'r', d:r, name:r.name||'', rcpNo:r.no||'', devNo:'', pays:getReceiptPayments(r), total:Number(r.total)||0, remaining:Number(r.remaining)}));
+  (invs||[]).forEach(i=>docs.push({kind:'i', d:i, name:i.clientName||'', rcpNo:'', devNo:`${lbl(i)} ${i.no||''}`, pays:i.payments||[], total:Number(i.ttc!=null?i.ttc:i.total)||0, remaining:Number(i.remaining), cancelled:!!i.cancelled}));
+  // 1) نفس الدفعة (نفس الرقم) بأكتر من مستند = محسوبة مرتين بلوحة التحكم
+  const byId = new Map();
+  docs.forEach(x=>x.pays.forEach(p=>{ if(p && p.id && Number(p.amount)>0){ (byId.get(p.id)||byId.set(p.id,[]).get(p.id)).push({x,p}); } }));
+  byId.forEach((list,id)=>{ if(list.length<2) return;
+    list.forEach(({x,p})=>add('مؤكد','نفس الدفعة (نفس الرقم الداخلي) موجودة بـ '+list.length+' مستندات — محسوبة أكتر من مرة بالمجموع',{ref:id, name:x.name, devNo:x.devNo, rcpNo:x.rcpNo, amount:Number(p.amount), date:p.date||''})); });
+  // 2) تحويل قديم من Devis لوصل: الدفعة ضلّت على الأصل وانعادت كتابتها بالوصل (قبل الإصلاح)
+  const rByNo = new Map((rcpts||[]).map(r=>[String(r.no), r]));
+  (invs||[]).forEach(i=>{
+    if(!i.convertedTo || !(i.payments||[]).length) return;
+    const r = (i.convertedTo.receiptId && (rcpts||[]).find(x=>x.id===i.convertedTo.receiptId)) || rByNo.get(String(i.convertedTo.receiptNo));
+    (i.payments||[]).forEach(p=>{ if(!(Number(p.amount)>0)) return;
+      const twin = r && getReceiptPayments(r).find(q=>q.id!==p.id && Number(q.amount)===Number(p.amount));
+      if(twin) add('مشتبه','الـ'+lbl(i)+' تحوّل للوصل '+(r.no||'')+'، والمبلغ نفسه مسجّل على الاتنين ('+(p.date||'-')+' / '+(twin.date||'-')+') — يمكن نفس الدفعة انكتبت مرتين',{ref:p.id||'', name:i.clientName||'', devNo:`${lbl(i)} ${i.no||''}`, rcpNo:r.no||'', amount:Number(p.amount), date:p.date||''});
+      else add('مشتبه','الـ'+lbl(i)+' تحوّل لوصل '+(i.convertedTo.receiptNo||'')+' وضلّت عليه هالدفعة — راجع إذا الوصل لازم ياخدها (وإلا الوصل بيبين الباقي أكتر من الحقيقي)',{ref:p.id||'', name:i.clientName||'', devNo:`${lbl(i)} ${i.no||''}`, rcpNo:i.convertedTo.receiptNo||'', amount:Number(p.amount), date:p.date||''});
+    });
+  });
+  // 3) بنفس المستند: نفس المبلغ ونفس التاريخ مرتين (ممكن تكون دفعتين حقيقيتين — للمراجعة)
+  docs.forEach(x=>{ const seen = new Map();
+    x.pays.forEach(p=>{ if(!(Number(p.amount)>0)) return; const k = Number(p.amount)+'|'+(p.date||''); if(seen.has(k)) add('مشتبه','نفس المبلغ ونفس التاريخ مرتين بنفس '+(x.kind==='r'?'الوصل':'المستند'),{ref:p.id||'', name:x.name, devNo:x.devNo, rcpNo:x.rcpNo, amount:Number(p.amount), date:p.date||''}); else seen.set(k,1); }); });
+  // 4) نفس الزبون: نفس المبلغ ونفس التاريخ بوصل وبـ Devis مختلفين (بلا تحويل مسجّل بينهم)
+  const rPays = []; docs.filter(x=>x.kind==='r').forEach(x=>x.pays.forEach(p=>{ if(Number(p.amount)>0) rPays.push({x,p}); }));
+  docs.filter(x=>x.kind==='i').forEach(x=>x.pays.forEach(p=>{ if(!(Number(p.amount)>0)) return;
+    const m = rPays.find(({x:rx,p:rp})=>rp.id!==p.id && norm(rx.name)===norm(x.name) && norm(x.name) && Number(rp.amount)===Number(p.amount) && (rp.date||'')===(p.date||''));
+    if(m && !(x.d.convertedTo && String(x.d.convertedTo.receiptNo)===String(m.x.rcpNo))) add('مشتبه','نفس الزبون ونفس المبلغ ونفس التاريخ على '+x.devNo+' وعلى الوصل '+m.x.rcpNo,{ref:p.id||'', name:x.name, devNo:x.devNo, rcpNo:m.x.rcpNo, amount:Number(p.amount), date:p.date||''}); }));
+  // 5) دفعة على فاتورة ملغاة (محسوبة بالدخل؟)
+  docs.filter(x=>x.cancelled).forEach(x=>x.pays.forEach(p=>{ if(Number(p.amount)>0) add('مشتبه','دفعة على فاتورة ملغاة',{ref:p.id||'', name:x.name, devNo:x.devNo, rcpNo:'', amount:Number(p.amount), date:p.date||''}); }));
+  // 6) الباقي المحفوظ مش مطابق (المجموع − الدفعات)
+  docs.forEach(x=>{ if(!isFinite(x.remaining)) return; const calc = x.total - sum(x.pays);
+    if(Math.abs(calc - x.remaining) > 0.5) add('غير مطابق','الباقي المحفوظ '+fmt(x.remaining)+' بس المجموع − المدفوع = '+fmt(calc),{ref:x.d.id, name:x.name, devNo:x.devNo, rcpNo:x.rcpNo, amount:sum(x.pays), date:''}); });
+  // 7) دفعة بلا تاريخ
+  docs.forEach(x=>x.pays.forEach(p=>{ if(Number(p.amount)>0 && !p.date) add('غير مطابق','دفعة بلا تاريخ',{ref:p.id||'', name:x.name, devNo:x.devNo, rcpNo:x.rcpNo, amount:Number(p.amount), date:''}); }));
+  // 8) سجل الدفعات: سطر مكرر أو ما إله دفعة بأي مستند (نفس فحص زر المطابقة، بس قراءة)
+  try{ const rec = computePaymentReconcile(rcpts, invs, hist);
+    rec.removes.forEach(({h,why})=>add(why==='مكررة بالسجل'?'مؤكد':'غير مطابق','سجل الدفعات: '+why+' (السجل بس، مش الوصل)',{ref:h.id||'', name:h.customerName||'', devNo:h.docType&&h.docType!=='وصل'?h.docType+' '+(h.docNo||''):'', rcpNo:h.docType==='وصل'?h.docNo||'':'', amount:Number(h.amount)||0, date:h.date||''}));
+    rec.adds.forEach(({p,m})=>add('غير مطابق','دفعة موجودة بالمستند بس ناقصة بسجل الدفعات',{ref:p.id||'', name:m.customerName||'', devNo:m.docType!=='وصل'?m.docType+' '+m.docNo:'', rcpNo:m.docType==='وصل'?m.docNo:'', amount:Number(p.amount)||0, date:p.date||''}));
+  }catch(e){ console.warn(e); }
+  const rank = {'مؤكد':0,'مشتبه':1,'غير مطابق':2};
+  return out.sort((a,b)=>(rank[a.level]-rank[b.level]) || String(a.name).localeCompare(String(b.name),'ar'));
+}
+window.computePaymentAudit = computePaymentAudit;
+function showPaymentAudit(){
+  const list = computePaymentAudit(receipts, invoices, paymentHistory);
+  const c = k=>list.filter(x=>x.level===k).length;
+  const col = {'مؤكد':'#C0392B','مشتبه':'#C27C0E','غير مطابق':'#5B4A3A'};
+  const ov = document.createElement('div'); ov.className='audit-ov'; ov.id='paymentAuditOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:12px;overflow:auto';
+  ov.innerHTML = `<div class="audit-box" style="background:var(--marble,#faf8f4);border-radius:14px;padding:16px;width:100%;max-width:1100px;box-sizing:border-box">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><b style="font-size:17px">🧾 تقرير الدفعات المشكوك فيها</b><span style="flex:1"></span>
+      <button type="button" class="btn btn-sm" data-xl>تنزيل Excel</button><button type="button" class="btn btn-sm" data-pr>طباعة</button><button type="button" class="btn btn-ghost btn-sm" data-x>إغلاق</button></div>
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:10px">قراءة فقط — ما انحذف ولا انعدّل شي. فحص ${receipts.length} وصل و${invoices.length} عرض سعر/فاتورة و${paymentHistory.length} سطر بالسجل.
+      <b style="color:${col['مؤكد']}">مؤكد: ${c('مؤكد')}</b> · <b style="color:${col['مشتبه']}">مشتبه (للمراجعة): ${c('مشتبه')}</b> · <b style="color:${col['غير مطابق']}">غير مطابق: ${c('غير مطابق')}</b>.
+      تشابه المبلغ أو التاريخ لحاله مش دليل إن الدفعة مكررة. هالتقرير لبرنامج ${FS_DOC==='factory'?'المعمل':'المعرض'} — افتحه كمان من البرنامج التاني.</div>
+    ${list.length ? `<table class="rt-audit" style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr>${['#','الدرجة','رقم السجل','اسم الزبون','رقم الدوفي','رقم الوصل','قيمة الدفعة','تاريخ الدفعة','سبب الاشتباه'].map(h=>`<th style="text-align:right;padding:6px;border-bottom:2px solid var(--line)">${h}</th>`).join('')}</tr></thead><tbody>
+      ${list.map((x,i)=>`<tr style="border-bottom:1px solid var(--line)"><td data-label="#">${i+1}</td><td data-label="الدرجة"><b style="color:${col[x.level]}">${x.level}</b></td><td data-label="رقم السجل" style="font-size:11px;overflow-wrap:anywhere"><bdi dir="ltr">${escHtmlText(x.ref)}</bdi></td><td data-label="اسم الزبون">${escHtmlText(x.name)}</td><td data-label="رقم الدوفي">${escHtmlText(x.devNo||'—')}</td><td data-label="رقم الوصل">${escHtmlText(String(x.rcpNo||'—'))}</td><td data-label="قيمة الدفعة" style="white-space:nowrap">${fmt(x.amount)}</td><td data-label="تاريخ الدفعة" style="white-space:nowrap">${escHtmlText(x.date||'—')}</td><td data-label="سبب الاشتباه">${escHtmlText(x.why)}</td></tr>`).join('')}</tbody></table>`
+      : '<div style="padding:14px;font-weight:700;color:#1F8F55">✓ ما في دفعات مكررة أو غير مطابقة.</div>'}</div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('[data-x]').onclick=()=>ov.remove();
+  ov.querySelector('[data-pr]').onclick=()=>{ document.body.classList.add('print-audit'); const done=()=>{document.body.classList.remove('print-audit');window.removeEventListener('afterprint',done)}; window.addEventListener('afterprint',done); window.print(); };
+  ov.querySelector('[data-xl]').onclick=()=>{
+    const H={cells:['الدرجة','رقم السجل','اسم الزبون','رقم الدوفي','رقم الوصل','قيمة الدفعة','تاريخ الدفعة','سبب الاشتباه'].map(v=>({v,s:4}))};
+    const rows=[{cells:[{v:'تقرير الدفعات المشكوك فيها — '+localDate(),s:1,span:8}],height:28},H,...list.map(x=>({cells:[{v:x.level,s:6},{v:x.ref,s:5},{v:x.name,s:5},{v:x.devNo||'',s:5},{v:String(x.rcpNo||''),s:6},{v:Number(x.amount)||0,s:7},{v:x.date||'',s:6},{v:x.why,s:5}]}))];
+    downloadBlob(buildXlsx(rows,[11,22,22,22,10,14,12,60]), 'تقرير-الدفعات-المشكوك-فيها-'+localDate()+'.xlsx'); };
+}
+document.getElementById('btnPaymentAudit').addEventListener('click', showPaymentAudit);
+{const st=document.createElement('style');st.textContent=`
+  @media (max-width:800px){ .rt-audit thead{display:none} .rt-audit, .rt-audit tbody{display:block} .rt-audit tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;border:1px solid var(--line)!important;border-radius:10px;padding:8px;margin-bottom:8px} .rt-audit td{display:block;padding:0} .rt-audit td::before{content:attr(data-label);display:block;font-size:11px;color:var(--text-dim)} .rt-audit td:last-child{grid-column:1/-1} }
+  @media print{ body.print-audit #paymentAuditOverlay, body.print-audit #paymentAuditOverlay *{visibility:visible!important} body.print-audit #paymentAuditOverlay{position:static!important;background:none!important;padding:0!important;display:block!important} body.print-audit #paymentAuditOverlay .btn{display:none!important} body.print-audit .rt-audit tr{break-inside:avoid} }`;document.head.appendChild(st);}
 
 async function deletePaymentHistoryEntry(id){
   if(!confirm('حذف هذه الدفعة من سجل الدفعات؟ هذا ما يأثرش على الوصل الأصلي إذا كان مازال موجود.')) return;
