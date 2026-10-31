@@ -3402,6 +3402,7 @@ async function deleteReceipt(id){
   renderReceiptsTable();
   renderDashboard();
   renderTrash();
+  try{ renderCustomerReports(); renderReports(); }catch(e){}
   toast('تم نقل الوصل لسلة المهملات وتحديث الدخل');
 }
 async function restoreReceiptFromTrash(id){
@@ -6176,7 +6177,7 @@ function renderCustomerReports(){
     deliveredWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن تم تسليمهم بعد.</div>';
   } else {
     deliveredWrap.innerHTML = `<table><thead><tr>
-      <th>الاسم</th><th>التفاصيل</th><th>الهاتف</th><th>تاريخ الوصل</th><th>تاريخ التسليم</th><th>المجموع</th><th>حالة الدفع</th><th style="width:60px"></th>
+      <th>رقم الوصل</th><th>الاسم</th><th>التفاصيل</th><th>الهاتف</th><th>تاريخ الوصل</th><th>تاريخ التسليم</th><th>المجموع</th><th>حالة الدفع</th><th style="width:90px"></th>
     </tr></thead><tbody>${
       delivered.map(r=>{
         const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
@@ -6184,6 +6185,7 @@ function renderCustomerReports(){
           ? `<span style="color:var(--danger); font-weight:700;">دين</span><br>${debtLateLabel(r)}`
           : `<span style="color:var(--verdigris-deep); font-weight:700;">مدفوع</span>`;
         return `<tr>
+          <td>${escHtmlText(String(r.no||'—'))}</td>
           <td>${escHtmlText(r.name)}</td>
           <td class="wrap-cell"><div class="details-wrap">${escHtmlText(details)}</div></td>
           <td>${phoneHtml(r.phone)}</td>
@@ -6195,6 +6197,7 @@ function renderCustomerReports(){
             <div class="row-actions">
               <button class="btn btn-sm btn-ghost" onclick="viewReceipt('${r.id}')" title="عرض/طباعة">👁</button>
               <button class="btn btn-sm btn-ghost" onclick="editReceipt('${r.id}')" title="تعديل">✎</button>
+              <button class="btn btn-sm btn-ghost" onclick="deleteReceipt('${r.id}')" title="حذف (لسلة المهملات)">🗑</button>
             </div>
           </td>
         </tr>`;
