@@ -854,7 +854,7 @@
             <button class="btn btn-primary btn-sm" id="btnPrintPaymentHistory">طباعة السجل</button>
           </div>
         </div>
-        <p style="font-size:12.5px; color:var(--text-dim); margin-top:0;">كل دفعة جديدة بتتسجل هون تلقائيًا بشكل دائم بالتاريخ والوقت — حتى لو الوصل أو الفاتورة الأصلية اتعدّلت أو انحذفت لاحقًا، السجل هون بيضل موجود.</p>
+        <p style="font-size:12.5px; color:var(--text-dim); margin-top:0;">السجل هون مرآة للزبائن والوصولات والفواتير: أي دفعة بتنضاف أو بتتعدّل أو بتنحذف هونيك بتتحدّث هون تلقائيًا، وحذف دفعة من هون بيحذفها من الوصل كمان.</p>
         <div class="grid2" style="margin-bottom:10px;">
           <div class="search-box" style="max-width:none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
@@ -6287,9 +6287,13 @@ function computePaymentReconcile(rcpts, invs, hist){
       updates.push({h, p, m});
   });
   docPays.forEach((d, id)=>{ if(!seen.has(id)) adds.push({p:d.p, m:d.m}); });
+  // دفعات مشكوك إنها مكررة بالوصولات نفسها: نفس الزبون ونفس المبلغ ونفس التاريخ
+  const grp = new Map();
+  docPays.forEach(d=>{ const k = [(d.m.customerName||'').trim(), Number(d.p.amount), d.p.date||''].join('|'); if(!grp.has(k)) grp.set(k, []); grp.get(k).push(d); });
+  const dups = [...grp.values()].filter(g=>g.length>1);
   const sumR = (rcpts||[]).reduce((s,r)=>s+getReceiptPayments(r).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
   const sumI = (invs||[]).reduce((s,i)=>s+(i.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
-  return {updates, removes, adds, idFixes, sumR, sumI};
+  return {updates, removes, adds, idFixes, sumR, sumI, dups};
 }
 function applyPaymentReconcile(hist, rec){
   const rm = new Set(rec.removes.map(x=>x.h));
@@ -6312,14 +6316,15 @@ document.getElementById('btnReconcilePayments').addEventListener('click', async 
   const rec = computePaymentReconcile(receipts, invoices, paymentHistory);
   const n = rec.updates.length + rec.removes.length + rec.adds.length;
   const why = `المقبوضات بالتقارير (الوصولات): ${fmt(rec.sumR)}\nدفعات الفواتير وعروض الأسعار: ${fmt(rec.sumI)}\nلوحة التحكم = الاثنين معاً = ${fmt(rec.sumR + rec.sumI)}`;
-  if(!n){ alert('✓ سجل الدفعات مطابق للوصولات والفواتير.\n\n' + why); return; }
   const line = (name, no, a)=>`• ${name||'-'} — ${no||'-'} — ${fmt(a)}`;
+  const dupTxt = rec.dups.length ? `\n\n⚠ دفعات يمكن تكون مكررة بالوصولات (نفس الزبون والمبلغ والتاريخ) — راجعها بالزبائن والوصولات:\n` + rec.dups.slice(0,8).map(g=>`• ${g[0].m.customerName||'-'} — ${fmt(g[0].p.amount)} — ${g[0].p.date||'-'} — بـ: ${g.map(d=>d.m.docType+' '+(d.m.docNo||'-')).join(' و ')}`).join('\n') : '';
+  if(!n){ alert('✓ سجل الدفعات مطابق للزبائن والوصولات والفواتير.\n\n' + why + dupTxt); return; }
   const parts = [];
   if(rec.updates.length) parts.push(`تعديل ${rec.updates.length} سطر (مبلغ أو تاريخ تغيّر، أو سطر قديم انربط بدفعته):\n` + rec.updates.slice(0,8).map(u=>line(u.m.customerName,u.m.docNo,u.p.amount)+(Number(u.h.amount)!==Number(u.p.amount)?`  (كان ${fmt(u.h.amount)})`:'')).join('\n'));
-  if(rec.adds.length) parts.push(`إضافة ${rec.adds.length} دفعة ناقصة بالسجل:\n` + rec.adds.slice(0,8).map(a=>line(a.m.customerName,a.m.docNo,a.p.amount)).join('\n'));
+  if(rec.adds.length) parts.push(`إضافة ${rec.adds.length} دفعة موجودة بالزبائن والوصولات وناقصة بالسجل:\n` + rec.adds.slice(0,8).map(a=>line(a.m.customerName,a.m.docNo,a.p.amount)).join('\n') + `\n⚠ إذا وحدة منهم مكررة: اضغط «إلغاء» واحذفها من الوصل نفسه بصفحة الزبائن والوصولات، بعدين ارجع طابق.`);
   if(rec.removes.length) parts.push(`حذف ${rec.removes.length} سطر من السجل (دفعة محذوفة، مكررة، أو قديمة بلا وصل):\n` + rec.removes.slice(0,8).map(r=>line(r.h.customerName,r.h.docNo,r.h.amount)).join('\n'));
   const more = (rec.updates.length>8||rec.adds.length>8||rec.removes.length>8) ? '\n(والباقي بنفس الطريقة)' : '';
-  if(!confirm('مطابقة سجل الدفعات مع الوصولات والفواتير:\n\n' + parts.join('\n\n') + more + '\n\nبعد التصحيح:\n' + why + '\n\nقبل التصحيح رح تنزل نسخة احتياطية كاملة على جهازك. متابعة؟')) return;
+  if(!confirm('مطابقة سجل الدفعات مع الوصولات والفواتير:\n\n' + parts.join('\n\n') + more + dupTxt + '\n\nبعد التصحيح:\n' + why + '\n\nقبل التصحيح رح تنزل نسخة احتياطية كاملة على جهازك. متابعة؟')) return;
   try{ exportRestoreJSON(true); }catch(e){ console.error(e); if(!confirm('تعذّر تنزيل النسخة الاحتياطية. متابعة بدونها؟')) return; }
   if(rec.idFixes.length && !(await saveReconcileIdFixes(rec))){ toast('ما انحفظ — تأكد من الإنترنت وجرّب مرة تانية'); return; }
   paymentHistory = applyPaymentReconcile(paymentHistory, rec);
@@ -6514,12 +6519,43 @@ document.getElementById('btnPaymentAudit').addEventListener('click', showPayment
   @media (max-width:800px){ .rt-audit thead{display:none} .rt-audit, .rt-audit tbody{display:block} .rt-audit tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 10px;border:1px solid var(--line)!important;border-radius:10px;padding:8px;margin-bottom:8px} .rt-audit td{display:block;padding:0} .rt-audit td::before{content:attr(data-label);display:block;font-size:11px;color:var(--text-dim)} .rt-audit td:last-child{grid-column:1/-1} }
   @media print{ body.print-audit #paymentAuditOverlay, body.print-audit #paymentAuditOverlay *{visibility:visible!important} body.print-audit #paymentAuditOverlay{position:static!important;background:none!important;padding:0!important;display:block!important} body.print-audit #paymentAuditOverlay .btn{display:none!important} body.print-audit .rt-audit tr{break-inside:avoid} }`;document.head.appendChild(st);}
 
+// المرجع هو «الزبائن والوصولات» (والفواتير): السجل مرآة إلهم.
+// حذف سطر من السجل وهو لسا موجود بوصل/فاتورة بيحذف الدفعة من المستند نفسه، وإلا المطابقة رح ترجّعه.
+function findPaymentSource(pid){
+  if(!pid) return null;
+  const r = receipts.find(x=>getReceiptPayments(x).some(p=>p && p.id===pid));
+  if(r) return {kind:'r', d:r};
+  const i = invoices.find(x=>(x.payments||[]).some(p=>p && p.id===pid));
+  if(i) return {kind:'i', d:i};
+  return null;
+}
 async function deletePaymentHistoryEntry(id){
-  if(!confirm('حذف هذه الدفعة من سجل الدفعات؟ هذا ما يأثرش على الوصل الأصلي إذا كان مازال موجود.')) return;
-  paymentHistory = paymentHistory.filter(h=>h.id!==id);
+  const h = paymentHistory.find(x=>x.id===id);
+  if(!h) return;
+  const src = findPaymentSource(h.paymentId);
+  if(src){
+    const docLbl = src.kind==='r' ? `الوصل #${src.d.no} (${src.d.name||'-'})` : `${h.docType||'المستند'} #${src.d.no} (${src.d.clientName||'-'})`;
+    if(!confirm(`هاي الدفعة (${fmt(h.amount)} بتاريخ ${h.date||'-'}) مسجّلة بـ ${docLbl}.\n\nالسجل لازم يطابق الزبائن والوصولات، فحذفها من هون رح يحذفها من ${src.kind==='r'?'الوصل':'المستند'} كمان، وينزل المبلغ من المدفوع ويرجع للباقي.\n\nمتابعة؟`)) return;
+    const pid = h.paymentId;
+    const drop = (d, list)=>{ const keep = list.filter(p=>!(p && p.id===pid));
+      const total = Number(src.kind==='r' ? d.total : (d.ttc!=null ? d.ttc : d.total))||0;
+      const paid = keep.reduce((s,p)=>s+(Number(p.amount)||0),0);
+      const out = {...d, payments: keep, remaining: total - paid};
+      if(src.kind==='i' && 'paid' in d) out.paid = paid;
+      if(src.kind==='r'){ delete out.pay1; delete out.pay2; }
+      return out; };
+    const ok = src.kind==='r'
+      ? await saveReceiptsTx(arr=>arr.map(d=>d.id===src.d.id ? drop(d, getReceiptPayments(d)) : d))
+      : await saveInvoicesTx(arr=>arr.map(d=>d.id===src.d.id ? drop(d, d.payments||[]) : d));
+    if(!ok){ toast('ما انحفظ — تأكد من الإنترنت وجرّب مرة تانية'); return; }
+    paymentHistory = paymentHistory.filter(x=>x.paymentId!==pid);
+  } else {
+    if(!confirm('هاد السطر مش مرتبط بأي وصل أو فاتورة موجودة. حذفه من السجل؟')) return;
+    paymentHistory = paymentHistory.filter(x=>x.id!==id);
+  }
   await savePaymentHistory();
-  renderPaymentHistoryTable();
-  toast('تم حذف الدفعة من السجل');
+  renderPaymentHistoryTable(); renderDashboard(); renderReports(); renderReceiptsTable(); renderInvoicesTable();
+  toast(src ? 'تم حذف الدفعة من المستند ومن السجل' : 'تم حذف السطر من السجل');
 }
 document.getElementById('paymentHistorySearch').addEventListener('input', renderPaymentHistoryTable);
 document.getElementById('paymentHistoryFrom').addEventListener('input', renderPaymentHistoryTable);
