@@ -7003,10 +7003,39 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   // الصورة بتنضغط وبتنحفظ مرة وحدة بالسحابة (مستند لحالها) ونسخة على الجهاز، والوصل/الطلبية بيحفظوا رقمها بس —
   // فالتحويل من Devis لوصل أو الإرسال للمعمل ما بيعمل نسخ مكررة من الصورة.
   const PH={rcp:[],inv:[]},PH_MAX=4;let phCarry=null;
-  const phOut=list=>(list||[]).filter(p=>p&&p.id).map(p=>({id:p.id,caption:String(p.caption||'').slice(0,300)}));
+  const phOut=list=>(list||[]).filter(p=>p&&p.id).map(p=>({id:p.id,caption:String(p.caption||'').slice(0,300),...(p.color&&p.color!=='orig'?{color:p.color}:{})}));
   async function phSrc(p){if(!p)return null;if(p.img)return p.img;return await loadImg({id:p.id})}
   function phItemsText(k){const body=document.getElementById(k==='rcp'?'itemsBody':'invItemsBody');if(!body)return '';
     return [...body.querySelectorAll('textarea')].map(t=>t.value.trim()).filter(Boolean)[0]||''}
+  const PH_COLORS=[{k:'orig',l:'الأصل',t:'الصورة متل ما هي',sw:'linear-gradient(135deg,#222 50%,#d9c7a6 50%)'},
+    {k:'black',l:'أسود',t:'حجر أسود',sw:'#1d1d1d'},{k:'beige',l:'بيج',t:'حجر بيج',sw:'#d9c3a0'},{k:'white',l:'أبيض',t:'حجر أبيض',sw:'#f4f2ee'}];
+  // بيلقى لون الخلفية من أطراف الصورة، وكل شي مختلف عنها (الحجر) بيتلوّن، مع الحفاظ على العروق والظل.
+  // الحجر الغامق لما يصير فاتح بتنقلب عروقه (العرق الأبيض بالأسود بيصير عرق رمادي بالأبيض) متل الطبيعي.
+  async function phRecolor(src,target){
+    try{
+      const im=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src});
+      const W=im.naturalWidth,H=im.naturalHeight,cv=document.createElement('canvas');cv.width=W;cv.height=H;
+      const cx=cv.getContext('2d');cx.drawImage(im,0,0);const d=cx.getImageData(0,0,W,H),a=d.data;
+      const lum=(r,g,b)=>(0.2126*r+0.7152*g+0.0722*b)/255;
+      // لون الخلفية = متوسط شريط رفيع على الأطراف
+      let br=0,bg=0,bb=0,bn=0;const m=Math.max(2,Math.round(Math.min(W,H)*0.02));
+      for(let y=0;y<H;y++)for(let x=0;x<W;x++){if(x>=m&&x<W-m&&y>=m&&y<H-m)continue;const o=(y*W+x)*4;br+=a[o];bg+=a[o+1];bb+=a[o+2];bn++}
+      br/=bn;bg/=bn;bb/=bn;
+      const T1=38,T2=80; // مسافة اللون عن الخلفية: أقل من T1 خلفية، أكتر من T2 حجر، وبيناتهم تدرّج
+      const w=new Float32Array(W*H);let sL=0,sW=0;
+      for(let i=0,o=0;i<W*H;i++,o+=4){const dd=Math.hypot(a[o]-br,a[o+1]-bg,a[o+2]-bb);const wt=dd<=T1?0:dd>=T2?1:(dd-T1)/(T2-T1);w[i]=wt;if(wt>0){sL+=lum(a[o],a[o+1],a[o+2])*wt;sW+=wt}}
+      if(sW<W*H*0.02)return null; // ما لقينا حجر واضح
+      const Ls=sL/sW;
+      const TG={black:{L:0.13,c:[1,1,1]},beige:{L:0.80,c:[1.04,0.97,0.86]},white:{L:0.92,c:[1,1,1]}}[target];if(!TG)return null;
+      const flip=(Ls<0.45)!==(TG.L<0.45); // من غامق لفاتح أو العكس: العروق بتنقلب
+      const k=0.75;
+      for(let i=0,o=0;i<W*H;i++,o+=4){const wt=w[i];if(!wt)continue;
+        const L=lum(a[o],a[o+1],a[o+2]);let t=(L-Ls)*k;if(flip)t=-t;
+        let nl=Math.min(1,Math.max(0,TG.L+t));
+        for(let ch=0;ch<3;ch++){const nv=Math.min(255,nl*255*TG.c[ch]);a[o+ch]=Math.round(a[o+ch]*(1-wt)+nv*wt)}}
+      cx.putImageData(d,0,0);return cv.toDataURL('image/jpeg',0.88);
+    }catch(e){console.error(e);return null}
+  }
   function phUI(k){
     const prev=document.querySelector(`[data-mirsam-prev="${k}"]`);if(!prev)return;
     const w=document.createElement('div');w.className='prod-photo-ui';w.style.cssText='margin-top:10px';
@@ -7020,13 +7049,26 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       PH[k].push({id:'',img,caption:PH[k].length?'':phItemsText(k),dirty:true});phRender(k)};
     w.addEventListener('input',e=>{const i=e.target.dataset.phCap;if(i!=null&&PH[k][i])PH[k][i].caption=e.target.value});
     w.addEventListener('click',e=>{const b=e.target.closest('[data-ph-del]');if(!b)return;PH[k].splice(+b.dataset.phDel,1);phRender(k)});
+    // تغيير لون الحجر بالصورة (أسود / بيج / أبيض) — الأصل بيضل محفوظ وبترجعله بكبسة
+    w.addEventListener('click',async e=>{const b=e.target.closest('[data-ph-col]');if(!b)return;const p=PH[k][+b.dataset.phCol];if(!p)return;
+      const c=b.dataset.c;if((p.color||'orig')===c)return;
+      if(!p.orig){p.orig=await phSrc(p);p.origId=p.id||'';}
+      if(!p.orig){toast('الصورة ما تحمّلت');return}
+      if(c==='orig'){p.img=p.orig;p.id=p.origId;p.dirty=!p.origId;p.color='orig';phRender(k);return}
+      b.disabled=true;const out=await phRecolor(p.orig,c);b.disabled=false;
+      if(!out){toast('تعذر تغيير اللون');return}
+      p.img=out;p.id='';p.dirty=true;p.color=c;phRender(k)});
   }
   async function phRender(k){
     const list=document.querySelector(`#${k==='rcp'?'receiptOverlay':'invoiceOverlay'} [data-ph-list]`);if(!list)return;
     list.innerHTML=PH[k].map((p,i)=>`<div style="display:flex;gap:10px;align-items:flex-start;border:1px dashed var(--line);border-radius:10px;padding:8px">
       <img data-ph-i="${i}" alt="" style="width:96px;height:96px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:6px;flex:none">
       <textarea data-ph-cap="${i}" rows="3" placeholder="اسم المنتج، المقاسات، ملاحظات (بتطلع جنب الصورة بالورقة)" style="flex:1;min-width:0;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">${esc(p.caption||'')}</textarea>
-      <button type="button" class="btn btn-ghost btn-sm" data-ph-del="${i}" title="إزالة الصورة">✕</button></div>`).join('');
+      <button type="button" class="btn btn-ghost btn-sm" data-ph-del="${i}" title="إزالة الصورة">✕</button></div>
+      <div class="ph-colors" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-2px 0 4px;font-size:12px">
+        <span style="color:var(--text-dim)">لون الحجر:</span>
+        ${PH_COLORS.map(c=>`<button type="button" class="btn btn-sm${(p.color||'orig')===c.k?' btn-primary':' btn-ghost'}" data-ph-col="${i}" data-c="${c.k}" title="${c.t}"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid #999;vertical-align:middle;background:${c.sw}"></span> ${c.l}</button>`).join('')}
+      </div>`).join('');
     for(const im of list.querySelectorAll('img[data-ph-i]')){const src=await phSrc(PH[k][+im.dataset.phI]);if(src)im.src=src}
   }
   // رفع الصور الجديدة وقت الحفظ (ما منستنى السحابة للأبد: إذا النت مقطوع بتضل على الجهاز وبتطلع للسحابة لما يرجع النت)
@@ -7036,12 +7078,12 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       if(p.dirty){const id='mirsam_drw_'+uid();drwCache[id]=p.img;await IDB.set(id,p.img);
         try{await Promise.race([db.collection(FS_COLLECTION).doc(id).set({img:p.img,kind:'photo',createdAt:new Date().toISOString()}),new Promise(r=>setTimeout(r,8000))])}catch(e){console.error(e);toast('تعذر رفع الصورة — بتضل محفوظة على هالجهاز وبتنرفع لما يرجع النت')}
         p.id=id;p.dirty=false}
-      out.push({id:p.id,caption:p.caption||''});
+      out.push({id:p.id,caption:p.caption||'',color:p.color||'orig'});
     }
     return phOut(out);
   }
   window.__phCurrent=async k=>phPersist(k);
-  const phLoad=(k,doc)=>{PH[k]=(phCarry||((doc&&doc.productPhotos)||[])).map(p=>({id:p.id,caption:p.caption||'',dirty:false}));phCarry=null;phRender(k)};
+  const phLoad=(k,doc)=>{PH[k]=(phCarry||((doc&&doc.productPhotos)||[])).map(p=>({id:p.id,caption:p.caption||'',color:p.color||'orig',dirty:false}));phCarry=null;phRender(k)};
   {const _o=openReceiptModal;openReceiptModal=function(r){const c=phCarry;_o(r);phCarry=c;phLoad('rcp',r)};
    const _i=openInvoiceModal;openInvoiceModal=function(v){const c=phCarry;_i(v);phCarry=c;phLoad('inv',v)};
    const _sr=buildAndSaveReceiptFromForm;buildAndSaveReceiptFromForm=async function(){window.__phSave={rcp:await phPersist('rcp')};try{return await _sr()}finally{window.__phSave=null}};
