@@ -662,3 +662,17 @@ test('البيان بجدول الوصولات: سطر واحد والباقي "
   expect(r.h2).toBeGreaterThan(r.h1 * 2);
   expect(r.h3).toBe(r.h1);
 });
+
+test('عرض الوصل على الجوال (390): الورقة والأزرار و× كلها جوّا الشاشة، بلا تحريك يمين/يسار', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const r = await page.evaluate(() => {
+    document.getElementById('loginScreen').style.display = 'none';
+    receipts.push({ id: 'mob1', no: 52, name: 'ابراهيم', phone: '0557004615', address: 'بوزريعة', date: '2026-10-01', items: [{ qty: 1, desc: 'رفوف رخام احمر', price: 75000, amount: 75000 }], total: 75000, remaining: 65000, payments: [{ id: 'p1', amount: 10000, date: '2026-10-01' }] });
+    viewReceipt('mob1');
+    const W = document.documentElement.clientWidth, o = document.getElementById('viewReceiptOverlay');
+    const out = [...o.querySelectorAll('.modal *')].filter(e => { const b = e.getBoundingClientRect(); return b.width > 0 && (b.right > W + 1 || b.left < -1); }).length;
+    return { out, page: document.documentElement.scrollWidth - innerWidth };
+  });
+  expect(r.out).toBe(0);
+  expect(r.page).toBeLessThanOrEqual(1);
+});

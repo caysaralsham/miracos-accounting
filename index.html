@@ -464,6 +464,24 @@
   @media (max-width: 420px){
     .stats-grid.cols-5, .stats-grid.cols-3{grid-template-columns:1fr;}
   }
+  /* عرض الوصل/الفاتورة على الجوال (الشاشة بس، مش الطباعة): كل شي جوّا عرض الشاشة بلا تحريك يمين/يسار */
+  @media screen and (max-width: 700px){
+    .modal-body .receipt-view{ padding:14px 12px; }
+    .modal-body .receipt-view > table{ width:100% !important; }
+    .modal-body .receipt-view .receipt-top{ flex-wrap:wrap; gap:10px; align-items:center; }
+    .modal-body .receipt-view .receipt-brand{ flex:1 1 220px; min-width:0; gap:8px; }
+    .modal-body .receipt-view .receipt-brand > div{ min-width:0; }
+    .modal-body .receipt-view .receipt-brand img{ width:72px !important; height:72px !important; flex:0 0 72px; }
+    .modal-body .receipt-view .receipt-brand .name{ font-size:18px !important; overflow-wrap:anywhere; }
+    .modal-body .receipt-view .receipt-brand .meta{ font-size:12.5px; overflow-wrap:anywhere; }
+    .modal-body .receipt-view .doc-qr img{ width:64px !important; height:64px !important; }
+    .modal-body .receipt-view table{ font-size:13.5px; }
+    .modal-body .receipt-view th, .modal-body .receipt-view td{ padding:7px 5px; overflow-wrap:break-word; }
+    /* راس النافذة: الأزرار بتنزل لسطر تاني بدل ما تطلع برا الشاشة (زر الطباعة و× كانوا مقصوصين) */
+    .modal-head{ flex-wrap:wrap; gap:8px; padding:12px 14px; }
+    .modal-head > div{ flex-wrap:wrap; min-width:0; justify-content:flex-start; }
+    .modal-body .receipt-view .receipt-info-grid, .modal-body .receipt-view .receipt-info-grid > div{ min-width:0; overflow-wrap:anywhere; }
+  }
 
   .view{display:none;}
   .view.active{display:block;}
