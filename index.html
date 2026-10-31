@@ -6673,12 +6673,12 @@ function sortLedgerRows(rows){
     return da - db;
   });
 }
-function showLedger(title, rows, oneLine){
+function showLedger(title, rows, oneLine, amountRight){
   document.getElementById('ledgerViewTitle').textContent = title;
   const totalAmount = rows.reduce((s,r)=>s+r.amount,0);
   let html = `
     <table${oneLine ? ' style="table-layout:fixed; width:100%;"' : ''}>
-      ${oneLine ? '<colgroup><col style="width:60px"><col style="width:120px"><col><col style="width:150px"></colgroup>' : ''}
+      ${oneLine ? (amountRight ? '<colgroup><col style="width:60px"><col style="width:150px"><col style="width:120px"><col></colgroup>' : '<colgroup><col style="width:60px"><col style="width:120px"><col><col style="width:150px"></colgroup>') : ''}
       <thead>
         <tr class="print-head-row"><td colspan="4">
           <div class="receipt-top" style="margin-bottom:16px;">
@@ -6691,10 +6691,17 @@ function showLedger(title, rows, oneLine){
             </div>
           </div>
         </td></tr>
-        <tr><th style="width:60px;">#</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr>
+        ${amountRight
+          ? '<tr><th style="width:60px;">#</th><th style="width:130px;">المبلغ</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th></tr>'
+          : '<tr><th style="width:60px;">#</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr>'}
       </thead>
       <tbody>
-        ${rows.map((r,i)=>`<tr><td class="row-no">${i+1}</td><td>${r.date||'—'}</td><td style="text-align:right;${oneLine ? ' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' : ''}"${oneLine ? ` title="${escHtmlText(r.details)}"` : ''}>${escHtmlText(r.details)}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
+        ${rows.map((r,i)=>{
+          const det = `<td style="text-align:right;${oneLine ? ' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' : ''}"${oneLine ? ` title="${escHtmlText(r.details)}"` : ''}>${escHtmlText(r.details)}</td>`;
+          return amountRight
+            ? `<tr><td class="row-no">${i+1}</td><td style="white-space:nowrap;">${fmt(r.amount)}</td><td>${r.date||'—'}</td>${det}</tr>`
+            : `<tr><td class="row-no">${i+1}</td><td>${r.date||'—'}</td>${det}<td>${fmt(r.amount)}</td></tr>`;
+        }).join('')}
       </tbody>
     </table>
     <div class="totals-box" style="margin-top:14px;">
@@ -6720,7 +6727,7 @@ document.getElementById('btnPrintIncomeLedger').addEventListener('click', ()=>{
   });
   sortLedgerRows(rows);
   if(rows.length === 0){ toast('لا يوجد دخل مسجّل بعد'); return; }
-  showLedger('سجل الدخل', rows, true);   // الاسم والتفاصيل بسطر واحد
+  showLedger('سجل الدخل', rows, true, true);   // الاسم والتفاصيل بسطر واحد، والمبلغ جهة اليمين
 });
 
 document.getElementById('btnPrintExpenseLedger').addEventListener('click', ()=>{
@@ -6731,7 +6738,7 @@ document.getElementById('btnPrintExpenseLedger').addEventListener('click', ()=>{
   }));
   sortLedgerRows(rows);
   if(rows.length === 0){ toast('لا يوجد مصاريف مسجّلة بعد'); return; }
-  showLedger('سجل المصروف', rows);
+  showLedger('سجل المصروف', rows, false, true);   // المبلغ جهة اليمين
 });
 
 document.getElementById('btnPrintLedger').addEventListener('click', ()=>window.print());
