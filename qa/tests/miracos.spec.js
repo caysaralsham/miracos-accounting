@@ -676,3 +676,22 @@ test('عرض الوصل على الجوال (390): الورقة والأزرار
   expect(r.out).toBe(0);
   expect(r.page).toBeLessThanOrEqual(1);
 });
+
+test('جاهز للتسليم: أزرق بدل «متأخر»، وبعد الموعد بيعدّ تأخر الزبون عن الاستلام، والتسليم بيلغيه', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    const d = n => { const x = new Date(); x.setDate(x.getDate() + n); return localDate(x); };
+    const base = { phone: '', items: [{ qty: 1, desc: 'جرن', price: 1, amount: 1 }], total: 1, remaining: 0, payments: [] };
+    const lateOurs = deliveryCell({ ...base, date: d(-30), duration: '20' });                                 // متأخر علينا
+    const readyEarly = deliveryCell({ ...base, date: d(-5), duration: '20', ready: true, readyDate: d(-1) });   // جاهز قبل الموعد
+    const readyLate = deliveryCell({ ...base, date: d(-30), duration: '20', ready: true, readyDate: d(-15) });  // الموعد قبل 10 أيام
+    const readyAfter = deliveryCell({ ...base, date: d(-30), duration: '10', ready: true, readyDate: d(-4) });  // جهز بعد الموعد بـ4 أيام
+    const deliv = deliveryCell({ ...base, date: d(-30), duration: '10', ready: true, readyDate: d(-4), delivered: true });
+    return { lateOurs, readyEarly, readyLate, readyAfter, deliv };
+  });
+  expect(r.lateOurs).toContain('تأخر 10 يوم');
+  expect(r.readyEarly).toContain('جاهز للتسليم'); expect(r.readyEarly).not.toContain('متأخر');
+  expect(r.readyLate).toContain('الزبون متأخر 10 يوم'); expect(r.readyLate).toContain('#2D6FA3');
+  expect(r.readyAfter).toContain('الزبون متأخر 4 يوم');
+  expect(r.deliv).toContain('تم التسليم');
+});
+

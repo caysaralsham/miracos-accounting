@@ -1126,6 +1126,11 @@
         <div class="totals-row" style="margin-top:12px;"><span>مجموع المدفوع</span><span id="paidTotalDisplay">0 دج</span></div>
         <div class="totals-row"><span>الباقي</span><span id="remainingDisplay" style="font-weight:800;">0 دج</span></div>
         <div id="rcpDeliveredWrap" style="margin-top:12px; padding-top:10px; border-top:1px dashed var(--line);">
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0 0 8px;">
+            <input type="checkbox" id="rcpReady" style="width:auto;">
+            <span style="color:#2D6FA3; font-weight:700;">🔵 جاهز للتسليم</span>
+            <span style="font-size:12px; color:var(--text-dim);">(خلص الشغل وناطر الزبون — ما بيطلع «متأخر» عليك)</span>
+          </label>
           <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
             <input type="checkbox" id="rcpDelivered" style="width:auto;">
             <span style="color:var(--verdigris-deep); font-weight:700;">تم تسليم البضاعة</span>
@@ -3072,6 +3077,9 @@ function openReceiptModal(receipt){
   renderReceiptMeasTables();
   recalcTotals();
   document.getElementById('rcpDelivered').checked = !!(receipt && receipt.delivered);
+  document.getElementById('rcpReady').checked = !!(receipt && receipt.ready && !receipt.delivered);
+  document.getElementById('rcpDelivered').onchange = e=>{ if(e.target.checked) document.getElementById('rcpReady').checked = false; };
+  document.getElementById('rcpReady').onchange = e=>{ if(e.target.checked) document.getElementById('rcpDelivered').checked = false; };
   // زر "تحويل إلى عرض سعر" بيظهر بس بتعديل وصل محفوظ (مش بالوصل الجديد ولا النسخة ولا المحوّل)
   document.getElementById('btnReceiptToQuote').style.display = 'none';
   document.getElementById('receiptOverlay').classList.add('show');
@@ -3202,6 +3210,9 @@ async function buildAndSaveReceiptFromForm(){
   const id = document.getElementById('rcpId').value;
   const prevReceipt = id ? receipts.find(r=>r.id===id) : null;
   const isDelivered = document.getElementById('rcpDelivered').checked;
+  // جاهز للتسليم: منحفظ أول يوم صار فيه جاهز (لحساب كم يوم تأخر الزبون عن الاستلام)
+  const isReady = !isDelivered && document.getElementById('rcpReady').checked;
+  const readyDate = isReady ? ((prevReceipt && prevReceipt.ready && prevReceipt.readyDate) || localDate()) : '';
   let deliveredDate = '';
   if(isDelivered){
     deliveredDate = (prevReceipt && prevReceipt.delivered && prevReceipt.deliveredDate)
@@ -3222,6 +3233,8 @@ async function buildAndSaveReceiptFromForm(){
     measurementTables: measTablesToSave,
     delivered: isDelivered,
     deliveredDate,
+    ready: isReady,
+    readyDate,
     ...(window.__mdSave&&window.__mdSave.rcp?{mirsamDrawing:window.__mdSave.rcp}:{}),
     ...(window.__phSave&&window.__phSave.rcp&&window.__phSave.rcp.length?{productPhotos:window.__phSave.rcp}:{})
   };
@@ -3315,6 +3328,18 @@ function debtLateLabel(r){
   return `<span style="color:var(--danger); font-weight:800;">⏱ متأخر ${n} يوم</span>`;
 }
 
+// خانة «موعد التسليم»: إذا الوصل «جاهز للتسليم» بيضل أزرق (مش متأخر علينا)، وبعد الموعد بيعدّ كم يوم تأخر الزبون عن الاستلام
+function deliveryCell(r){
+  if(r.delivered) return '<span style="color:var(--verdigris-deep); font-weight:700;">✔ تم التسليم</span>';
+  if(!r.ready) return daysUntilLabel(computeDeliveryDate(r));
+  const due = computeDeliveryDate(r), rd = r.readyDate || '';
+  const from = [due, rd].filter(Boolean).sort().pop();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const late = from ? Math.round((today - new Date(from + 'T00:00:00')) / 86400000) : 0;
+  return late > 0
+    ? `<span style="color:#2D6FA3; font-weight:800;" title="الشغل جاهز والزبون ما إجا يستلم">🔵 جاهز — الزبون متأخر ${late} يوم عن الاستلام</span>`
+    : '<span style="color:#2D6FA3; font-weight:800;">🔵 جاهز للتسليم</span>';
+}
 function daysUntilLabel(dateStr){
   if(!dateStr) return '<span style="color:var(--text-dim);">—</span>';
   const target = new Date(dateStr + 'T00:00:00');
@@ -3358,7 +3383,7 @@ function renderReceiptsTable(){
       <td>${escHtmlText(r.name)}</td>
       <td class="wrap-cell"><div class="details-wrap">${escHtmlText(details)}</div></td>
       <td>${phoneHtml(r.phone)}</td>
-      <td>${r.delivered ? '<span style="color:var(--verdigris-deep); font-weight:700;">✔ تم التسليم</span>' : daysUntilLabel(computeDeliveryDate(r))}</td>
+      <td>${deliveryCell(r)}</td>
       <td>${fmt(r.total)}</td>
       <td>${fmt(r.remaining)}</td>
       <td>${statusTag(r)}</td>
@@ -6247,7 +6272,7 @@ function renderCustomerReports(){
           <td>${r.date||''}</td>
           <td>${r.duration} يوم</td>
           <td>${deliveryDate}</td>
-          <td>${daysUntilLabel(deliveryDate)}</td>
+          <td>${deliveryCell(r)}</td>
           <td>${fmt(r.remaining)}</td>
         </tr>`;
       }).join('')
