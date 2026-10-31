@@ -402,10 +402,12 @@ const pdfPages = buf => (buf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ||
 const fakeRcp = n => ({ id:'pp'+n, no:300+n, name:'زبون تجريبي', phone:'+213 550 12 34 56', address:'دالي ابراهيم', date:'2026-10-16', duration:15,
   items:Array.from({length:n},(_,i)=>({qty:2,desc:'رخام كرارا '+(i+1),price:1500,amount:3000})), total:3000*n, discount:0, remaining:3000*n-1000,
   payments:[{id:'pm',date:'2026-10-16',amount:1000}] });
-for (const [n, pages] of [[1,1],[18,1],[20,1],[21,2],[35,2]]) {
+// لحد ما بتساع بتصغير معقول = ورقة وحدة مليانة (ما في ورقة تانية فيها سطر والمجموع بس)، وأكتر = صفحات مرتّبة
+for (const [n, pages] of [[1,1],[18,1],[21,1],[30,2],[60,3]]) {
   test(`طباعة وصل فيه ${n} بند = ${pages} ورقة، والمجموع والباقي ما بينقسموا`, async ({ page }) => {
     await page.evaluate(r => { receipts.push(r); viewReceipt(r.id); }, fakeRcp(n));
     await page.waitForTimeout(150);
+    await page.evaluate(() => document.getElementById('viewReceiptOverlay').__fitReady);
     await page.emulateMedia({ media: 'print' });
     const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
     expect(pdfPages(pdf)).toBe(pages);
@@ -533,15 +535,11 @@ test.describe('تحويل Devis إلى وصل مع الدفعات', () => {
     document.getElementById('btnSaveReceipt').click(); document.getElementById('btnSaveReceipt').click();
     await new Promise(r => setTimeout(r, 400));
     const rcps = receipts.filter(r => r.name === 'زبون الدوفي');
-    const r = rcps[0], v = invoices.find(i => i.id === 'dv1');
-    // تحويل تاني لنفس الدوفي: ما في دفعات بتنتقل مرة تانية
-    convertInvoiceToReceipt('dv1');
-    const second = document.getElementById('paymentsBody').querySelectorAll('tr').length;
-    document.getElementById('receiptOverlay').classList.remove('show');
-    viewInvoice('dv1');
+    // بعد التحويل الأصلي بيروح لسلة المهملات (ما بيضل بالقائمة)
+    const r = rcps[0], v = deletedInvoices.find(i => i.id === 'dv1');
     return { receipts: rcps.length, rPays: getReceiptPayments(r), rRemaining: r.remaining, vPays: v.payments, vMoved: (v.movedPayments || []).map(p => [p.id, p.amount, p.date, p.toReceiptNo]),
       conv: v.convertedTo && v.convertedTo.receiptNo === r.no, before, after: sumAll(), hist: paymentHistory.filter(h => h.paymentId === 'pmD').map(h => [h.docType, h.amount, h.date]),
-      formRemaining, fromLabel, second, invView: document.getElementById('invoicePrintArea').innerText };
+      formRemaining, fromLabel, inList: invoices.some(i => i.id === 'dv1'), trashCount: deletedInvoices.filter(i => i.id === 'dv1').length };
   }, paid);
 
   test('دوفي 100,000 عليه دفعة 30,000 → الوصل: الدفعة نفسها والباقي 70,000، والمجموع ما تغيّر', async ({ page }) => {
@@ -556,8 +554,8 @@ test.describe('تحويل Devis إلى وصل مع الدفعات', () => {
     expect(r.after).toBe(r.before);                   // مجموع المقبوضات بلوحة التحكم نفسه
     expect(r.hist).toEqual([['وصل', 30000, '2026-10-02']]); // سطر واحد بالسجل، صار يشاور عالوصل
     expect(r.fromLabel).toContain('Devis رقم S0099');
-    expect(r.second).toBe(0);                         // التحويل التاني ما بينقل الدفعة مرة تانية
-    expect(r.invView).toContain('انتقلت للوصل رقم');
+    expect(r.inList).toBe(false);                     // الأصلي ما عاد بالقائمة
+    expect(r.trashCount).toBe(1);                     // انحط بسلة المهملات مرة وحدة
   });
   test('دوفي بلا دفعة → وصل بلا دفعات والباقي 100,000', async ({ page }) => {
     const r = await run(page, 0);

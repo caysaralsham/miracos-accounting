@@ -361,6 +361,7 @@
       margin:0 !important; padding:0 !important; background:none !important; backdrop-filter:none !important;
     }
     .overlay.show *{ visibility:visible; }
+    .overlay.show.print-hide{ display:none !important; }
     body.print-factory-only .overlay.show:not(#factoryViewOverlay){ display:none !important; }
 
     .modal{ max-width:none !important; width:auto !important; height:auto !important; min-height:0 !important; box-shadow:none !important; margin:0 !important; }
@@ -380,8 +381,8 @@
     tbody tr{ break-inside:avoid; page-break-inside:avoid; }
     body.print-multipage .overlay.show .modal{ page: multi; }
     .overlay.show[data-multipage] .modal{ page: multi; }
-    .overlay.show:not([data-multipage]) .modal-body{ zoom: var(--pz, 1); }
-    .overlay.show:not([data-multipage]) .receipt-top{ zoom: var(--pzh, 1); }
+    /* التصغير لورقة وحدة بينكتب كقيمة ثابتة بـ <style id="printFitStyle"> (راجع fitPrintOverlay):
+       كروم ما بيحسب تقسيم الصفحات صح إذا الـ zoom جاي من var()، فكان يطلع ورقة فيها جزء وورقة تانية فيها آخر سطر والمجموع */
     /* المجموع والدفعات والباقي والتواقيع والملاحظة ما بينقسموا بين ورقتين أبداً */
     .totals-box, .sig-block, .receipt-view .field, .prod-photo-block{ break-inside:avoid; page-break-inside:avoid; }
     .receipt-view table + .totals-box{ break-before:avoid; page-break-before:avoid; }
@@ -3218,8 +3219,19 @@ async function buildAndSaveReceiptFromForm(){
   logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no, details: items.map(it=>it.desc).filter(Boolean).join('، ')}, prevReceipt ? prevReceipt.payments : []);
   if(convertingFromInvoiceId){
     const srcId = convertingFromInvoiceId; convertingFromInvoiceId = null;
-    const mut = moveInvoicePaymentsMutator(srcId, data);
+    // بعد التحويل: الأصلي (Devis / Facture proforma / Facture) بيروح لسلة المهملات 30 يوم، والدفعات بتضل مع الوصل الجديد.
+    // رقمه بيضل محجوز (ما بيرجع ينعطى لمستند جديد).
+    const move = moveInvoicePaymentsMutator(srcId, data);
+    let moved = null;
+    const mut = arr=>{ const out = move(arr); moved = out.find(i=>i.id===srcId) || moved; return out.filter(i=>i.id!==srcId); };
     if(!(await saveInvoicesTx(mut))){ invoices = mut(invoices); await saveInvoices(); }
+    if(moved){
+      try{ noteInvoiceNoUsed(moved.no); }catch(e){}
+      deletedInvoices = deletedInvoices.filter(i=>i.id!==srcId);
+      deletedInvoices.push({...moved, deletedAt: new Date().toISOString(), trashedPaymentEntries: [], deletedReason: 'تحوّل لوصل '+data.no});
+      saveDeletedInvoices();
+      try{ renderTrash(); }catch(e){}
+    }
     renderInvoicesTable();
   }
   renderReceiptsTable();
@@ -3255,7 +3267,7 @@ document.getElementById('btnSaveReceipt').addEventListener('click', ()=> guarded
 
 document.getElementById('btnSaveAndPrint').addEventListener('click', ()=> guardedSaveReceipt((id)=>{
   viewReceipt(id);
-  setTimeout(()=>window.print(), 300);
+  printWhenFit('viewReceiptOverlay');
 }));
 
 function statusTag(r){
@@ -4085,7 +4097,7 @@ document.getElementById('btnSaveAndPrintInvoice').addEventListener('click', asyn
   document.getElementById('invoiceOverlay').classList.remove('show');
   toast('تم حفظ الفاتورة بنجاح');
   viewInvoice(id);
-  setTimeout(()=>window.print(), 300);
+  printWhenFit('viewInvoiceOverlay');
 });
 
 function renderInvoicesTable(){
@@ -4193,7 +4205,7 @@ function moveInvoicePaymentsMutator(invId, receipt){
 function convertInvoiceToReceipt(id){
   const inv = invoices.find(i=>i.id===id);
   if(!inv) return;
-  if(!confirm(`تحويل "${inv.clientName}" إلى وصل زبون جديد؟ عرض السعر الأصلي بيضل محفوظ وبيتعلّم «تحوّل لوصل».`)) return;
+  if(!confirm(`تحويل "${inv.clientName}" إلى وصل زبون جديد؟ بعد ما تحفظ الوصل، الأصلي بيروح لسلة المهملات 30 يوم (بتقدر ترجعه من الإعدادات)، والدفعات بتنتقل للوصل.`)) return;
   convertingFromInvoiceId = id;
   const pseudoReceipt = {
     id: '',
@@ -5561,7 +5573,7 @@ document.getElementById('btnMeasSavePrint').addEventListener('click', async ()=>
   await saveMeasurementRecord(rec);
   toast('تم حفظ القياسات');
   viewMeasurementRecord(rec.id);
-  setTimeout(()=>window.print(), 300);
+  printWhenFit('measurementsViewOverlay');
   resetMeasForm();
 });
 
@@ -5856,52 +5868,116 @@ renderMeasTables();
 // قبل ما تخلص الصور تتحمّل. فكانت الورقة تطلع بلا تصغير، والمجموع/الباقي ينكسر لحاله على ورقة تانية.
 // الحل: منحسب نسبة التصغير لحظة فتح الوصل وبعد تحميل الصور، ومنحطها كمتغيّر CSS بيشتغل بالطباعة بس
 // (حتى لو ما وصل حدث beforeprint)، ومنعيد الحساب قبل الطباعة إذا الحدث وصل.
-const PRINT_PAGE_W = 718;   // عرض A4 بعد هوامش 10mm (px)
-const PRINT_PAGE_H = 1000;  // ارتفاع A4 بعد الهوامش مع هامش أمان ~5% (الخطوط بالطباعة أعرض شوي من الشاشة)
-function fitPrintOverlay(ov){
+const PRINT_FIT = {};
+function setPrintFit(ov, scale, headZoom){
+  if(!ov.id) return;
+  if(scale) PRINT_FIT[ov.id] = {scale, headZoom}; else delete PRINT_FIT[ov.id];
+  let st = document.getElementById('printFitStyle');
+  if(!st){ st = document.createElement('style'); st.id = 'printFitStyle'; document.head.appendChild(st); }
+  st.textContent = '@media print{' + Object.entries(PRINT_FIT).map(([id, f])=>
+    `#${id}.show:not([data-multipage]) .modal-body{zoom:${f.scale} !important}` +
+    (f.headZoom ? `#${id}.show:not([data-multipage]) .receipt-top{zoom:${f.headZoom} !important}` : '')).join('') + '}';
+}
+// القياس الحقيقي: منحط نسخة من الورقة بإطار مخفي بعرض A4، ومنشغّل فيه قواعد الطباعة نفسها (@media print)،
+// فمنعرف طول الورقة المطبوعة بالضبط (القياس بستايل الشاشة كان يغلط لحد 35%).
+const PRINT_A4_W = 794, PRINT_A4_H = 1123, PRINT_PAD_MM_V = 18;   // هامش الورقة جوّا (10mm فوق + 8mm تحت)
+let __printCss = null, __printCssN = -1;
+function printCssText(){
+  const sts = [...document.querySelectorAll('style')].filter(st=>st.id!=='printFitStyle');
+  if(__printCss && __printCssN===sts.length) return __printCss;
+  __printCssN = sts.length;
+  __printCss = sts.map(st=>st.textContent).join('\n').replace(/@media\s+print/g, '@media all');
+  return __printCss;
+}
+function measurePrintLayout(ov){
+  return new Promise(resolve=>{
+    const fr = document.createElement('iframe');
+    fr.setAttribute('aria-hidden','true'); fr.tabIndex = -1;
+    fr.style.cssText = `position:fixed;left:-20000px;top:0;width:${PRINT_A4_W}px;height:${PRINT_A4_H}px;border:0;visibility:hidden;pointer-events:none;`;
+    document.body.appendChild(fr);
+    const clone = ov.cloneNode(true);
+    clone.removeAttribute('data-multipage'); clone.classList.remove('print-hide'); clone.classList.add('show'); clone.removeAttribute('id');
+    clone.style.display = '';
+    const links = [...document.querySelectorAll('link[rel="stylesheet"]')].map(l=>l.outerHTML).join('');
+    const d = fr.contentDocument;
+    d.open();
+    d.write(`<!doctype html><html dir="${document.documentElement.getAttribute('dir')||'ltr'}" lang="ar"><head><meta charset="utf-8">${links}<style>${printCssText()}</style></head><body dir="rtl">${clone.outerHTML}</body></html>`);
+    d.close();
+    let done = false;
+    const finish = ()=>{
+      if(done) return; done = true;
+      try{
+        const b = d.querySelector('.modal-body'), hd = b && b.querySelector('.receipt-top');
+        resolve({h: b ? b.scrollHeight : 0, headH: hd ? hd.offsetHeight : 0});
+      }catch(e){ resolve({h:0, headH:0}); }
+      fr.remove();
+    };
+    const imgs = [...d.images].filter(im=>!im.complete);
+    const fontsReady = (d.fonts && d.fonts.ready) ? d.fonts.ready : Promise.resolve();
+    Promise.all([fontsReady, ...imgs.map(im=>new Promise(r=>{ im.onload = im.onerror = r; }))]).then(()=>requestAnimationFrame(finish));
+    setTimeout(finish, 1500);
+  });
+}
+const __fitSeq = new WeakMap();
+async function fitPrintOverlay(ov){
   const body = ov && ov.querySelector('.modal-body');
   if(!body) return;
-  body.style.removeProperty('--pz'); ov.removeAttribute('data-multipage');
-  const head = body.querySelector('.receipt-top'); if(head) head.style.removeProperty('--pzh');
-  const oldW = body.style.width, oldMax = body.style.maxHeight, oldOv = body.style.overflow;
-  body.style.width = PRINT_PAGE_W + 'px'; body.style.maxHeight = 'none'; body.style.overflow = 'visible';
-  const h = body.scrollHeight;
-  const headH = head ? head.offsetHeight : 0;
-  body.style.width = oldW; body.style.maxHeight = oldMax; body.style.overflow = oldOv;
-  if(!h) return;
-  let scale = Math.min(1, PRINT_PAGE_H / h);
+  const seq = (__fitSeq.get(ov)||0) + 1; __fitSeq.set(ov, seq);
+  const {h, headH} = await measurePrintLayout(ov);
+  if(__fitSeq.get(ov) !== seq || !h) return;   // في قياس أحدث
+  const avail = (PRINT_A4_H - PRINT_PAD_MM_V*96/25.4) * 0.97;   // هامش أمان 3%
+  let scale = Math.min(1, avail / h);
   const MIN_HEAD = 0.8;
-  // أكتر من 20 بند (أو بدها تصغير كتير): ما منصغّر — بيكمّل على صفحات مرتّبة، بنفس الرأس ورقم الوصل بكل صفحة
+  // إذا بتساع بورقة وحدة بتصغير معقول → ورقة وحدة (ما في ورقة تانية فيها سطر واحد والمجموع بس).
+  // كتير بنود وبدها تصغير كبير → بيكمّل على صفحات مرتّبة، بنفس الرأس ورقم الوصل بكل صفحة.
   const rowsCount = body.querySelectorAll('td.row-no').length;
-  if(rowsCount > 20 || (scale < 0.6 && rowsCount > 0)){ ov.setAttribute('data-multipage', '1'); return; }
-  if(scale < 1){
-    let headScale = scale;
-    if(head && scale < MIN_HEAD && h > headH){
-      headScale = MIN_HEAD;
-      scale = Math.max(0.2, (PRINT_PAGE_H - headH*MIN_HEAD) / (h - headH));
-    }
-    body.style.setProperty('--pz', scale.toFixed(3));
-    if(head && headScale > scale) head.style.setProperty('--pzh', (headScale/scale).toFixed(3));
+  if((rowsCount > 20 && scale < 0.7) || (scale < 0.55 && rowsCount > 0)){ setPrintFit(ov, 0); ov.setAttribute('data-multipage', '1'); return; }
+  ov.removeAttribute('data-multipage');
+  if(scale >= 1){ setPrintFit(ov, 0); return; }
+  let headScale = scale;
+  if(headH && scale < MIN_HEAD && h > headH){
+    headScale = MIN_HEAD;
+    scale = Math.max(0.2, (avail - headH*MIN_HEAD) / (h - headH));
   }
+  setPrintFit(ov, scale.toFixed(3), (headH && headScale > scale) ? (headScale/scale).toFixed(3) : 0);
 }
-function fitPrintAll(){ document.querySelectorAll('.overlay.show').forEach(fitPrintOverlay); }
+function fitPrintAll(){ return Promise.all([...document.querySelectorAll('.overlay.show')].map(fitPrintOverlay)); }
 // بعد ما تتحمّل كل صور الورقة (اللوغو، الباركود، الرسمة، صور المنتج)
 function fitPrintWhenReady(ov){
-  fitPrintOverlay(ov);
+  ov.__fitReady = fitPrintOverlay(ov);
   const imgs = [...ov.querySelectorAll('img')].filter(im=>!im.complete);
   imgs.forEach(im=>{ im.addEventListener('load', ()=>fitPrintOverlay(ov), {once:true}); im.addEventListener('error', ()=>fitPrintOverlay(ov), {once:true}); });
 }
 window.fitPrintWhenReady = fitPrintWhenReady;
+// طباعة بعد ما يخلص حساب حجم الورقة (حتى ما تنطبع قبل التصغير)
+function printWhenFit(ovId){
+  setTimeout(async ()=>{
+    const ov = document.getElementById(ovId);
+    try{ if(ov && ov.__fitReady) await Promise.race([ov.__fitReady, new Promise(r=>setTimeout(r, 2500))]); }catch(e){}
+    window.print();
+  }, 50);
+}
 new MutationObserver(muts=>{
-  muts.forEach(m=>{ const t = m.target; if(t.classList && t.classList.contains('overlay') && t.classList.contains('show')) setTimeout(()=>fitPrintWhenReady(t), 0); });
-}).observe(document.body, {subtree:true, attributes:true, attributeFilter:['class']});
+  muts.forEach(m=>{ const t = m.target; if(t.classList && t.classList.contains('overlay') && t.classList.contains('show')){
+    if(m.oldValue==null || !/\bshow\b/.test(m.oldValue)){ t.dataset.shownAt = String(Date.now()); setTimeout(()=>fitPrintWhenReady(t), 0); } } });
+}).observe(document.body, {subtree:true, attributes:true, attributeOldValue:true, attributeFilter:['class']});
+// بينطبع بس الشي اللي فوق (آخر نافذة انفتحت). قبل: إذا كانت نافذة تانية مفتوحة تحت الوصل
+// كانت تنطبع معه، فتطلع ورقة فيها جزء من النافذة التانية وبعدها ورقة الوصل.
+function markPrintTopOverlay(){
+  const shown = [...document.querySelectorAll('.overlay.show')];
+  shown.forEach(o=>{ o.classList.remove('print-hide'); if(!o.dataset.shownAt) o.dataset.shownAt = String(Date.now()); });
+  if(shown.length < 2) return;
+  const top = shown.reduce((a,b)=> Number(b.dataset.shownAt) >= Number(a.dataset.shownAt) ? b : a);
+  shown.forEach(o=>{ if(o!==top) o.classList.add('print-hide'); });
+}
 window.addEventListener('beforeprint', ()=>{
   document.body.classList.remove('print-compact');
-  fitPrintAll();
+  markPrintTopOverlay();
   document.body.classList.toggle('print-multipage', !!document.querySelector('.overlay.show[data-multipage]'));
 });
 window.addEventListener('afterprint', ()=>{
   document.body.classList.remove('print-multipage');
+  document.querySelectorAll('.overlay.print-hide').forEach(o=>o.classList.remove('print-hide'));
 });
 
 function renderDashboard(){
@@ -6617,7 +6693,7 @@ function showLedger(title, rows){
         <tr><th style="width:60px;">#</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr>
       </thead>
       <tbody>
-        ${rows.map((r,i)=>`<tr><td>${i+1}</td><td>${r.date||'—'}</td><td style="text-align:right;">${escHtmlText(r.details)}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
+        ${rows.map((r,i)=>`<tr><td class="row-no">${i+1}</td><td>${r.date||'—'}</td><td style="text-align:right;">${escHtmlText(r.details)}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
       </tbody>
     </table>
     <div class="totals-box" style="margin-top:14px;">
