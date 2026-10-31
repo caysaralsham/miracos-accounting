@@ -6673,11 +6673,12 @@ function sortLedgerRows(rows){
     return da - db;
   });
 }
-function showLedger(title, rows){
+function showLedger(title, rows, oneLine){
   document.getElementById('ledgerViewTitle').textContent = title;
   const totalAmount = rows.reduce((s,r)=>s+r.amount,0);
   let html = `
-    <table>
+    <table${oneLine ? ' style="table-layout:fixed; width:100%;"' : ''}>
+      ${oneLine ? '<colgroup><col style="width:60px"><col style="width:120px"><col><col style="width:150px"></colgroup>' : ''}
       <thead>
         <tr class="print-head-row"><td colspan="4">
           <div class="receipt-top" style="margin-bottom:16px;">
@@ -6693,7 +6694,7 @@ function showLedger(title, rows){
         <tr><th style="width:60px;">#</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr>
       </thead>
       <tbody>
-        ${rows.map((r,i)=>`<tr><td class="row-no">${i+1}</td><td>${r.date||'—'}</td><td style="text-align:right;">${escHtmlText(r.details)}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
+        ${rows.map((r,i)=>`<tr><td class="row-no">${i+1}</td><td>${r.date||'—'}</td><td style="text-align:right;${oneLine ? ' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' : ''}"${oneLine ? ` title="${escHtmlText(r.details)}"` : ''}>${escHtmlText(r.details)}</td><td>${fmt(r.amount)}</td></tr>`).join('')}
       </tbody>
     </table>
     <div class="totals-box" style="margin-top:14px;">
@@ -6719,7 +6720,7 @@ document.getElementById('btnPrintIncomeLedger').addEventListener('click', ()=>{
   });
   sortLedgerRows(rows);
   if(rows.length === 0){ toast('لا يوجد دخل مسجّل بعد'); return; }
-  showLedger('سجل الدخل', rows);
+  showLedger('سجل الدخل', rows, true);   // الاسم والتفاصيل بسطر واحد
 });
 
 document.getElementById('btnPrintExpenseLedger').addEventListener('click', ()=>{
