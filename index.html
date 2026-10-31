@@ -3296,11 +3296,17 @@ function daysUntilLabel(dateStr){
   return `<span style="color:var(--danger); font-weight:800;">⛔ تأخر ${Math.abs(diffDays)} يوم</span>`;
 }
 
+// رقم الوصل: 16 و016 و#016 كلهم نفس الشي
+function rcpNoMatch(r, q){
+  const n = s=>String(s==null?'':s).replace(/[٠-٩]/g,d=>String(d.charCodeAt(0)-1632)).replace(/[#\s]/g,'').replace(/^0+(?=\d)/,'');
+  const a = n(q); return /^\d+$/.test(a) && n(r.no)===a;
+}
 function renderReceiptsTable(){
   const wrap = document.getElementById('receiptsTableWrap');
   const q = (document.getElementById('customerSearch').value || '').trim();
   let list = receipts.filter(r => !r.delivered).reverse();
   if(q) list = list.filter(r =>
+    rcpNoMatch(r, q) ||
     r.name.includes(q) ||
     (r.phone||'').includes(q) ||
     (r.items||[]).some(it => (it.desc||'').includes(q))
@@ -3374,13 +3380,17 @@ function duplicateReceipt(id){
   document.getElementById('receiptModalTitle').textContent = `نسخة جديدة (من وصل رقم ${r.no})`;
   toast('نسخة جديدة جاهزة — عدّل نوع البضاعة/الأسعار زي ما بدك واحفظ');
 }
+// دفعة لسا موجودة بوصل أو فاتورة تانية (مثلاً وصل مكرر انعمل من نفس عرض السعر) → ما منشيلها من السجل
+function paymentIdStillUsed(pid){
+  return receipts.some(r=>getReceiptPayments(r).some(p=>p && p.id===pid)) || invoices.some(i=>(i.payments||[]).some(p=>p && p.id===pid));
+}
 async function deleteReceipt(id){
   if(!confirm('هل تريد حذف هذا الوصل؟ رح ينحط في سلة المهملات 30 يوم وينشال مبلغه من الدخل فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.')) return;
   const target = receipts.find(r=>r.id===id);
   if(!target) return;
   receipts = receipts.filter(r=>r.id!==id);
   saveReceipts();
-  const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(Boolean));
+  const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(id=>id && !paymentIdStillUsed(id)));
   const trashedPaymentEntries = paymentIds.size > 0 ? paymentHistory.filter(h=>paymentIds.has(h.paymentId)) : [];
   if(trashedPaymentEntries.length > 0){
     paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
@@ -4222,7 +4232,7 @@ async function deleteInvoice(id){
   }
   if(!confirm('حذف هذا المستند؟ رح ينحط بسلة المهملات 30 يوم وبتقدر ترجعه.')) return;
   invoices = invoices.filter(i=>i.id!==id);
-  const paymentIds = new Set((inv.payments||[]).map(p=>p.id).filter(Boolean));
+  const paymentIds = new Set((inv.payments||[]).map(p=>p.id).filter(id=>id && !paymentIdStillUsed(id)));
   const trashedPaymentEntries = paymentIds.size ? paymentHistory.filter(h=>paymentIds.has(h.paymentId)) : [];
   if(trashedPaymentEntries.length){ paymentHistory = paymentHistory.filter(h=>!paymentIds.has(h.paymentId)); savePaymentHistory(); renderPaymentHistoryTable(); }
   deletedInvoices.push({...inv, deletedAt: new Date().toISOString(), trashedPaymentEntries});
@@ -6156,6 +6166,7 @@ function renderCustomerReports(){
     .filter(r => r.delivered)
     .sort((a,b)=>((b.deliveredDate||b.date||'')).localeCompare(a.deliveredDate||a.date||''));
   if(dq) delivered = delivered.filter(r =>
+    rcpNoMatch(r, dq) ||
     (r.name||'').includes(dq) ||
     (r.phone||'').includes(dq) ||
     (r.items||[]).some(it => (it.desc||'').includes(dq))
@@ -6250,7 +6261,7 @@ function renderPaymentHistoryTable(){
 function computePaymentReconcile(rcpts, invs, hist){
   // 1) كل دفعة بالوصولات والفواتير — والدفعات القديمة بلا رقم بتاخد رقم جديد (بينحفظ بالوصل/الفاتورة)
   const docPays = new Map(), idFixes = [];
-  const metaR = r=>({customerName:r.name, docType:'وصل', docNo:r.no, details:(r.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
+  const metaR = r=>({customerName:r.name, docType:'وصل', docNo:r.no, delivered:!!r.delivered, details:(r.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
   const metaI = i=>({customerName:i.clientName, docType:i.docType==='facture'?'فاتورة':(i.docType==='devis'?'Facture proforma':'Devis'), docNo:i.no, details:(i.items||[]).map(it=>it.desc).filter(Boolean).join('، ')});
   const collect = (kind, d, list, meta)=>{
     let fix = null;
@@ -6321,7 +6332,7 @@ document.getElementById('btnReconcilePayments').addEventListener('click', async 
   if(!n){ alert('✓ سجل الدفعات مطابق للزبائن والوصولات والفواتير.\n\n' + why + dupTxt); return; }
   const parts = [];
   if(rec.updates.length) parts.push(`تعديل ${rec.updates.length} سطر (مبلغ أو تاريخ تغيّر، أو سطر قديم انربط بدفعته):\n` + rec.updates.slice(0,8).map(u=>line(u.m.customerName,u.m.docNo,u.p.amount)+(Number(u.h.amount)!==Number(u.p.amount)?`  (كان ${fmt(u.h.amount)})`:'')).join('\n'));
-  if(rec.adds.length) parts.push(`إضافة ${rec.adds.length} دفعة موجودة بالزبائن والوصولات وناقصة بالسجل:\n` + rec.adds.slice(0,8).map(a=>line(a.m.customerName,a.m.docNo,a.p.amount)).join('\n') + `\n⚠ إذا وحدة منهم مكررة: اضغط «إلغاء» واحذفها من الوصل نفسه بصفحة الزبائن والوصولات، بعدين ارجع طابق.`);
+  if(rec.adds.length) parts.push(`إضافة ${rec.adds.length} دفعة موجودة بالزبائن والوصولات وناقصة بالسجل:\n` + rec.adds.slice(0,8).map(a=>line(a.m.customerName,a.m.docNo,a.p.amount)+(a.m.delivered?'  (بـ «زبائن تم تسليمهم»)':'')).join('\n') + `\n⚠ إذا وحدة منهم مكررة: اضغط «إلغاء» واحذفها من الوصل نفسه بصفحة الزبائن والوصولات، بعدين ارجع طابق.`);
   if(rec.removes.length) parts.push(`حذف ${rec.removes.length} سطر من السجل (دفعة محذوفة، مكررة، أو قديمة بلا وصل):\n` + rec.removes.slice(0,8).map(r=>line(r.h.customerName,r.h.docNo,r.h.amount)).join('\n'));
   const more = (rec.updates.length>8||rec.adds.length>8||rec.removes.length>8) ? '\n(والباقي بنفس الطريقة)' : '';
   if(!confirm('مطابقة سجل الدفعات مع الوصولات والفواتير:\n\n' + parts.join('\n\n') + more + dupTxt + '\n\nبعد التصحيح:\n' + why + '\n\nقبل التصحيح رح تنزل نسخة احتياطية كاملة على جهازك. متابعة؟')) return;
