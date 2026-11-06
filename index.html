@@ -167,6 +167,16 @@
   table.rt-cards td:nth-child(n){ overflow-wrap:anywhere; }
   table.rt-cards td .tag, table.rt-cards td bdi.ph{ white-space:nowrap; }
   table.rt-cards td.rt-money{ white-space:nowrap !important; }
+  table.rt-cards td.rt-name{ white-space:nowrap !important; overflow-wrap:normal !important; }
+  table.rt-cards td.rt-name .nm{ display:block; max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  table.rt-cards td.rt-name .nm .tag{ margin-inline-start:4px; }
+  /* البيان هو اللي بيضيق (بـ «…») حتى يساع الجدول بعرض الصفحة بلا ما ينقص شي من الأزرار */
+  @media (min-width:1101px){
+    table.rt-cards td.wrap-cell{ width:30%; min-width:130px; }
+    table.rt-cards td .no-tag{ display:table; margin-top:3px; }
+    table.rt-cards td.wrap-cell .details-wrap{ width:0; min-width:100%; max-width:none; }
+  }
+  @media (max-width:1500px){ table.rt-cards td.rt-name .nm{ max-width:170px; } table.rt-cards th, table.rt-cards td{ padding-left:5px !important; padding-right:5px !important; } }
   table.rt-cards .row-actions{ flex-wrap:wrap; }
   @media (max-width: 1100px){
     table.rt-cards, table.rt-cards tbody{ display:block; width:100%; }
@@ -2173,7 +2183,10 @@ function cardifyTable(table){
   if(!table) return;
   table.classList.add('rt-cards');
   const heads = [...table.querySelectorAll('thead th')].map(th=>th.textContent.trim());
-  table.querySelectorAll('tbody tr').forEach(tr=>{ [...tr.cells].forEach((td,i)=>{ if(heads[i]) td.setAttribute('data-label', heads[i]); else td.classList.add('rt-actions'); const tx = td.textContent.trim(); if(/^[\s\d.,-]+ دج$/.test(tx) || /^\d{4}-\d{2}-\d{2}$/.test(tx)) td.classList.add('rt-money'); }); });
+  table.querySelectorAll('tbody tr').forEach(tr=>{ [...tr.cells].forEach((td,i)=>{ if(heads[i]) td.setAttribute('data-label', heads[i]); else td.classList.add('rt-actions'); const tx = td.textContent.trim(); if(/^[\s\d.,-]+ دج$/.test(tx) || /^\d{4}-\d{2}-\d{2}$/.test(tx)) td.classList.add('rt-money');
+    // اسم الزبون ورقم الوصل/المستند: سطر واحد أفقي (الاسم الطويل بينقص بـ «…» والاسم الكامل بيبيّن لما توقف عليه)
+    if(/^(الاسم|Client|اسم الزبون|الزبون)$/.test(heads[i]||'')){ td.classList.add('rt-name'); if(!td.querySelector('.nm')){ const nm = document.createElement('span'); nm.className = 'nm'; while(td.firstChild) nm.appendChild(td.firstChild); td.appendChild(nm); } td.querySelector('.nm').title = tx; }
+    if(/^(رقم الوصل|N°|رقم المستند)$/.test(heads[i]||'')) td.classList.add('rt-money'); }); });
 }
 function toast(msg){
   const t = document.getElementById('toast');
@@ -3430,7 +3443,7 @@ function activeFactureRows(){ return (invoices||[]).filter(i=>i.docType==='factu
 function workRows(){ return [...receipts, ...activeFactureRows()]; }
 function rowViewJs(r){ return r._inv ? `viewInvoice('${r.id}')` : `viewReceipt('${r.id}')`; }
 function rowEditJs(r){ return r._inv ? `editInvoice('${r.id}')` : `editReceipt('${r.id}')`; }
-function rowNoHtml(r){ return r._inv ? `${escHtmlText(String(r.no||''))} <span class="tag tag-paid" style="font-size:10.5px">Facture</span>` : escHtmlText(String(r.no||'—')); }
+function rowNoHtml(r){ return r._inv ? `${escHtmlText(String(r.no||''))} <span class="tag tag-paid no-tag" style="font-size:10.5px">Facture</span>` : escHtmlText(String(r.no||'—')); }
 function statusTag(r){
   if(r.remaining <= 0) return '<span class="tag tag-paid">مدفوع بالكامل</span>';
   if(getReceiptPayments(r).length) return '<span class="tag tag-partial">دفعة جزئية</span>';

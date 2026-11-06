@@ -946,3 +946,31 @@ test('الـ Facture بتطلع مع الزبائن والوصولات (TTC)، �
   expect(r.rcpAfter).not.toContain('اللجنة الدينية');
   expect(r.fcCancelled).toBe(true);
 });
+
+test('اسم الزبون سطر واحد أفقي بكل الجداول، والجدول بيساع الصفحة', async ({ page }) => {
+  for (const w of [1920, 1366, 1024, 390]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    const r = await page.evaluate(() => {
+      document.getElementById('loginScreen').style.display = 'none';
+      if (!invoices.some(i => i.id === 'NMF')) {
+        invoices.push({ id: 'NMF', docType: 'facture', no: 'F009/2026', date: '2026-11-06', delay: '45 jours', clientName: 'اللجنة الدينية لمسجد ابي ذر الغفاري', clientPhone: '0662161580', items: [{ qty: 1, desc: 'عامود مدور — قطع لصق — قطر 65 سم', price: 1, amount: 1 }], ttc: 14470495.2, payments: [], remaining: 14470495.2 });
+        receipts.push({ id: 'NM1', no: 76, name: 'eurl hd travaux et service', phone: '0561775118', date: '2026-10-20', duration: 10, delivered: true, deliveredDate: '2026-10-30', items: [{ qty: 1, desc: 'مجسم', price: 1, amount: 1 }], total: 2355000, remaining: 1155000, payments: [] });
+      }
+      renderAllViews();
+      const out = {};
+      for (const v of ['customers', 'customer-reports', 'dashboard']) {
+        document.querySelector(`.nav-item[data-view="${v}"]`).click();
+        const tds = [...document.querySelectorAll('#view-' + v + ' td.rt-name')].filter(td => td.offsetParent);
+        const lh = tds.map(td => { const n = td.querySelector('.nm'); return n ? Math.round(n.getBoundingClientRect().height) : 99; });
+        const over = [...document.querySelectorAll('#view-' + v + ' table.rt-cards')].filter(t => t.offsetParent).map(t => Math.round(t.getBoundingClientRect().width - t.parentElement.clientWidth));
+        out[v] = { n: tds.length, maxH: Math.max(0, ...lh), over: Math.max(0, ...over) };
+      }
+      return out;
+    });
+    for (const [v, x] of Object.entries(r)) {
+      expect(x.n, v + ' ' + w).toBeGreaterThan(0);
+      expect(x.maxH, v + ' ' + w).toBeLessThan(30);
+      expect(x.over, v + ' ' + w).toBeLessThanOrEqual(1);
+    }
+  }
+});
