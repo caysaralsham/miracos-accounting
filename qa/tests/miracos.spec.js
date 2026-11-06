@@ -974,3 +974,20 @@ test('اسم الزبون سطر واحد أفقي بكل الجداول، وا�
     }
   }
 });
+
+test('إزالة الرسمة من الوصل: النوع والتفاصيل والسعر بيضلوا، ورسمة جديدة بعدين ما بتمسحهم', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    document.getElementById('loginScreen').style.display = 'none';
+    receipts.push({ id: 'MDR', no: 990, name: 'زبون رسمة', date: '2026-11-06', items: [{ qty: 1, desc: 'نافورة — قطر 120 سم', price: 250000, amount: 250000, md: 1 }, { qty: 2, desc: 'جرن', price: 1000, amount: 2000 }],
+      total: 252000, remaining: 252000, payments: [], mirsamDrawing: { kind: 'pure', title: 'نافورة', img: 'data:image/png;base64,iVBORw0KGgo=' } });
+    editReceipt('MDR'); await new Promise(res => setTimeout(res, 300));
+    const del = document.querySelector('#receiptOverlay [data-mirsam-del]');
+    const had = !!del; if (del) del.click();
+    await buildAndSaveReceiptFromForm(); await new Promise(res => setTimeout(res, 300));
+    const rc = receipts.find(x => x.id === 'MDR');
+    return { had, items: rc.items.map(i => [i.desc, i.price, i.md || 0]), drawing: !!rc.mirsamDrawing };
+  });
+  expect(r.had).toBe(true);
+  expect(r.items).toEqual([['نافورة — قطر 120 سم', 250000, 0], ['جرن', 1000, 0]]);
+  expect(r.drawing).toBe(false);
+});

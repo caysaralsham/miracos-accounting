@@ -7178,6 +7178,9 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       +`<div style="font-size:12px;color:var(--text-dim);margin-top:6px">لبند تاني برسمة تانية (متل عامود تاني): اكبس «✏️ ارسم الآن» — بينضاف سطر جديد وما بيتغيّر الأول</div>`;
     all.forEach((x,i)=>{const row=box.querySelector(`[data-mi="${i}"]`);
       row.querySelector('[data-mirsam-del]').onclick=()=>{
+        // إزالة الرسمة بس: البنود (النوع والتفاصيل والسعر) بتضل بالوصل/الفاتورة كبنود عادية —
+        // منشيل علامتها حتى رسمة جديدة بعدين ما تعتبرها بنودها وتبدّلها
+        {const b0=document.getElementById(k==='rcp'?'itemsBody':'invItemsBody'),tg=i?x.gid:'1';if(b0&&tg)b0.querySelectorAll(`tr[data-md="${tg}"]`).forEach(r=>{delete r.dataset.md})}
         if(i){m.more=m.more.filter(y=>y!==x)}
         else if(m.more&&m.more.length){const [nx,...rest]=m.more;const body=document.getElementById(k==='rcp'?'itemsBody':'invItemsBody');
           if(body){body.querySelectorAll('tr[data-md="1"]').forEach(r=>delete r.dataset.md);body.querySelectorAll(`tr[data-md="${nx.gid}"]`).forEach(r=>r.dataset.md='1')}
