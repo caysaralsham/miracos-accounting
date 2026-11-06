@@ -2458,7 +2458,11 @@ function exportExcelReport(silent){
     // الحسابات بنفس طريقة صفحة التقارير بالبرنامج
     const commissionPercent = Number(settings.commissionPercent)||0;
     let totalIncomeInvoiced = 0, totalIncomePaid = 0, totalExpenses = 0;
-    receipts.forEach(r=>{ totalIncomeInvoiced += Number(r.total)||0; totalIncomePaid += getReceiptPayments(r).reduce((s,p)=>s+(Number(p.amount)||0),0); });
+    // الوصولات + المستندات اللي عليها دفعات (Devis / Facture proforma / Facture) — نفس حساب لوحة التحكم
+    const xlPays = allDocPayments(), paidOf = d=>xlPays.filter(x=>x.d===d).reduce((s,x)=>s+(Number(x.p.amount)||0),0);
+    const xlDocs = [...receipts.map(r=>({no:String(r.no||''), date:r.date||'', name:r.name||'', total:Number(r.total)||0, paid:paidOf(r)})),
+      ...invoices.filter(i=>!i.cancelled).map(i=>({i, paid:paidOf(i)})).filter(x=>x.paid>0).map(({i,paid})=>({no:(i.docType==='facture'?'Facture ':(i.docType==='devis'?'Proforma ':'Devis '))+(i.no||''), date:i.date||'', name:i.clientName||'', total:Number(i.ttc!=null?i.ttc:i.total)||0, paid}))];
+    xlDocs.forEach(x=>{ totalIncomeInvoiced += x.total; totalIncomePaid += x.paid; });
     expenses.forEach(e=>{ totalExpenses += Number(e.amount)||0; });
     const commission = totalIncomePaid * commissionPercent/100;
     const net = totalIncomePaid - commission - totalExpenses;
@@ -2480,15 +2484,13 @@ function exportExcelReport(silent){
     add([{v:'قسم الدخل — الزبائن', s:S.section, span:6}], 24);
     add([{v:'رقم الوصل',s:S.head},{v:'التاريخ',s:S.head},{v:'الاسم',s:S.head},{v:'المجموع',s:S.head},{v:'المدفوع',s:S.head},{v:'الباقي',s:S.head}], 22);
     const incFirst = rows.length+1;
-    receipts.forEach(r=>{
-      const paid = getReceiptPayments(r).reduce((s,p)=>s+(Number(p.amount)||0),0);
-      const total = Number(r.total)||0;
+    xlDocs.forEach(x=>{
       const rn = rows.length+1;
-      add([{v:String(r.no||''),s:S.txtC},{v:r.date||'',s:S.txtC},{v:r.name||'',s:S.txtR},{v:total,s:S.num},{v:paid,s:S.num},{v:total-paid,s:S.num,f:`D${rn}-E${rn}`}]);
+      add([{v:x.no,s:S.txtC},{v:x.date,s:S.txtC},{v:x.name,s:S.txtR},{v:x.total,s:S.num},{v:x.paid,s:S.num},{v:x.total-x.paid,s:S.num,f:`D${rn}-E${rn}`}]);
     });
     const incLast = Math.max(rows.length, incFirst);
     const incTotRow = rows.length+1;
-    const sumF = (col, a, b) => b>=a && receipts.length ? `SUM(${col}${a}:${col}${b})` : '0';
+    const sumF = (col, a, b) => b>=a && xlDocs.length ? `SUM(${col}${a}:${col}${b})` : '0';
     add([{v:'',s:S.totLbl,span:2},{v:'إجمالي الدخل',s:S.totLbl},
       {v:totalIncomeInvoiced,s:S.totNum,f:sumF('D',incFirst,incLast)},
       {v:totalIncomePaid,s:S.totNum,f:sumF('E',incFirst,incLast)},
@@ -3026,6 +3028,18 @@ document.getElementById('btnAddPaymentRow').addEventListener('click', ()=>{newPa
 document.getElementById('btnAddItemRow').addEventListener('click', ()=>newItemRow());
 document.getElementById('rcpDiscount').addEventListener('input', recalcTotals);
 
+// ===== مصدر واحد للدخل: كل الدفعات الموجودة فعلياً بالوصولات والفواتير/Devis =====
+// لوحة التحكم، التقارير، تقرير الشهر، وملف Excel كلهم بيحسبوا من هون — فأي دفعة بتنحذف أو بتتعدّل،
+// أو وصل/مستند بينحذف (أو فاتورة بتنلغى)، بيتغيّر الرقم بكل مكان بنفس اللحظة.
+// نفس الدفعة إذا كانت بوصل ومستند بنفس الوقت (وصل انعمل من Devis) بتنحسب مرة وحدة.
+function allDocPayments(){
+  const seen = new Set(), out = [];
+  const push = (p, kind, d)=>{ if(!p || !(Number(p.amount)>0)) return; if(p.id){ if(seen.has(p.id)) return; seen.add(p.id); } out.push({p, kind, d}); };
+  (receipts||[]).forEach(r=>getReceiptPayments(r).forEach(p=>push(p, 'r', r)));
+  (invoices||[]).forEach(i=>{ if(i.cancelled) return; (i.payments||[]).forEach(p=>push(p, 'i', i)); });
+  return out;
+}
+function totalPaidAll(inRange){ return allDocPayments().filter(x=>!inRange || inRange(x.p.date || x.d.date || '')).reduce((s,x)=>s+(Number(x.p.amount)||0), 0); }
 function getReceiptPayments(receipt){
   if(receipt.payments && receipt.payments.length) return receipt.payments;
   const migrated = [];
@@ -3520,10 +3534,16 @@ async function deleteReceipt(id){
   if(!target) return;
   receipts = receipts.filter(r=>r.id!==id);
   saveReceipts();
-  const paymentIds = new Set((target.payments||[]).map(p=>p.id).filter(id=>id && !paymentIdStillUsed(id)));
-  const trashedPaymentEntries = paymentIds.size > 0 ? paymentHistory.filter(h=>paymentIds.has(h.paymentId)) : [];
+  const paymentIds = new Set(getReceiptPayments(target).map(p=>p.id).filter(id=>id && !paymentIdStillUsed(id)));
+  // دفعات قديمة بلا رقم (pay1/pay2 أو قبل نظام الأرقام): سطرها بالسجل بينعرف من رقم الوصل والمبلغ
+  const legacyAmts = getReceiptPayments(target).filter(p=>p && !p.id).map(p=>Number(p.amount));
+  const legacyHits = new Set();
+  paymentHistory.forEach(h=>{ if(h.paymentId || h.docType!=='وصل' || String(h.docNo)!==String(target.no)) return;
+    const k = legacyAmts.indexOf(Number(h.amount)); if(k>-1){ legacyAmts.splice(k,1); legacyHits.add(h); } });
+  const isTrashed = h=>paymentIds.has(h.paymentId) || legacyHits.has(h);
+  const trashedPaymentEntries = paymentHistory.filter(isTrashed);
   if(trashedPaymentEntries.length > 0){
-    paymentHistory = paymentHistory.filter(h => !paymentIds.has(h.paymentId));
+    paymentHistory = paymentHistory.filter(h => !isTrashed(h));
     savePaymentHistory();
     renderPaymentHistoryTable();
   }
@@ -6101,7 +6121,7 @@ window.addEventListener('afterprint', ()=>{
 });
 
 function renderDashboard(){
-  const income = paymentHistory.reduce((s,h)=>s+(Number(h.amount)||0), 0);
+  const income = totalPaidAll();
   const expTotal = expenses.reduce((s,e)=>s+e.amount,0);
   const commissionPercent = Number(settings.commissionPercent)||0;
   const commission = income * (commissionPercent/100);
@@ -6167,7 +6187,7 @@ function renderDashboard(){
 
 function renderReports(){
   const totalInvoiced = receipts.reduce((s,r)=>s+r.total,0);
-  const totalCollected = receipts.reduce((s,r)=>s+getReceiptPayments(r).reduce((a,p)=>a+p.amount,0),0);
+  const totalCollected = totalPaidAll();
   const totalDue = receipts.reduce((s,r)=>s+Math.max(r.remaining,0),0);
   const totalExp = expenses.reduce((s,e)=>s+e.amount,0);
   const commissionPercent = Number(settings.commissionPercent)||0;
@@ -6475,7 +6495,7 @@ function computePaymentReconcile(rcpts, invs, hist){
     if(fix) idFixes.push(fix);
   };
   (rcpts||[]).forEach(r=>collect('r', r, getReceiptPayments(r), metaR));
-  (invs||[]).forEach(i=>collect('i', i, i.payments||[], metaI));
+  (invs||[]).filter(i=>!i.cancelled).forEach(i=>collect('i', i, i.payments||[], metaI)); // الفاتورة الملغاة: دفعاتها ما بتنحسب بالدخل
   // 2) سطور السجل القديمة بلا رقم دفعة: منحاول نربطها بدفعة بنفس رقم المستند والمبلغ
   const linked = new Set((hist||[]).map(h=>h.paymentId).filter(Boolean));
   const links = new Map();
@@ -6504,7 +6524,7 @@ function computePaymentReconcile(rcpts, invs, hist){
   docPays.forEach(d=>{ const k = [(d.m.customerName||'').trim(), Number(d.p.amount), d.p.date||''].join('|'); if(!grp.has(k)) grp.set(k, []); grp.get(k).push(d); });
   const dups = [...grp.values()].filter(g=>g.length>1);
   const sumR = (rcpts||[]).reduce((s,r)=>s+getReceiptPayments(r).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
-  const sumI = (invs||[]).reduce((s,i)=>s+(i.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
+  const sumI = (invs||[]).filter(i=>!i.cancelled).reduce((s,i)=>s+(i.payments||[]).reduce((a,p)=>a+(Number(p.amount)||0),0),0);
   return {updates, removes, adds, idFixes, sumR, sumI, dups};
 }
 function applyPaymentReconcile(hist, rec){
@@ -6527,7 +6547,7 @@ async function saveReconcileIdFixes(rec){
 document.getElementById('btnReconcilePayments').addEventListener('click', async ()=>{
   const rec = computePaymentReconcile(receipts, invoices, paymentHistory);
   const n = rec.updates.length + rec.removes.length + rec.adds.length;
-  const why = `المقبوضات بالتقارير (الوصولات): ${fmt(rec.sumR)}\nدفعات الفواتير وعروض الأسعار: ${fmt(rec.sumI)}\nلوحة التحكم = الاثنين معاً = ${fmt(rec.sumR + rec.sumI)}`;
+  const why = `دفعات الوصولات: ${fmt(rec.sumR)}\nدفعات الفواتير وعروض الأسعار: ${fmt(rec.sumI)}\nالدخل بلوحة التحكم والتقارير = الاثنين معاً = ${fmt(rec.sumR + rec.sumI)}`;
   const line = (name, no, a)=>`• ${name||'-'} — ${no||'-'} — ${fmt(a)}`;
   const dupTxt = rec.dups.length ? `\n\n⚠ دفعات يمكن تكون مكررة بالوصولات (نفس الزبون والمبلغ والتاريخ) — راجعها بالزبائن والوصولات:\n` + rec.dups.slice(0,8).map(g=>`• ${g[0].m.customerName||'-'} — ${fmt(g[0].p.amount)} — ${g[0].p.date||'-'} — بـ: ${g.map(d=>d.m.docType+' '+(d.m.docNo||'-')).join(' و ')}`).join('\n') : '';
   if(!n){ alert('✓ سجل الدفعات مطابق للزبائن والوصولات والفواتير.\n\n' + why + dupTxt); return; }
@@ -7571,7 +7591,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
         pn.querySelector('[data-r]').textContent=isM?'':'من '+mLbl(a)+' إلى '+mLbl(b);
         const rs=(typeof receipts!=='undefined'?receipts:[]).filter(r=>inP(r.date));
         const tot=rs.reduce((x,r)=>x+n(r.total),0);
-        const paid=(typeof receipts!=='undefined'?receipts:[]).reduce((x,r)=>x+(r.payments||[]).filter(p=>inP(p.date)).reduce((y,p)=>y+n(p.amount),0),0);
+        const paid=totalPaidAll(inP);
         const rem=rs.reduce((x,r)=>x+n(r.remaining),0);
         const ex=(typeof expenses!=='undefined'?expenses:[]).filter(e=>inP(e.date)).reduce((x,e)=>x+n(e.amount),0);
         const top=tsAggregate(rs.map(r=>({r,d:null}))).slice(0,6); // الكمية المباعة (مش عدد الوصولات)

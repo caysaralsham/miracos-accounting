@@ -797,3 +797,55 @@ test('الطباعة: إذا الورقة انسكّرت قبل ما تجهز م
   const vis = await page.evaluate(() => getComputedStyle(document.querySelector('.view.active')).visibility + '|' + getComputedStyle(document.querySelector('.app')).display);
   expect(vis).toBe('visible|block');
 });
+
+test('حذف دفعة/وصل/مستند/مصروف أو تعديل سعر: القيمة بتتغيّر بكل البرنامج (لوحة التحكم، التقارير، تقرير الشهر، Excel، السجل)', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    document.getElementById('loginScreen').style.display = 'none';
+    window.confirm = () => true;
+    const wait = ms => new Promise(res => setTimeout(res, ms));
+    // معاملات السحابة (بلا نت بالاختبار): بتتطبّق على البيانات المحلية
+    window.saveReceiptsTx = async f => { receipts = f(receipts); return true; };
+    window.saveInvoicesTx = async f => { invoices = f(invoices); return true; };
+    const mon = '2026-11';
+    receipts.push(
+      { id: 'A', no: 801, name: 'زبون A', date: mon + '-01', items: [{ qty: 1, desc: 'جرن', price: 100000, amount: 100000 }], total: 100000, remaining: 30000, payments: [{ id: 'a1', date: mon + '-01', amount: 50000 }, { id: 'a2', date: mon + '-02', amount: 20000 }] },
+      { id: 'B', no: 802, name: 'زبون قديم', date: mon + '-03', items: [{ qty: 1, desc: 'درج', price: 40000, amount: 40000 }], total: 40000, remaining: 25000, pay1: 15000 });
+    invoices.push(
+      { id: 'C', no: 'D-1', docType: 'simple', clientName: 'زبون C', date: mon + '-04', items: [], total: 30000, payments: [{ id: 'c1', date: mon + '-04', amount: 10000 }] },
+      { id: 'D', no: 'F-1', docType: 'facture', clientName: 'زبون D', date: mon + '-05', items: [], total: 60000, ttc: 60000, payments: [{ id: 'd1', date: mon + '-05', amount: 5000 }] });
+    expenses.push({ id: 'E', date: mon + '-06', desc: 'نقل', category: 'نقل', amount: 4000 });
+    paymentHistory.push({ id: 'hB', amount: 15000, date: mon + '-03', customerName: 'زبون قديم', docType: 'وصل', docNo: 802 });
+    saveReceipts(); await wait(700);
+    const xl = () => { let rows; const o = window.buildXlsx; window.buildXlsx = (rs, w) => { rows = rs; return new Blob(['x']); }; const oc = URL.createObjectURL; URL.createObjectURL = () => 'blob:x';
+      HTMLAnchorElement.prototype.click = function () {}; exportExcelReport(true); window.buildXlsx = o; URL.createObjectURL = oc;
+      const row = rows.find(x => x && x.cells && x.cells[0] && x.cells[0].v === 'الدخل (المقبوضات فعلياً)'); return row.cells[1].v; };
+    const inMon = d => String(d || '').slice(0, 7) === mon;
+    const snap = () => ({ dash: document.getElementById('statIncome').textContent, rep: document.getElementById('repTotalCollected').textContent,
+      month: totalPaidAll(inMon), xl: xl(), exp: document.getElementById('statExpenses').textContent, inv: document.getElementById('repTotalInvoiced').textContent,
+      hist: paymentHistory.filter(h => ['زبون A', 'زبون قديم', 'زبون C', 'زبون D'].includes(h.customerName)).reduce((s, h) => s + h.amount, 0) });
+    const out = { start: snap() };
+    // 1) حذف دفعة من الوصل + تعديل السعر
+    receipts = receipts.map(x => x.id === 'A' ? { ...x, items: [{ qty: 1, desc: 'جرن', price: 120000, amount: 120000 }], total: 120000, payments: [x.payments[0]], remaining: 70000 } : x);
+    saveReceipts(); await wait(700); out.editA = snap();
+    // 2) حذف وصل قديم (دفعته بلا رقم)
+    await deleteReceipt('B'); await wait(700); out.delB = snap();
+    // 3) حذف دفعة من سجل الدفعات بالتقارير (Devis)
+    const hc = paymentHistory.find(h => h.paymentId === 'c1'); await deletePaymentHistoryEntry(hc.id); await wait(700); out.delC = snap();
+    out.cPays = invoices.find(i => i.id === 'C').payments.length;
+    // 4) إلغاء الفاتورة
+    await deleteInvoice('D'); await wait(700); out.cancelD = snap();
+    // 5) حذف مصروف
+    const e0 = document.getElementById('statExpenses').textContent; await deleteExpense('E'); await wait(700); out.delE = [e0, document.getElementById('statExpenses').textContent];
+    return out;
+  });
+  const n = s => num(s);
+  const all = s => [n(s.dash), n(s.rep), s.month, s.xl, s.hist];
+  expect(all(r.start)).toEqual([100000, 100000, 100000, 100000, 100000]);
+  expect(all(r.editA)).toEqual([80000, 80000, 80000, 80000, 80000]);
+  expect(n(r.editA.inv) - n(r.start.inv)).toBe(20000);
+  expect(all(r.delB)).toEqual([65000, 65000, 65000, 65000, 65000]);
+  expect(all(r.delC)).toEqual([55000, 55000, 55000, 55000, 55000]);
+  expect(r.cPays).toBe(0);
+  expect(all(r.cancelD)).toEqual([50000, 50000, 50000, 50000, 50000]);
+  expect(n(r.delE[0]) - n(r.delE[1])).toBe(4000);
+});
