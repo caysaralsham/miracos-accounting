@@ -163,28 +163,33 @@
   table.rt-cards td.rt-actions .btn{ white-space:nowrap; }
   table.rt-cards .row-actions .btn-sm{ padding:5px 7px; }
   table.rt-cards td.rt-actions{ width:1%; white-space:nowrap !important; }
-  table.rt-cards td{ white-space:normal !important; }
-  table.rt-cards td:nth-child(n){ overflow-wrap:anywhere; }
+  /* كل كتابة بالجداول سطر واحد أفقي؛ الاسم والبيان الطويلين بينقصوا بـ «…» وكبسة عليهم بتعرض الباقي */
+  table.rt-cards td{ white-space:nowrap !important; }
+  table.rt-cards td:nth-child(n){ overflow-wrap:normal; }
   table.rt-cards td .tag, table.rt-cards td bdi.ph{ white-space:nowrap; }
   table.rt-cards td.rt-money{ white-space:nowrap !important; }
   table.rt-cards td.rt-name{ white-space:nowrap !important; overflow-wrap:normal !important; }
-  table.rt-cards td.rt-name .nm{ display:block; max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  table.rt-cards td.rt-name .nm{ display:block; max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; unicode-bidi:plaintext; text-align:right; }
+  table.rt-cards td.rt-name .nm.expanded{ white-space:normal; overflow:visible; max-width:260px !important; }
+  table.rt-cards td.rt-name:has(.nm.expanded){ white-space:normal !important; }
   table.rt-cards td.rt-name .nm .tag{ margin-inline-start:4px; }
   /* البيان هو اللي بيضيق (بـ «…») حتى يساع الجدول بعرض الصفحة بلا ما ينقص شي من الأزرار */
-  @media (min-width:1101px){
-    table.rt-cards td.wrap-cell{ width:30%; min-width:130px; }
+  @media (min-width:1301px){
+    table.rt-cards td.wrap-cell{ width:30%; min-width:90px; }
+    table.rt-cards .row-actions .btn-sm{ padding:4px 5px; }
     table.rt-cards td .no-tag{ display:table; margin-top:3px; }
     table.rt-cards td.wrap-cell .details-wrap{ width:0; min-width:100%; max-width:none; }
   }
-  @media (max-width:1500px){ table.rt-cards td.rt-name .nm{ max-width:170px; } table.rt-cards th, table.rt-cards td{ padding-left:5px !important; padding-right:5px !important; } }
+  @media (max-width:1500px){ table.rt-cards td.rt-name .nm{ max-width:140px; } table.rt-cards th, table.rt-cards td{ padding-left:5px !important; padding-right:5px !important; } }
   table.rt-cards .row-actions{ flex-wrap:wrap; }
-  @media (max-width: 1100px){
+  @media (max-width: 1300px){
     table.rt-cards, table.rt-cards tbody{ display:block; width:100%; }
     table.rt-cards thead{ display:none; }
     table.rt-cards tbody tr{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:4px 12px; border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin-bottom:10px; background:var(--marble, #fff); }
     table.rt-cards tbody td{ display:block; border:none; padding:2px 0 !important; min-width:0; }
     table.rt-cards tbody td::before{ content:attr(data-label); display:block; font-size:11.5px; color:var(--text-dim); font-weight:700; }
-    table.rt-cards tbody td.wrap-cell, table.rt-cards tbody td.rt-actions{ grid-column:1 / -1; }
+    table.rt-cards tbody td.wrap-cell, table.rt-cards tbody td.rt-actions, table.rt-cards tbody td.rt-wide{ grid-column:1 / -1; }
+    table.rt-cards tbody td.rt-name .nm{ max-width:100%; }
     table.rt-cards tbody td.rt-actions{ border-top:1px dashed var(--line); padding-top:6px !important; margin-top:2px; }
     table.rt-cards .details-wrap{ width:auto; max-width:none; min-width:0; }
   }
@@ -2186,7 +2191,8 @@ function cardifyTable(table){
   table.querySelectorAll('tbody tr').forEach(tr=>{ [...tr.cells].forEach((td,i)=>{ if(heads[i]) td.setAttribute('data-label', heads[i]); else td.classList.add('rt-actions'); const tx = td.textContent.trim(); if(/^[\s\d.,-]+ دج$/.test(tx) || /^\d{4}-\d{2}-\d{2}$/.test(tx)) td.classList.add('rt-money');
     // اسم الزبون ورقم الوصل/المستند: سطر واحد أفقي (الاسم الطويل بينقص بـ «…» والاسم الكامل بيبيّن لما توقف عليه)
     if(/^(الاسم|Client|اسم الزبون|الزبون)$/.test(heads[i]||'')){ td.classList.add('rt-name'); if(!td.querySelector('.nm')){ const nm = document.createElement('span'); nm.className = 'nm'; while(td.firstChild) nm.appendChild(td.firstChild); td.appendChild(nm); } td.querySelector('.nm').title = tx; }
-    if(/^(رقم الوصل|N°|رقم المستند)$/.test(heads[i]||'')) td.classList.add('rt-money'); }); });
+    if(/^(رقم الوصل|N°|رقم المستند)$/.test(heads[i]||'')) td.classList.add('rt-money');
+    if(!td.classList.contains('wrap-cell') && !td.classList.contains('rt-name') && tx.length > 18) td.classList.add('rt-wide'); }); });
 }
 function toast(msg){
   const t = document.getElementById('toast');
@@ -3480,7 +3486,7 @@ function deliveryCell(r){
   const today = new Date(); today.setHours(0,0,0,0);
   const late = from ? Math.round((today - new Date(from + 'T00:00:00')) / 86400000) : 0;
   return late > 0
-    ? `<span style="color:#2D6FA3; font-weight:800;" title="الشغل جاهز والزبون ما إجا يستلم">🔵 جاهز — الزبون متأخر ${late} يوم عن الاستلام</span>`
+    ? `<span style="color:#2D6FA3; font-weight:800; white-space:nowrap;" title="الشغل جاهز والزبون متأخر ${late} يوم عن الاستلام">🔵 جاهز — متأخر ${late} يوم</span>`
     : '<span style="color:#2D6FA3; font-weight:800;">🔵 جاهز للتسليم</span>';
 }
 function daysUntilLabel(dateStr){
@@ -3565,7 +3571,7 @@ function renderReceiptsTable(){
 }
 document.getElementById('customerSearch').addEventListener('input', renderReceiptsTable);
 document.addEventListener('click', e=>{
-  const d = e.target.closest && e.target.closest('.details-wrap');
+  const d = e.target.closest && e.target.closest('.details-wrap, td.rt-name .nm');
   if(d) d.classList.toggle('expanded');
 });
 document.getElementById('expenseSearch').addEventListener('input', renderExpensesTable);

@@ -690,8 +690,8 @@ test('جاهز للتسليم: أزرق بدل «متأخر»، وبعد الم�
   });
   expect(r.lateOurs).toContain('تأخر 10 يوم');
   expect(r.readyEarly).toContain('جاهز للتسليم'); expect(r.readyEarly).not.toContain('متأخر');
-  expect(r.readyLate).toContain('الزبون متأخر 10 يوم'); expect(r.readyLate).toContain('#2D6FA3');
-  expect(r.readyAfter).toContain('الزبون متأخر 4 يوم');
+  expect(r.readyLate).toContain('متأخر 10 يوم'); expect(r.readyLate).toContain('#2D6FA3');
+  expect(r.readyAfter).toContain('متأخر 4 يوم');
   expect(r.deliv).toContain('تم التسليم');
 });
 
@@ -990,4 +990,31 @@ test('إزالة الرسمة من الوصل: النوع والتفاصيل و�
   expect(r.had).toBe(true);
   expect(r.items).toEqual([['نافورة — قطر 120 سم', 250000, 0], ['جرن', 1000, 0]]);
   expect(r.drawing).toBe(false);
+});
+
+test('كل كتابة بالجدول سطر أفقي («جاهز — متأخر» كمان)، وكبسة على الاسم أو البيان بتعرض الباقي', async ({ page }) => {
+  for (const w of [1920, 1366, 1280, 390]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    const r = await page.evaluate(() => {
+      document.getElementById('loginScreen').style.display = 'none';
+      const d = n => { const x = new Date(); x.setDate(x.getDate() + n); return localDate(x); };
+      if (!receipts.some(x => x.id === 'HZ1')) receipts.push(
+        { id: 'HZ1', no: 66, name: 'اللجنة الدينية لمسجد ابي ذر الغفاري', phone: '0551387142', date: d(-30), duration: 10, ready: true, readyDate: d(-15), items: [{ qty: 1, desc: 'جرن مدور 40 سم جهة حائط بدون نحت للوزات ارتفاع 90', price: 1, amount: 1 }], total: 60000, remaining: 50000, payments: [] },
+        { id: 'HZ2', no: 76, name: 'eurl hd travaux et service', phone: '0561775118', date: d(-20), duration: 10, items: [{ qty: 1, desc: 'مجسم', price: 1, amount: 1 }], total: 2355000, remaining: 1155000, payments: [] });
+      renderAllViews(); document.querySelector('.nav-item[data-view="customers"]').click();
+      const wrap = document.getElementById('receiptsTableWrap'), t = wrap.querySelector('table');
+      const row = [...t.querySelectorAll('tbody tr')].find(tr => tr.textContent.includes('جاهز'));
+      const cells = [...row.cells].filter(td => !td.classList.contains('rt-actions'));
+      const lineH = parseFloat(getComputedStyle(row.cells[0]).lineHeight) || 22;
+      const tall = cells.filter(td => { const kids = td.querySelectorAll('.nm, .details-wrap'); const el = kids[0] || td.firstElementChild || td; const range = document.createRange(); range.selectNodeContents(el); return range.getBoundingClientRect().height > lineH * 1.6; }).map(td => td.textContent.trim().slice(0, 25));
+      const nm = row.querySelector('td.rt-name .nm'); const h1 = nm.getBoundingClientRect().height, w1 = nm.scrollWidth > nm.clientWidth;
+      nm.click(); const h2 = nm.getBoundingClientRect().height, open = nm.classList.contains('expanded'); nm.click();
+      const dw = row.querySelector('.details-wrap'); dw.click(); const dOpen = dw.classList.contains('expanded'); dw.click();
+      return { tall, truncated: w1, open, grew: h2 > h1, dOpen, over: Math.round(t.getBoundingClientRect().width - wrap.clientWidth) };
+    });
+    expect(r.tall, 'w ' + w).toEqual([]);
+    expect(r.over, 'w ' + w).toBeLessThanOrEqual(1);
+    expect(r.open && r.dOpen, 'w ' + w).toBe(true);
+    if (r.truncated) expect(r.grew, 'w ' + w).toBe(true);
+  }
 });
