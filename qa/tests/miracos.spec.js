@@ -900,3 +900,49 @@ test('لوحة التحكم: زر «عرض» بالمبالغ المتبقية،
   expect(r.due).toBeGreaterThan(0); expect(r.deliv).toBeGreaterThan(0); expect(r.recent).toBeGreaterThan(1);
   expect(r.view).toBe(true); expect(r.exp).toBe(true);
 });
+
+test('الـ Facture بتطلع مع الزبائن والوصولات (TTC)، والقسم التاني اسمه «عروض الأسعار»، والتسليم والتقارير بيحسبوها', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    document.getElementById('loginScreen').style.display = 'none';
+    const wait = ms => new Promise(res => setTimeout(res, ms));
+    const d = n => { const x = new Date(); x.setDate(x.getDate() + n); return localDate(x); };
+    invoices.push(
+      { id: 'FX', docType: 'facture', no: 'F001/2026', date: d(-10), delay: '30 jours', clientName: 'اللجنة الدينية', items: [{ qty: 1, desc: 'تغليف رخام', price: 1000000, amount: 1000000 }], ht: 1000000, tva: 190000, ttc: 1190000, payments: [{ id: 'fxp', date: d(-5), amount: 190000 }], paid: 190000, remaining: 1000000 },
+      { id: 'DV', docType: 'simple', no: 'D020/2026', date: d(-2), clientName: 'زبون عرض', items: [], ttc: 5000, payments: [], remaining: 5000 },
+      { id: 'FC', docType: 'facture', no: 'F002/2026', date: d(-2), clientName: 'ملغاة', cancelled: true, items: [], ttc: 7000, payments: [], remaining: 7000 });
+    const before = { inv: document.getElementById('repTotalInvoiced').textContent };
+    renderAllViews();
+    const rcpTxt = document.getElementById('receiptsTableWrap').innerText;
+    const invTxt = document.getElementById('invoicesTableWrap').innerText;
+    const heading = [...document.querySelectorAll('#view-customers h2')].map(h => h.textContent).join('|');
+    const btn = document.getElementById('btnNewInvoice').textContent.trim();
+    const track = document.getElementById('deliveryTrackWrap').innerText;
+    const due = document.getElementById('dueList').innerText;
+    const rep = { inv: document.getElementById('repTotalInvoiced').textContent, due: document.getElementById('repTotalDue').textContent };
+    // تعديل: تم التسليم
+    editInvoice('FX');
+    const wrapShown = getComputedStyle(document.getElementById('invDeliveredWrap')).display !== 'none';
+    document.getElementById('invDelivered').checked = true;
+    await buildAndSaveInvoiceFromForm(); await wait(600);
+    const fx = invoices.find(i => i.id === 'FX');
+    const deliv = document.getElementById('deliveredCustomersWrap').innerText;
+    const ddue = document.getElementById('deliveredDueList').innerText;
+    const rcpAfter = document.getElementById('receiptsTableWrap').innerText;
+    // الملغاة بتضل ملغاة بعد التعديل
+    editInvoice('FC'); await buildAndSaveInvoiceFromForm(); await wait(300);
+    const fcCancelled = invoices.find(i => i.id === 'FC').cancelled;
+    return { rcpTxt, invTxt, heading, btn, track, due, rep, wrapShown, fxDelivered: fx.delivered && !!fx.deliveredDate, deliv, ddue, rcpAfter, fcCancelled };
+  });
+  expect(r.rcpTxt).toContain('اللجنة الدينية'); expect(r.rcpTxt).toContain('F001/2026'); expect(r.rcpTxt).toContain('1.190.000');
+  expect(r.rcpTxt).not.toContain('زبون عرض');
+  expect(r.invTxt).toContain('زبون عرض'); expect(r.invTxt).not.toContain('اللجنة الدينية'); expect(r.invTxt).toContain('ملغاة');
+  expect(r.heading).toContain('عروض الأسعار'); expect(r.heading).not.toContain('الفواتير');
+  expect(r.btn).toBe('عرض سعر جديد');
+  expect(r.track).toContain('اللجنة الدينية'); expect(r.track).toContain('30 يوم');
+  expect(r.due).toContain('اللجنة الدينية'); expect(r.due).toContain('1.000.000');
+  expect(num(r.rep.inv)).toBe(1190000); expect(num(r.rep.due)).toBe(1000000);
+  expect(r.wrapShown).toBe(true); expect(r.fxDelivered).toBe(true);
+  expect(r.deliv).toContain('اللجنة الدينية'); expect(r.ddue).toContain('اللجنة الدينية');
+  expect(r.rcpAfter).not.toContain('اللجنة الدينية');
+  expect(r.fcCancelled).toBe(true);
+});

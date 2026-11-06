@@ -700,7 +700,7 @@
           </button>
           <button class="btn btn-primary" id="btnNewInvoice">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            فاتورة جديدة
+            عرض سعر جديد
           </button>
         </div>
       </div>
@@ -717,7 +717,8 @@
 
       <div class="panel">
         <div class="panel-head">
-          <h2>الفواتير</h2>
+          <h2>عروض الأسعار</h2>
+          <span style="font-size:12px; color:var(--text-dim);">Devis و Facture proforma — الـ Facture بتطلع فوق مع الزبائن والوصولات</span>
         </div>
         <div id="invoicesTableWrap"></div>
       </div>
@@ -1280,6 +1281,17 @@
 
         <div class="totals-row" style="margin-top:12px;"><span id="invPaidLabel">Total payé</span><span id="invPaidDisplay">0 دج</span></div>
         <div class="totals-row"><span id="invRemainingLabel">Reste à payer</span><span id="invRemainingDisplay" style="font-weight:800;">0 دج</span></div>
+        <div id="invDeliveredWrap" style="display:none; margin-top:12px; padding-top:10px; border-top:1px dashed var(--line);">
+          <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px;">الـ Facture بتطلع مع الزبائن والوصولات — مدة التسليم من خانة «Délai de livraison» (مثلاً 30 jours)</div>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0 0 8px;">
+            <input type="checkbox" id="invReady" style="width:auto;">
+            <span style="color:#2D6FA3; font-weight:700;">🔵 جاهز للتسليم</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; margin:0;">
+            <input type="checkbox" id="invDelivered" style="width:auto;">
+            <span style="color:var(--verdigris-deep); font-weight:700;">تم تسليم البضاعة</span>
+          </label>
+        </div>
       </div>
 
       <div class="field" style="margin-top:10px;">
@@ -2469,7 +2481,7 @@ function exportExcelReport(silent){
     // الوصولات + المستندات اللي عليها دفعات (Devis / Facture proforma / Facture) — نفس حساب لوحة التحكم
     const xlPays = allDocPayments(), paidOf = d=>xlPays.filter(x=>x.d===d).reduce((s,x)=>s+(Number(x.p.amount)||0),0);
     const xlDocs = [...receipts.map(r=>({no:String(r.no||''), date:r.date||'', name:r.name||'', total:Number(r.total)||0, paid:paidOf(r)})),
-      ...invoices.filter(i=>!i.cancelled).map(i=>({i, paid:paidOf(i)})).filter(x=>x.paid>0).map(({i,paid})=>({no:(i.docType==='facture'?'Facture ':(i.docType==='devis'?'Proforma ':'Devis '))+(i.no||''), date:i.date||'', name:i.clientName||'', total:Number(i.ttc!=null?i.ttc:i.total)||0, paid}))];
+      ...invoices.filter(i=>!i.cancelled).map(i=>({i, paid:paidOf(i)})).filter(x=>x.paid>0 || x.i.docType==='facture').map(({i,paid})=>({no:(i.docType==='facture'?'Facture ':(i.docType==='devis'?'Proforma ':'Devis '))+(i.no||''), date:i.date||'', name:i.clientName||'', total:Number(i.ttc!=null?i.ttc:i.total)||0, paid}))];
     xlDocs.forEach(x=>{ totalIncomeInvoiced += x.total; totalIncomePaid += x.paid; });
     expenses.forEach(e=>{ totalExpenses += Number(e.amount)||0; });
     const commission = totalIncomePaid * commissionPercent/100;
@@ -3398,6 +3410,27 @@ document.getElementById('btnSaveAndPrint').addEventListener('click', ()=> guarde
   printWhenFit('viewReceiptOverlay');
 }));
 
+// ===== الـ Facture مع الزبائن والوصولات =====
+// الـ Facture (شغل مؤكّد) بتضل مستند قانوني برقمها، بس بتطلع بكل قوائم الزبائن متل الوصل:
+// قيد العمل، تم التسليم، عليهم دين، المبالغ المتبقية، ومجموع الشغل بالتقارير — بالمبلغ مع الضريبة (TTC).
+function delayDays(t){
+  t = String(t||''); const m = t.match(/\d+/); if(!m) return '';
+  let n = +m[0];
+  if(/mois|month|شهر|أشهر|اشهر/i.test(t)) n *= 30; else if(/sem|week|أسبوع|اسبوع|أسابيع|اسابيع|جمعة/i.test(t)) n *= 7;
+  return n;
+}
+function factureAsRow(i){
+  const total = Number(i.ttc!=null ? i.ttc : i.total)||0;
+  const paid = (i.payments||[]).reduce((s,p)=>s+(Number(p.amount)||0),0);
+  return { id:i.id, _inv:true, no:i.no, date:i.date||'', duration:delayDays(i.delay), name:i.clientName||'', phone:i.clientPhone||'', address:i.clientAddress||'',
+    items:i.items||[], total, remaining: total - paid, payments:i.payments||[],
+    delivered:!!i.delivered, deliveredDate:i.deliveredDate||'', ready:!!i.ready, readyDate:i.readyDate||'' };
+}
+function activeFactureRows(){ return (invoices||[]).filter(i=>i.docType==='facture' && !i.cancelled).map(factureAsRow); }
+function workRows(){ return [...receipts, ...activeFactureRows()]; }
+function rowViewJs(r){ return r._inv ? `viewInvoice('${r.id}')` : `viewReceipt('${r.id}')`; }
+function rowEditJs(r){ return r._inv ? `editInvoice('${r.id}')` : `editReceipt('${r.id}')`; }
+function rowNoHtml(r){ return r._inv ? `${escHtmlText(String(r.no||''))} <span class="tag tag-paid" style="font-size:10.5px">Facture</span>` : escHtmlText(String(r.no||'—')); }
 function statusTag(r){
   if(r.remaining <= 0) return '<span class="tag tag-paid">مدفوع بالكامل</span>';
   if(getReceiptPayments(r).length) return '<span class="tag tag-partial">دفعة جزئية</span>';
@@ -3456,10 +3489,11 @@ function rcpNoMatch(r, q){
 function renderReceiptsTable(){
   const wrap = document.getElementById('receiptsTableWrap');
   const q = (document.getElementById('customerSearch').value || '').trim();
-  let list = receipts.filter(r => !r.delivered).reverse();
+  let list = [...activeFactureRows().filter(r => !r.delivered).reverse(), ...receipts.filter(r => !r.delivered).reverse()];
   if(q) list = list.filter(r =>
     rcpNoMatch(r, q) || dmyMatch(q, r.date) ||
-    r.name.includes(q) ||
+    (r.name||'').includes(q) ||
+    (r._inv && String(r.no||'').toLowerCase().includes(q.toLowerCase())) ||
     (r.phone||'').includes(q) ||
     (r.items||[]).some(it => (it.desc||'').includes(q))
   );
@@ -3475,6 +3509,24 @@ function renderReceiptsTable(){
   </tr></thead><tbody>`;
   list.forEach(r=>{
     const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
+    if(r._inv){ html += `<tr>
+      <td>${rowNoHtml(r)}</td>
+      <td>${escHtmlText(r.name)}</td>
+      <td class="wrap-cell"><div class="details-wrap">${escHtmlText(details)}</div></td>
+      <td>${phoneHtml(r.phone)}</td>
+      <td>${deliveryCell(r)}</td>
+      <td>${fmt(r.total)}</td>
+      <td>${fmt(r.remaining)}</td>
+      <td>${statusTag(r)}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-sm btn-ghost" onclick="viewInvoice('${r.id}')" title="عرض/طباعة">👁</button>
+          <button class="btn btn-sm btn-ghost" onclick="editInvoice('${r.id}')" title="تعديل (والتسليم)">✎</button>
+          <button class="btn btn-sm btn-ghost" onclick="duplicateInvoice('${r.id}')" title="نسخ">⧉</button>
+          <button class="btn btn-sm btn-ghost" onclick="deleteInvoice('${r.id}')" title="إلغاء الفاتورة">⊘</button>
+        </div>
+      </td>
+    </tr>`; return; }
     html += `<tr>
       <td>${r.no}</td>
       <td>${escHtmlText(r.name)}</td>
@@ -4082,6 +4134,7 @@ function noteInvoiceNoUsed(no){
 }
 
 function updateInvNoLabel(){
+  { const w = document.getElementById('invDeliveredWrap'); if(w) w.style.display = document.getElementById('invDocType').value === 'facture' ? '' : 'none'; }
   const type = document.getElementById('invDocType').value;
   const isSimple = type === 'simple';
   document.getElementById('invNoLabel').textContent = type === 'facture' ? 'N° de facture' : (type === 'devis' ? 'N° proforma' : 'رقم العرض');
@@ -4143,7 +4196,11 @@ function openInvoiceModal(invoice){
     (invoice.items||[]).forEach(it=>newInvoiceItemRow(it));
     (invoice.payments||[]).forEach(p=>newInvoicePaymentRow(p));
     document.getElementById('invNote').value = invoice.note||'';
+    document.getElementById('invDelivered').checked = !!invoice.delivered;
+    document.getElementById('invReady').checked = !!(invoice.ready && !invoice.delivered);
   } else {
+    document.getElementById('invDelivered').checked = false;
+    document.getElementById('invReady').checked = false;
     document.getElementById('invoiceModalTitle').textContent = 'مستند جديد';
     document.getElementById('invId').value = '';
     document.getElementById('invDocType').value = 'simple';
@@ -4165,7 +4222,18 @@ function openInvoiceModal(invoice){
   requestAnimationFrame(()=>growAllDesc(document.getElementById('invoiceOverlay')));
 }
 document.getElementById('btnNewInvoice').addEventListener('click', ()=>openInvoiceModal(null));
+document.getElementById('invDelivered').addEventListener('change', e=>{ if(e.target.checked) document.getElementById('invReady').checked = false; });
+document.getElementById('invReady').addEventListener('change', e=>{ if(e.target.checked) document.getElementById('invDelivered').checked = false; });
 
+function invDeliveryFromForm(prev){
+  if(document.getElementById('invDocType').value !== 'facture') return {};
+  const delivered = document.getElementById('invDelivered').checked;
+  const ready = !delivered && document.getElementById('invReady').checked;
+  return {
+    delivered, deliveredDate: delivered ? ((prev && prev.delivered && prev.deliveredDate) || localDate()) : '',
+    ready, readyDate: ready ? ((prev && prev.ready && prev.readyDate) || localDate()) : ''
+  };
+}
 async function buildAndSaveInvoiceFromForm(){
   const clientName = document.getElementById('invClientName').value.trim();
   if(!clientName){ toast('يرجى إدخال اسم الزبون / الشركة'); return null; }
@@ -4211,6 +4279,11 @@ async function buildAndSaveInvoiceFromForm(){
     items, ht, tva, ttc, payments,
     paid, remaining: ttc - paid,
     note: document.getElementById('invNote').value.trim(),
+    // حالة التسليم (للـ Facture — بتطلع مع الزبائن والوصولات)
+    ...invDeliveryFromForm(prevInvoice),
+    // الحالات اللي ما إلها خانة بالنموذج بتضل متل ما هي (قبل: التعديل كان يشيل «ملغاة»)
+    ...(prevInvoice && prevInvoice.cancelled ? {cancelled:true, cancelledAt:prevInvoice.cancelledAt} : {}),
+    ...(prevInvoice && prevInvoice.convertedTo ? {convertedTo:prevInvoice.convertedTo} : {}),
     ...(window.__mdSave&&window.__mdSave.inv?{mirsamDrawing:window.__mdSave.inv}:{}),
     ...(window.__phSave&&window.__phSave.inv&&window.__phSave.inv.length?{productPhotos:window.__phSave.inv}:{})
   };
@@ -4249,17 +4322,19 @@ document.getElementById('btnSaveAndPrintInvoice').addEventListener('click', asyn
 function renderInvoicesTable(){
   const wrap = document.getElementById('invoicesTableWrap');
   if(!wrap) return;
-  if(invoices.length === 0){
+  // عروض الأسعار بس (Devis / Facture proforma) + الـ Facture الملغاة (لترجيعها إذا لزم). الـ Facture الفعّالة بجدول الزبائن والوصولات
+  const shownInv = invoices.filter(i=>i.docType!=='facture' || i.cancelled);
+  if(shownInv.length === 0){
     wrap.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
-      <div>لا توجد فواتير بعد. اضغط "فاتورة جديدة" لإنشاء أول فاتورة.</div>
+      <div>لا توجد عروض أسعار بعد. اضغط "عرض سعر جديد".</div>
     </div>`;
     return;
   }
   let html = `<table><thead><tr>
     <th>Type</th><th>N°</th><th>Date</th><th>Client</th><th>Total TTC</th><th>Reste</th><th></th>
   </tr></thead><tbody>`;
-  [...invoices].reverse().forEach(inv=>{
+  [...shownInv].reverse().forEach(inv=>{
     const isFacture = inv.docType === 'facture';
     const isDevis = inv.docType === 'devis';
     const typeTag = isFacture ? 'Facture' : (isDevis ? 'Facture proforma' : 'Devis');
@@ -6141,27 +6216,27 @@ function renderDashboard(){
   const balEl = document.getElementById('statBalance');
   balEl.textContent = fmt(balance);
   balEl.className = 'stat-num ' + (balance>=0 ? 'pos':'neg');
-  document.getElementById('statCustomers').textContent = new Set(receipts.map(r=>r.name)).size;
+  document.getElementById('statCustomers').textContent = new Set(workRows().map(r=>r.name)).size;
 
-  const due = receipts.filter(r=>r.remaining>0).sort((a,b)=>b.remaining-a.remaining);
+  const due = workRows().filter(r=>r.remaining>0).sort((a,b)=>b.remaining-a.remaining);
   const dueWrap = document.getElementById('dueList');
   if(due.length===0){
     dueWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا توجد مبالغ متبقية على أي زبون 🎉</div>';
   } else {
     dueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th><th style="width:70px"></th></tr></thead><tbody>${
-      due.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td><button class="btn btn-sm" onclick="viewReceipt('${r.id}')" title="عرض الوصل">👁 عرض</button></td></tr>`).join('')
+      due.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${rowNoHtml(r)}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td><button class="btn btn-sm" onclick="${rowViewJs(r)}" title="عرض">👁 عرض</button></td></tr>`).join('')
     }</tbody></table>`;
     cardifyTable(dueWrap.querySelector('table'));
   }
 
-  const deliveredDue = receipts.filter(r => r.delivered && r.remaining > 0)
+  const deliveredDue = workRows().filter(r => r.delivered && r.remaining > 0)
     .sort((a,b)=> (daysSinceDelivery(b) ?? -1) - (daysSinceDelivery(a) ?? -1));
   const deliveredDueWrap = document.getElementById('deliveredDueList');
   if(deliveredDue.length===0){
     deliveredDueWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن مستلمين وعليهم دين 🎉</div>';
   } else {
     deliveredDueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th><th>تأخر السداد</th><th style="width:150px"></th></tr></thead><tbody>${
-      deliveredDue.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td>${debtLateLabel(r)}</td><td><div class="row-actions"><button class="btn btn-sm" onclick="viewReceipt('${r.id}')" title="عرض الوصل">👁 عرض</button><button class="btn btn-sm btn-primary" data-dashboard-edit-receipt="${r.id}">تعديل</button></div></td></tr>`).join('')
+      deliveredDue.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${rowNoHtml(r)}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td>${debtLateLabel(r)}</td><td><div class="row-actions"><button class="btn btn-sm" onclick="${rowViewJs(r)}" title="عرض">👁 عرض</button><button class="btn btn-sm btn-primary" ${r._inv?`onclick="editInvoice('${r.id}')"`:`data-dashboard-edit-receipt="${r.id}"`}>تعديل</button></div></td></tr>`).join('')
     }</tbody></table>`;
     cardifyTable(deliveredDueWrap.querySelector('table'));
     deliveredDueWrap.querySelectorAll('[data-dashboard-edit-receipt]').forEach(btn=>{
@@ -6183,6 +6258,7 @@ function renderDashboard(){
     const act = latestReceiptActivity(r);
     return {type:'وصل', label:`${r.name} — #${r.no}`, amount: act.received, date: act.date, open:`viewReceipt('${r.id}')`};
   }).filter(x=>x.amount > 0);
+  activeFactureRows().forEach(r=>{ const act = latestReceiptActivity(r); if(act.received > 0) recentReceipts.push({type:'Facture', label:`${r.name} — ${r.no}`, amount: act.received, date: act.date, open:`viewInvoice('${r.id}')`}); });
   const recentExp = expenses.map(e=>({type:'مصروف', label:e.desc, amount:-e.amount, date:e.date, open:`editExpense('${e.id}')`}));
   const combined = [...recentReceipts, ...recentExp].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,8);
   const recentWrap = document.getElementById('recentList');
@@ -6197,9 +6273,9 @@ function renderDashboard(){
 }
 
 function renderReports(){
-  const totalInvoiced = receipts.reduce((s,r)=>s+r.total,0);
+  const totalInvoiced = workRows().reduce((s,r)=>s+(Number(r.total)||0),0);
   const totalCollected = totalPaidAll();
-  const totalDue = receipts.reduce((s,r)=>s+Math.max(r.remaining,0),0);
+  const totalDue = workRows().reduce((s,r)=>s+Math.max(Number(r.remaining)||0,0),0);
   const totalExp = expenses.reduce((s,e)=>s+e.amount,0);
   const commissionPercent = Number(settings.commissionPercent)||0;
   const commission = totalCollected * (commissionPercent/100);
@@ -6361,7 +6437,7 @@ document.getElementById('tsAllBtn').addEventListener('click', e=>{
 
 function renderCustomerReports(){
   const dWrap = document.getElementById('deliveryTrackWrap');
-  const withDelivery = receipts
+  const withDelivery = workRows()
     .filter(r => !r.delivered)
     .map(r=>({r, deliveryDate: computeDeliveryDate(r)}))
     .filter(x=>x.deliveryDate)
@@ -6375,7 +6451,7 @@ function renderCustomerReports(){
       withDelivery.map(({r, deliveryDate})=>{
         const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
         return `<tr>
-          <td>${escHtmlText(r.name)}</td>
+          <td>${escHtmlText(r.name)}${r._inv?' <span class="tag tag-paid" style="font-size:10.5px">Facture</span>':''}</td>
           <td class="wrap-cell"><div class="details-wrap">${escHtmlText(details)}</div></td>
           <td>${r.date||''}</td>
           <td>${r.duration} يوم</td>
@@ -6391,7 +6467,7 @@ function renderCustomerReports(){
   const deliveredWrap = document.getElementById('deliveredCustomersWrap');
   const dq = (document.getElementById('deliveredCustomerSearch').value || '').trim();
   const dDate = document.getElementById('deliveredCustomerDate').value;
-  let delivered = [...receipts]
+  let delivered = workRows()
     .filter(r => r.delivered)
     .sort((a,b)=>((b.deliveredDate||b.date||'')).localeCompare(a.deliveredDate||a.date||''));
   if(dq) delivered = delivered.filter(r =>
@@ -6413,7 +6489,7 @@ function renderCustomerReports(){
           ? `<span style="color:var(--danger); font-weight:700;">دين</span><br>${debtLateLabel(r)}`
           : `<span style="color:var(--verdigris-deep); font-weight:700;">مدفوع</span>`;
         return `<tr>
-          <td>${escHtmlText(String(r.no||'—'))}</td>
+          <td>${rowNoHtml(r)}</td>
           <td>${escHtmlText(r.name)}</td>
           <td class="wrap-cell"><div class="details-wrap">${escHtmlText(details)}</div></td>
           <td>${phoneHtml(r.phone)}</td>
@@ -6423,9 +6499,9 @@ function renderCustomerReports(){
           <td>${paymentStatus}</td>
           <td>
             <div class="row-actions">
-              <button class="btn btn-sm btn-ghost" onclick="viewReceipt('${r.id}')" title="عرض/طباعة">👁</button>
-              <button class="btn btn-sm btn-ghost" onclick="editReceipt('${r.id}')" title="تعديل">✎</button>
-              <button class="btn btn-sm btn-ghost" onclick="deleteReceipt('${r.id}')" title="حذف (لسلة المهملات)">🗑</button>
+              <button class="btn btn-sm btn-ghost" onclick="${rowViewJs(r)}" title="عرض/طباعة">👁</button>
+              <button class="btn btn-sm btn-ghost" onclick="${rowEditJs(r)}" title="تعديل">✎</button>
+              ${r._inv ? `<button class="btn btn-sm btn-ghost" onclick="deleteInvoice('${r.id}')" title="إلغاء الفاتورة">⊘</button>` : `<button class="btn btn-sm btn-ghost" onclick="deleteReceipt('${r.id}')" title="حذف (لسلة المهملات)">🗑</button>`}
             </div>
           </td>
         </tr>`;
@@ -7600,7 +7676,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
         const isM=ki.value==='m',P=isM?'الشهر':'الفترة';
         pn.querySelector('[data-t]').textContent='📊 تقرير '+KN[ki.value];
         pn.querySelector('[data-r]').textContent=isM?'':'من '+mLbl(a)+' إلى '+mLbl(b);
-        const rs=(typeof receipts!=='undefined'?receipts:[]).filter(r=>inP(r.date));
+        const rs=(typeof workRows==='function'?workRows():receipts).filter(r=>inP(r.date));
         const tot=rs.reduce((x,r)=>x+n(r.total),0);
         const paid=totalPaidAll(inP);
         const rem=rs.reduce((x,r)=>x+n(r.remaining),0);
