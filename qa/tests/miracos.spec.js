@@ -695,3 +695,105 @@ test('جاهز للتسليم: أزرق بدل «متأخر»، وبعد الم�
   expect(r.deliv).toContain('تم التسليم');
 });
 
+
+// ---- تعديلات 2026-11-06 ----
+test('خانات المبالغ: فواصل الآلاف وانت عم تكتب، والقيمة المحسوبة صافية', async ({ page }) => {
+  const r = await page.evaluate(() => { document.getElementById('loginScreen').style.display = 'none'; openReceiptModal(null); newPaymentRow(); return true; });
+  const pm = page.locator('#paymentsBody .pm-amount').last();
+  await pm.click(); await pm.fill(''); await page.keyboard.type('1500000');
+  expect(await pm.inputValue()).toBe('1,500,000');
+  expect(await pm.evaluate(e => e.value)).toBe('1500000');
+  const pr = page.locator('#itemsBody .it-price').first();
+  await pr.click(); await page.keyboard.type('٢٥٠٠٠');
+  expect(await pr.inputValue()).toBe('25,000');
+  // تعديل بالنص: المؤشر بيضل بمكانه
+  await pm.evaluate(e => { e.focus(); e.setSelectionRange(1, 1); }); await page.keyboard.type('2');
+  expect(await pm.inputValue()).toBe('12,500,000');
+  // تعبئة من الكود (تعديل وصل قديم) بتطلع بفواصل
+  await page.evaluate(() => { document.getElementById('rcpDiscount').value = 30000; });
+  expect(await page.locator('#rcpDiscount').inputValue()).toBe('30,000');
+});
+
+test('تعديل دفعة أو سعر بالوصل بيتعدّل بسجل الدفعات ولوحة التحكم والتقارير', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const rc = { id: 'sy1', no: 901, name: 'زبون مزامنة', date: '2026-11-01', items: [{ qty: 1, desc: 'جرن', price: 100000, amount: 100000 }], total: 100000, remaining: 40000, payments: [{ id: 'syp1', date: '2026-11-01', amount: 60000 }] };
+    receipts.push(rc);
+    paymentHistory.push({ id: 'h1', paymentId: 'syp1', amount: 60000, date: '2026-11-01', customerName: 'زبون مزامنة', docNo: 901, docType: 'وصل' },
+                        { id: 'h2', paymentId: 'syp1', amount: 60000, date: '2026-11-01', customerName: 'زبون مزامنة', docNo: 901, docType: 'وصل' }); // مكررة
+    receipts[receipts.length - 1] = { ...rc, payments: [{ id: 'syp1', date: '2026-11-01', amount: 75000 }], remaining: 25000 };
+    saveReceipts();
+    await new Promise(res => setTimeout(res, 700));
+    const h = paymentHistory.filter(x => x.paymentId === 'syp1');
+    return { n: h.length, amt: h[0] && h[0].amount, income: document.getElementById('statIncome').textContent, col: document.getElementById('repTotalCollected').textContent };
+  });
+  expect(r.n).toBe(1);
+  expect(r.amt).toBe(75000);
+  expect(num(r.income)).toBe(75000);
+  expect(num(r.col)).toBe(75000);
+});
+
+test('أزرار الوصل بسطر أفقي، وتقارير الزبائن بلا تحريك يمين/يسار', async ({ page }) => {
+  for (const w of [1366, 1024, 390]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    const r = await page.evaluate(() => {
+      document.getElementById('loginScreen').style.display = 'none';
+      if (!receipts.some(x => x.id === 'lay1')) for (let i = 1; i < 5; i++) {
+        const mk = d => ({ id: 'lay' + i + d, no: 500 + i + (d ? 10 : 0), name: 'زبون طويل الاسم عبد الرحمن ' + i, phone: '0550123456', date: '2026-10-02', duration: 15, delivered: d, deliveredDate: d ? '2026-10-20' : '', items: [{ qty: 1, desc: 'رخام كرارا مع تفاصيل طويلة', price: 300000, amount: 300000 }], total: 300000, remaining: 50000, payments: [] });
+        receipts.push(mk(false), mk(true));
+      }
+      document.querySelector('.nav-item[data-view="customers"]').click();
+      const acts = [...document.querySelectorAll('#receiptsTableWrap .row-actions')].map(a => { const bs = [...a.querySelectorAll('button')].map(b => Math.round(b.getBoundingClientRect().top)); return new Set(bs).size; });
+      document.querySelector('.nav-item[data-view="customer-reports"]').click();
+      const wraps = ['deliveryTrackWrap', 'deliveredCustomersWrap'].map(id => { const e = document.getElementById(id); return e.scrollWidth - e.clientWidth; });
+      return { acts, wraps, page: document.documentElement.scrollWidth - innerWidth };
+    });
+    expect(r.acts.every(n => n === 1), 'width ' + w).toBe(true);
+    expect(r.wraps, 'width ' + w).toEqual([0, 0]);
+    expect(r.page).toBeLessThanOrEqual(1);
+  }
+});
+
+test('النسخة اليومية الساعة 5: بتصير والبرنامج مفتوح (بلا إعادة تشغيل)، ومرة وحدة باليوم، ونسخة مبارح الفايتة بتنعمل', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const calls = []; window.exportExcelReport = () => calls.push('x'); window.exportRestoreJSON = () => calls.push('j');
+    receipts.push({ id: 'bk', no: 1, name: 'a', items: [], total: 0, remaining: 0, payments: [] });
+    localStorage.removeItem(dailyBkKey());
+    const at = (h, dd) => { const d = new Date(); d.setDate(d.getDate() + (dd || 0)); d.setHours(h, 0, 0, 0); return d; };
+    const before5 = dailyBackupDueDay(at(16)), after5 = dailyBackupDueDay(at(17));
+    localStorage.setItem(dailyBkKey(), localDate(at(12)));
+    const doneToday = dailyBackupDueDay(at(18));
+    localStorage.setItem(dailyBkKey(), localDate(at(12, -3)));
+    const missed = dailyBackupDueDay(at(9)), yday = localDate(at(9, -1));
+    // تشغيل فعلي
+    localStorage.setItem(dailyBkKey(), localDate(at(12, -1)));
+    const RealDate = Date; const fake = at(17).getTime() + 60000;
+    window.Date = class extends RealDate { constructor(...a) { super(...(a.length ? a : [fake])); } static now() { return fake; } };
+    runDailyBackupIfNeeded();
+    await new Promise(res => setTimeout(res, 4500));
+    runDailyBackupIfNeeded(); await new Promise(res => setTimeout(res, 3500));
+    window.Date = RealDate;
+    return { before5, after5: !!after5, doneToday, missed, yday, calls: calls.join(''), notice: !!document.getElementById('dailyBackupNotice') };
+  });
+  expect(r.before5).toBe('');
+  expect(r.after5).toBe(true);
+  expect(r.doneToday).toBe('');
+  expect(r.missed).toBe(r.yday);
+  expect(r.calls).toBe('xj');
+  expect(r.notice).toBe(true);
+});
+
+test('الطباعة: إذا الورقة انسكّرت قبل ما تجهز ما بتطلع ورقة فاضية، وCtrl+P بلا ورقة بيطبع الصفحة', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    document.getElementById('loginScreen').style.display = 'none';
+    // الطباعة الحقيقية مخفية بالاختبار
+    let printed = 0; const orig = Window.prototype.print; Window.prototype.print = () => { printed++; };
+    window.print(); await new Promise(res => setTimeout(res, 400));
+    Window.prototype.print = orig;
+    return { printed };
+  });
+  expect(r.printed).toBe(0);
+  await page.evaluate(() => { window.dispatchEvent(new Event('beforeprint')); });
+  await page.emulateMedia({ media: 'print' });
+  const vis = await page.evaluate(() => getComputedStyle(document.querySelector('.view.active')).visibility + '|' + getComputedStyle(document.querySelector('.app')).display);
+  expect(vis).toBe('visible|block');
+});

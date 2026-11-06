@@ -157,7 +157,11 @@
   td.wrap-cell{ white-space:normal; }
   bdi.ph{ unicode-bidi:isolate; direction:ltr; white-space:nowrap; }
   /* جداول الزبائن والفواتير: بلا تحريك يمين/يسار — على الكمبيوتر الأسماء بتلتف، على الشاشات الأصغر بطاقات */
-  #receiptsTableWrap, #invoicesTableWrap{ overflow-x:visible; }
+  #receiptsTableWrap, #invoicesTableWrap, #deliveryTrackWrap, #deliveredCustomersWrap{ overflow-x:visible; }
+  /* أزرار الصف (عرض، تعديل، للمعمل، نسخ، حذف): كلها بسطر أفقي واحد */
+  .row-actions{ flex-wrap:nowrap !important; gap:2px; }
+  table.rt-cards .row-actions .btn-sm{ padding:5px 7px; }
+  table.rt-cards td.rt-actions{ width:1%; white-space:nowrap !important; }
   table.rt-cards td{ white-space:normal !important; }
   table.rt-cards td:nth-child(n){ overflow-wrap:anywhere; }
   table.rt-cards td .tag, table.rt-cards td bdi.ph{ white-space:nowrap; }
@@ -354,6 +358,11 @@
     #loginScreen, .app, .toast{ display:none !important; }
     body *{ visibility:hidden; }
 
+    body.print-page .app{ display:block !important; }
+    body.print-page .sidebar, body.print-page .view:not(.active){ display:none !important; }
+    body.print-page .main{ padding:10mm !important; max-width:none !important; }
+    body.print-page .view.active, body.print-page .view.active *{ visibility:visible; }
+    body.print-page .view.active button, body.print-page .view.active .btn{ display:none !important; }
     .overlay{ display:none !important; }
     .overlay.show{
       display:block !important; position:static !important;
@@ -937,7 +946,7 @@
           <div class="field"><label>اللون</label><input type="text" id="plItemColor" placeholder="مثلاً: أبيض"></div>
         </div>
         <div style="display:flex; gap:10px; align-items:end;">
-          <div class="field" style="max-width:160px;"><label>السعر</label><input type="number" id="plItemPrice" min="0"></div>
+          <div class="field" style="max-width:160px;"><label>السعر</label><input type="text" id="plItemPrice" inputmode="decimal" autocomplete="off"></div>
           <button class="btn btn-primary" id="btnAddPriceListItem" style="height:38px;">+ إضافة الصنف</button>
           <button class="btn" id="btnCancelPriceListEdit" style="height:38px; display:none;">إلغاء</button>
         </div>
@@ -1107,7 +1116,7 @@
 
       <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
         <label style="margin:0; white-space:nowrap;">خصم (اختياري)</label>
-        <input type="number" id="rcpDiscount" min="0" placeholder="0" style="max-width:160px;">
+        <input type="text" id="rcpDiscount" inputmode="decimal" autocomplete="off" placeholder="0" style="max-width:160px;">
       </div>
       <div class="totals-box">
         <div class="totals-row"><span>المجموع قبل الخصم</span><span id="itemsSubtotalDisplay">0 دج</span></div>
@@ -1383,7 +1392,7 @@
         <label>الفئة</label>
         <select id="expCategory"></select>
       </div>
-      <div class="field"><label>المبلغ</label><input type="number" id="expAmount"></div>
+      <div class="field"><label>المبلغ</label><input type="text" id="expAmount" inputmode="decimal" autocomplete="off"></div>
     </div>
     <div class="modal-foot">
       <button class="btn" data-close="expenseOverlay">إلغاء</button>
@@ -1848,6 +1857,36 @@ async function saveMeasurementsListTx(mutateFn){
   }catch(e){ console.error(e); toast('تعذر الحفظ على السحابة'); return false; }
 }
 async function savePaymentHistory(){ await safeSaveArray('paymentHistory', paymentHistory); }
+// ===== تعديل دفعة أو سعر بأي مكان (الوصل، تقارير الزبائن، الفواتير، المصاريف) بيتعدّل بكل البرنامج =====
+// بعد أي حفظ: سجل الدفعات بيتطابق لحاله مع الوصولات والفواتير (المرجع)، وكل الصفحات بتنرسم من جديد
+// (لوحة التحكم، التقارير، تقرير الشهر، تقارير الزبائن، سجل الدفعات) — فالدخل والمصروف والصافي دايماً نفس الرقم.
+// آلياً منلمس بس الدفعات اللي إلها رقم؛ السطور القديمة غير المرتبطة بتضل لزر «مطابقة» اليدوي.
+let __paySyncTimer = null;
+function syncPaymentsEverywhere(){
+  clearTimeout(__paySyncTimer);
+  __paySyncTimer = setTimeout(async ()=>{
+    try{
+      if(typeof allPartsLoaded === 'function' && !allPartsLoaded()) return;
+      const rec = computePaymentReconcile(receipts, invoices, paymentHistory);
+      const genIds = new Set(rec.idFixes.flatMap(f=>Object.values(f.ids)));
+      const safe = {
+        updates: rec.updates.filter(u=>u.h.paymentId),
+        adds: rec.adds.filter(a=>!genIds.has(a.p.id)),
+        removes: rec.removes.filter(r=>r.h.paymentId)
+      };
+      if(safe.updates.length || safe.adds.length || safe.removes.length){
+        paymentHistory = applyPaymentReconcile(paymentHistory, safe);
+        await savePaymentHistory();
+      }
+    }catch(e){ console.error('payment sync', e); }
+    try{ renderAllViews(); }catch(e){ console.error(e); }
+    try{ document.dispatchEvent(new Event('miracos-data-changed')); }catch(e){}
+  }, 300);
+}
+[['saveReceipts'],['saveReceiptsTx'],['saveInvoices'],['saveInvoicesTx'],['saveExpenses'],['saveExpensesTx']].forEach(([n])=>{
+  const orig = window[n]; if(typeof orig !== 'function') return;
+  window[n] = async function(...a){ syncPaymentsEverywhere(); try{ return await orig.apply(this, a); } finally { syncPaymentsEverywhere(); } };
+});
 async function savePriceList(){ await cloudSet({priceList, priceCategories}); }
 
 function renderPriceCategoryChips(){
@@ -2114,7 +2153,7 @@ function cardifyTable(table){
   if(!table) return;
   table.classList.add('rt-cards');
   const heads = [...table.querySelectorAll('thead th')].map(th=>th.textContent.trim());
-  table.querySelectorAll('tbody tr').forEach(tr=>{ [...tr.cells].forEach((td,i)=>{ if(heads[i]) td.setAttribute('data-label', heads[i]); else td.classList.add('rt-actions'); if(/^[\s\d.,-]+ دج$/.test(td.textContent.trim())) td.classList.add('rt-money'); }); });
+  table.querySelectorAll('tbody tr').forEach(tr=>{ [...tr.cells].forEach((td,i)=>{ if(heads[i]) td.setAttribute('data-label', heads[i]); else td.classList.add('rt-actions'); const tx = td.textContent.trim(); if(/^[\s\d.,-]+ دج$/.test(tx) || /^\d{4}-\d{2}-\d{2}$/.test(tx)) td.classList.add('rt-money'); }); });
 }
 function toast(msg){
   const t = document.getElementById('toast');
@@ -2506,7 +2545,8 @@ function exportRestoreJSON(silent){
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // مش فوراً: المتصفح بيقرا الملف بعد الكبسة، والإلغاء الفوري كان أحياناً يطلّع تنزيل فاشل
+  setTimeout(()=>URL.revokeObjectURL(url), 60000);
   if(!silent) toast('تم تحميل ملف الاسترجاع');
 }
 document.getElementById('btnExportRestore').addEventListener('click', ()=>exportRestoreJSON(false));
@@ -2593,51 +2633,86 @@ function updateLastDailyBackupLabel(){
   if(isMobileDevice()){
     el.textContent = settings.lastMobileBackupDate || 'لسا ما صارت';
   }else{
-    el.textContent = settings.lastDailyBackupDate || 'لسا ما صارت';
+    el.textContent = lastDailyBackupHere() || 'لسا ما صارت';
   }
 }
 
+// النسخة اليومية الساعة 5: بتنزل على هالجهاز، فمنسجّل تاريخها على هالجهاز (مش بس بالإعدادات المشتركة —
+// كان جهاز تاني يعملها فيسجّلها «صارت اليوم» وهالجهاز ما يعمل شي).
+// قبل: الفحص كان كل 5 دقايق بس، والمتصفح بيجمّد/بيأخّر المؤقتات إذا البرنامج مصغّر أو الجهاز نام،
+// فكانت تفوت ولا تصير إلا لما يطفي البرنامج ويرجع يشغّله. هلق: فحص كل دقيقة + موعد دقيق على 5:00
+// + فحص فوري أول ما ترجع للبرنامج (فتح النافذة، تكبيرها، صحيان الجهاز، رجوع النت).
+function dailyBkKey(){ return 'miracos_last_daily_backup_' + FS_DOC; }
+function lastDailyBackupHere(){
+  try{ return localStorage.getItem(dailyBkKey()) || ''; }
+  catch(e){ return settings.lastDailyBackupDate || ''; }
+}
+function markDailyBackupHere(day){
+  try{ localStorage.setItem(dailyBkKey(), day); }catch(e){}
+  if(!settings.lastDailyBackupDate || settings.lastDailyBackupDate < day){ settings.lastDailyBackupDate = day; saveSettings(); }
+}
+// شو اليوم اللي لازم تنعمل نسخته هلق (أو '' إذا ما في شي)
+function dailyBackupDueDay(now){
+  const today = localDate(now), last = lastDailyBackupHere();
+  if(last >= today) return '';
+  if(now.getHours() >= DAILY_BACKUP_HOUR) return today;
+  // نسخة مبارح الساعة 5 فاتت (البرنامج مسكّر أو الجهاز طافي) → منعملها هلق، ومنسجلها باسم مبارح
+  // حتى نسخة اليوم الساعة 5 تضل تصير بوقتها
+  const y = new Date(now); y.setDate(y.getDate() - 1);
+  const yd = localDate(y);
+  return (last && last < yd) ? yd : '';
+}
 let isRunningDailyBackup = false;
+function downloadDailyBackupFiles(){
+  exportExcelReport(true);
+  setTimeout(()=>exportRestoreJSON(true), 900);
+}
+function showDailyBackupNotice(){
+  let n = document.getElementById('dailyBackupNotice');
+  if(n) n.remove();
+  n = document.createElement('div'); n.id = 'dailyBackupNotice';
+  n.style.cssText = 'position:fixed;bottom:18px;inset-inline-start:18px;z-index:9000;background:#2E1F14;color:#F3EADB;padding:12px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.3);font-size:13.5px;max-width:340px;line-height:1.6';
+  n.innerHTML = `<div style="font-weight:800;margin-bottom:4px">✓ نزلت النسخة الاحتياطية اليومية (${fmtTimeLatn(new Date())})</div>
+    <div>ملفين بالتنزيلات: تقرير Excel + ملف الاسترجاع. إذا ما لقيتهن اكبس «نزّل مرة تانية».</div>
+    <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="btn btn-sm" data-again style="background:#C9A46A;color:#2E1F14;border:none">⬇ نزّل مرة تانية</button><button type="button" class="btn btn-sm" data-x style="background:transparent;color:#F3EADB;border:1px solid #7a6450">تمام</button></div>`;
+  n.querySelector('[data-again]').onclick = ()=>{ downloadDailyBackupFiles(); toast('عم ينزّل الملفين…'); };
+  n.querySelector('[data-x]').onclick = ()=>n.remove();
+  document.body.appendChild(n);
+  setTimeout(()=>{ if(n.isConnected) n.remove(); }, 15 * 60 * 1000);
+}
 function runDailyBackupIfNeeded(){
   try{
     if(isRunningDailyBackup) return;
-    const now = new Date();
-    if(now.getHours() < DAILY_BACKUP_HOUR) return;
-    const today = localDate(now);
-    const mobile = isMobileDevice();
-    if(mobile){
-      // على الموبايل: النسخة التلقائية ملغاة (كانت تفتح ملفات التنزيل بوجهك أول ما يفتح البرنامج)
-      // النسخ اليدوي من الإعدادات لسا شغال عادي
-      return;
-    }else{
-      // على الكمبيوتر: مرة كل يوم متل ما كانت (بدون تغيير)
-      if(settings.lastDailyBackupDate === today) return;
-    }
+    // على الموبايل: النسخة التلقائية ملغاة (كانت تفتح ملفات التنزيل بوجهك أول ما يفتح البرنامج)
+    // النسخ اليدوي من الإعدادات لسا شغال عادي
+    if(isMobileDevice()) return;
+    const day = dailyBackupDueDay(new Date());
+    if(!day) return;
     if(receipts.length === 0 && expenses.length === 0 && invoices.length === 0) return;
+    // البرنامج مصغّر/مخفي: التنزيل من نافذة مخفية ممكن يضيع بلا ما تعرف → منستنى لترجع عليه (بيصير فوراً وقتها)
+    if(document.visibilityState === 'hidden') return;
     isRunningDailyBackup = true;
-    // نستنى شوية أول ما يفتح البرنامج حتى ما يتزاحمش الباكأب مع تحميل الصفحة نفسها
+    // نستنى شوية حتى ما يتزاحمش الباكأب مع تحميل الصفحة نفسها
     setTimeout(()=>{
       try{
-        exportExcelReport(true);
-        setTimeout(()=>{
-          try{
-            exportRestoreJSON(true);
-            if(mobile){
-              settings.lastMobileBackupDate = today;
-            }else{
-              settings.lastDailyBackupDate = today;
-            }
-            saveSettings();
-            updateLastDailyBackupLabel();
-            toast(mobile ? 'تم إنشاء نسخة احتياطية أسبوعية تلقائيًا — تفقّدي مجلد التنزيلات' : 'تم إنشاء نسخة احتياطية يومية تلقائيًا — تفقّدي مجلد التنزيلات');
-          }catch(err){ console.error('daily backup (restore file) failed', err); }
-          finally{ isRunningDailyBackup = false; }
-        }, 700);
-      }catch(err){ console.error('daily backup (excel file) failed', err); isRunningDailyBackup = false; }
+        if(dailyBackupDueDay(new Date()) !== day){ isRunningDailyBackup = false; return; } // جهاز/نافذة تانية سبقتنا
+        markDailyBackupHere(day);
+        downloadDailyBackupFiles();
+        updateLastDailyBackupLabel();
+        showDailyBackupNotice();
+      }catch(err){ console.error('daily backup failed', err); }
+      finally{ setTimeout(()=>{ isRunningDailyBackup = false; }, 1500); }
     }, 3000);
   }catch(err){ console.error('runDailyBackupIfNeeded failed', err); isRunningDailyBackup = false; }
 }
-setInterval(runDailyBackupIfNeeded, 5 * 60 * 1000);
+setInterval(runDailyBackupIfNeeded, 60 * 1000);
+// موعد دقيق على الساعة 5:00 (بيتجدد كل يوم)
+(function scheduleDailyBackupAt5(){
+  const now = new Date(), t = new Date(now); t.setHours(DAILY_BACKUP_HOUR, 0, 5, 0);
+  if(t <= now) t.setDate(t.getDate() + 1);
+  setTimeout(()=>{ runDailyBackupIfNeeded(); scheduleDailyBackupAt5(); }, Math.min(t - now, 2147000000));
+})();
+['visibilitychange','focus','pageshow','online','resume'].forEach(ev=>(ev==='visibilitychange'||ev==='resume'?document:window).addEventListener(ev, ()=>{ if(document.visibilityState !== 'hidden') setTimeout(runDailyBackupIfNeeded, 500); }));
 
 document.getElementById('btnImportRestore').addEventListener('click', ()=>{
   document.getElementById('restoreFileInput').click();
@@ -2752,7 +2827,7 @@ function newItemRow(item){
   row.innerHTML = `
     <td><input type="number" class="it-qty" value="${item.qty}" min="0" step="0.01" placeholder="العدد"></td>
     <td class="desc-td"><textarea class="it-desc desc-grow" rows="1">${escHtmlText(item.desc||'')}</textarea>${drawsHtml(item.draws)}</td>
-    <td><input type="number" class="it-price" value="${item.price||''}" min="0" placeholder="السعر"></td>
+    <td><input type="text" inputmode="decimal" autocomplete="off" class="it-price" value="${item.price||''}" placeholder="السعر"></td>
     <td class="amount-cell it-amount">0 دج</td>
     <td><button type="button" class="btn btn-ghost btn-sm it-measure" title="قياس">📐</button></td>
     <td><button class="btn btn-ghost btn-sm it-remove">✕</button></td>
@@ -2936,7 +3011,7 @@ function newPaymentRow(payment){
   const fromLbl = payment.from ? `<div class="pm-from" style="font-size:11px;color:var(--verdigris-deep,#1F8F55);font-weight:700;margin-top:2px">↩ منقولة من ${escHtmlText(payment.from.label||'')} (نفس الدفعة، مش دفعة جديدة)</div>` : '';
   row.innerHTML = `
     <td><input type="text" class="pm-date date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric" value="${payment.date||''}">${fromLbl}</td>
-    <td><input type="number" class="pm-amount" value="${payment.amount||''}" min="0"></td>
+    <td><input type="text" inputmode="decimal" autocomplete="off" class="pm-amount" value="${payment.amount||''}"></td>
     <td><select class="pm-method">${paymentMethodOptions(payment.method||'نقدي')}</select></td>
     <td><button class="btn btn-ghost btn-sm pm-remove">✕</button></td>
   `;
@@ -3828,7 +3903,7 @@ function newInvoiceItemRow(item){
     <td><input type="number" class="inv-it-qty" value="${item.qty}" min="0" step="0.01" placeholder="العدد"></td>
     <td class="desc-td"><textarea class="inv-it-desc desc-grow" rows="1">${escHtmlText(item.desc||'')}</textarea>${drawsHtml(item.draws)}</td>
     <td><input type="text" class="inv-it-unit" list="unitOptions" value="${(item.unit||'').replace(/"/g,'&quot;')}" placeholder="الوحدة"></td>
-    <td><input type="number" class="inv-it-price" value="${item.price||''}" min="0" placeholder="السعر"></td>
+    <td><input type="text" inputmode="decimal" autocomplete="off" class="inv-it-price" value="${item.price||''}" placeholder="السعر"></td>
     <td class="amount-cell inv-it-amount">0 دج</td>
     <td><button type="button" class="btn btn-ghost btn-sm inv-it-measure" title="قياس">📐</button></td>
     <td><button class="btn btn-ghost btn-sm inv-it-remove">✕</button></td>
@@ -3948,7 +4023,7 @@ function newInvoicePaymentRow(payment){
   row.dataset.pmId = payment.id;
   row.innerHTML = `
     <td><input type="text" class="inv-pm-date date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric" value="${payment.date||''}"></td>
-    <td><input type="number" class="inv-pm-amount" value="${payment.amount||''}" min="0"></td>
+    <td><input type="text" inputmode="decimal" autocomplete="off" class="inv-pm-amount" value="${payment.amount||''}"></td>
     <td><select class="inv-pm-method">${paymentMethodOptions(payment.method||'نقدي')}</select></td>
     <td><button class="btn btn-ghost btn-sm inv-pm-remove">✕</button></td>
   `;
@@ -6014,12 +6089,14 @@ function markPrintTopOverlay(){
   shown.forEach(o=>{ if(o!==top) o.classList.add('print-hide'); });
 }
 window.addEventListener('beforeprint', ()=>{
+  // Ctrl+P بلا ورقة مفتوحة: بينطبع محتوى الصفحة الحالية بدل ورقة فاضية
+  document.body.classList.toggle('print-page', !document.querySelector('.overlay.show') && !document.body.classList.contains('print-audit'));
   document.body.classList.remove('print-compact');
   markPrintTopOverlay();
   document.body.classList.toggle('print-multipage', !!document.querySelector('.overlay.show[data-multipage]'));
 });
 window.addEventListener('afterprint', ()=>{
-  document.body.classList.remove('print-multipage');
+  document.body.classList.remove('print-multipage', 'print-page');
   document.querySelectorAll('.overlay.print-hide').forEach(o=>o.classList.remove('print-hide'));
 });
 
@@ -6278,6 +6355,7 @@ function renderCustomerReports(){
       }).join('')
     }</tbody></table>`;
   }
+  cardifyTable(dWrap.querySelector('table'));
 
   const deliveredWrap = document.getElementById('deliveredCustomersWrap');
   const dq = (document.getElementById('deliveredCustomerSearch').value || '').trim();
@@ -6296,7 +6374,7 @@ function renderCustomerReports(){
     deliveredWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن تم تسليمهم بعد.</div>';
   } else {
     deliveredWrap.innerHTML = `<table><thead><tr>
-      <th>رقم الوصل</th><th>الاسم</th><th>التفاصيل</th><th>الهاتف</th><th>تاريخ الوصل</th><th>تاريخ التسليم</th><th>المجموع</th><th>حالة الدفع</th><th style="width:90px"></th>
+      <th>رقم الوصل</th><th>الاسم</th><th>التفاصيل</th><th>الهاتف</th><th>تاريخ الوصل</th><th>تاريخ التسليم</th><th>المجموع</th><th>حالة الدفع</th><th></th>
     </tr></thead><tbody>${
       delivered.map(r=>{
         const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
@@ -6322,6 +6400,7 @@ function renderCustomerReports(){
         </tr>`;
       }).join('')
     }</tbody></table>`;
+    cardifyTable(deliveredWrap.querySelector('table'));
   }
 }
 document.getElementById('deliveredCustomerSearch').addEventListener('input', renderCustomerReports);
@@ -7042,7 +7121,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     const area=document.getElementById(areaId);if(!area)return;
     area.querySelectorAll('.mirsam-print').forEach(b=>b.remove());
     area.classList.toggle('mirsam-on',!!meta);
-    if(!meta)return;
+    // كل ورقة بتستنى رسماتها هي بس (قبل: كانت تستنى كمان تحميل معلّق من وصل قديم، فالطباعة تتأخر لحد 32 ثانية)
+    if(!meta){lastLoad=Promise.resolve();return}
     lastLoad=Promise.all([meta,...(meta.more||[])].map(m=>attachOne(area,m)));
   }
   function attachOne(area,meta){
@@ -7066,7 +7146,14 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   const _cap=captureAsPage;captureAsPage=async function(area){try{await lastLoad}catch(e){}return _cap(area)};
   window.addEventListener('beforeprint',()=>{});
   // الطباعة بتستنى الرسمة تخلص تحميل (من السحابة) حتى ما تطلع الورقة بلا رسمة
-  {const _pr=window.print.bind(window);window.print=function(){Promise.race([lastLoad,new Promise(r=>setTimeout(r,32000))]).catch(()=>{}).then(()=>setTimeout(_pr,150))}}
+  // الورقة الفاضية: كانت الطباعة تستنى تحميل الرسمة لحد 32 ثانية بلا أي إشارة، فتسكّر الوصل أو تكبس طباعة كمان مرة،
+  // وبعدين تنفتح الطباعة والورقة مسكّرة → ورقة فاضية. هلق: رسالة «عم تتجهّز»، انتظار أقصاه 8 ثواني، كبسة وحدة بس،
+  // وإذا الورقة انسكّرت قبل ما تجهز ما منطبع شي.
+  {const _pr=window.print.bind(window);let pending=false;
+   window.print=function(){if(pending)return;pending=true;let slow=setTimeout(()=>toast('عم تتجهّز الورقة للطباعة…'),400);
+     Promise.race([lastLoad,new Promise(r=>setTimeout(r,8000))]).catch(()=>{}).then(()=>setTimeout(()=>{clearTimeout(slow);pending=false;
+       if(!document.querySelector('.overlay.show, #paymentAuditOverlay')){toast('الورقة انسكّرت قبل الطباعة — افتحها واكبس طباعة من جديد');return}
+       _pr()},150))}}
 
   addUI('rcp','rcpItemsCount');
   addUI('inv','invItemsCount');
@@ -7503,7 +7590,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
         document.body.appendChild(ov);
         const done=()=>{window.removeEventListener('afterprint',done);ov.remove()};
         window.addEventListener('afterprint',done);setTimeout(()=>{window.print();setTimeout(()=>{if(document.body.contains(ov))done()},60000)},50)};
-      const nv=document.querySelector('.nav-item[data-view="reports"]');if(nv)nv.addEventListener('click',()=>setTimeout(build,50));
+      const nv=document.querySelector('.nav-item[data-view="reports"]');if(nv)nv.addEventListener('click',()=>setTimeout(build,50));document.addEventListener('miracos-data-changed',()=>setTimeout(build,50));
       setTimeout(build,3000);
     }
   }
@@ -7629,6 +7716,48 @@ document.addEventListener('click',function(e){var h=e.target.closest&&e.target.c
   function latnLang(root){ (root.querySelectorAll ? root : document).querySelectorAll('input[type=number],input[type=date],input[type=time],input[type=datetime-local],input[type=month]').forEach(function(el){ if(el.getAttribute('lang')!=='en') el.setAttribute('lang','en'); }); }
   function startLatn(){ latnLang(document); new MutationObserver(function(ms){ for(var i=0;i<ms.length;i++){ var m=ms[i]; for(var j=0;j<m.addedNodes.length;j++){ var n=m.addedNodes[j]; if(n.nodeType!==1) continue; if(n.tagName==='INPUT'){ if(/^(number|date|time|datetime-local|month)$/.test(n.type)&&n.getAttribute('lang')!=='en') n.setAttribute('lang','en'); } else if(n.querySelector&&n.querySelector('input')) latnLang(n); } } }).observe(document.documentElement,{childList:true,subtree:true}); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', startLatn); else startLatn();
+})();
+</script>
+<script id="money-inputs">/* خانات المبالغ (السعر، الدفعة، الخصم، المصروف): فواصل الآلاف وانت عم تكتب (150,000) حتى تعرف الرقم من أول نظرة.
+   الفواصل للعرض بس: el.value بيرجّع الرقم صافي (150000)، فكل الحسابات والحفظ متل ما هي. */
+(function(){
+  var SEL='.it-price,.pm-amount,.inv-it-price,.inv-pm-amount,#rcpDiscount,#expAmount,#plItemPrice,[data-money]';
+  var D=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+  function raw(s){
+    s=String(s==null?'':s); if(window.latinDigits) s=window.latinDigits(s,true);
+    s=s.replace(/[^\d.\-]/g,''); var neg=s.charAt(0)==='-'; s=s.replace(/-/g,'');
+    var i=s.indexOf('.'); if(i>-1) s=s.slice(0,i+1)+s.slice(i+1).replace(/\./g,'');
+    return (neg?'-':'')+s;
+  }
+  function group(r){
+    if(r===''||r==='-') return r; var neg=r.charAt(0)==='-'; if(neg) r=r.slice(1);
+    var p=r.split('.'), ip=p[0].replace(/^0+(?=\d)/,'').replace(/\B(?=(\d{3})+(?!\d))/g,',');
+    return (neg?'-':'')+ip+(p.length>1?'.'+p[1]:'');
+  }
+  function enhance(el){
+    if(el.__money||el.tagName!=='INPUT') return; el.__money=1;
+    if(el.type==='number'){ el.removeAttribute('min'); el.removeAttribute('step'); el.type='text'; }
+    if(!el.getAttribute('inputmode')) el.setAttribute('inputmode','decimal');
+    el.setAttribute('autocomplete','off');
+    Object.defineProperty(el,'value',{configurable:true,
+      get:function(){ return raw(D.get.call(this)); },
+      set:function(v){ D.set.call(this, group(raw(v))); }});
+    D.set.call(el, group(raw(D.get.call(el))));
+  }
+  function reformat(el){
+    var v=D.get.call(el), f=group(raw(v)); if(f===v) return;
+    var pos=el.selectionStart==null?v.length:el.selectionStart, n=(v.slice(0,pos).match(/[\d.\-]/g)||[]).length, i=0, c=0;
+    D.set.call(el,f);
+    while(i<f.length && c<n){ if(/[\d.\-]/.test(f.charAt(i))) c++; i++; }
+    try{ el.setSelectionRange(i,i); }catch(_){}
+  }
+  function scan(root){ if(root.matches && root.matches(SEL)) enhance(root); if(root.querySelectorAll) root.querySelectorAll(SEL).forEach(enhance); }
+  // قبل أي مستمع تاني (الحسابات بتقرا el.value الصافي)
+  document.addEventListener('input',function(e){ var el=e.target; if(el && el.matches && el.matches(SEL)){ enhance(el); reformat(el); } },true);
+  document.addEventListener('focusin',function(e){ var el=e.target; if(el && el.matches && el.matches(SEL)) enhance(el); },true);
+  function start(){ scan(document); new MutationObserver(function(ms){ ms.forEach(function(m){ m.addedNodes.forEach(function(n){ if(n.nodeType===1) scan(n); }); }); }).observe(document.documentElement,{childList:true,subtree:true}); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+  window.moneyRaw=raw; window.moneyGroup=group; window.enhanceMoneyInputs=scan;
 })();
 </script>
 <script>
