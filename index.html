@@ -140,7 +140,7 @@
     border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink);
     width:100%;
   }
-  input.date-field{ direction:ltr; text-align:right; font-variant-numeric:tabular-nums; }
+  input.date-field, input.date-dmy{ direction:ltr; text-align:right; font-variant-numeric:tabular-nums; }
   input:focus, select:focus, textarea:focus{outline:2px solid rgba(176,141,62,.35); border-color:var(--brass);}
   label{font-size:12.5px; font-weight:600; color:var(--text-dim); margin-bottom:5px; display:block;}
   .field{margin-bottom:13px;}
@@ -160,6 +160,7 @@
   #receiptsTableWrap, #invoicesTableWrap, #deliveryTrackWrap, #deliveredCustomersWrap{ overflow-x:visible; }
   /* أزرار الصف (عرض، تعديل، للمعمل، نسخ، حذف): كلها بسطر أفقي واحد */
   .row-actions{ flex-wrap:nowrap !important; gap:2px; }
+  table.rt-cards td.rt-actions .btn{ white-space:nowrap; }
   table.rt-cards .row-actions .btn-sm{ padding:5px 7px; }
   table.rt-cards td.rt-actions{ width:1%; white-space:nowrap !important; }
   table.rt-cards td{ white-space:normal !important; }
@@ -708,7 +709,7 @@
         <div class="panel-head">
           <div class="search-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-            <input type="text" id="customerSearch" placeholder="بحث بالإسم أو الهاتف أو النوع والتفاصيل...">
+            <input type="text" id="customerSearch" placeholder="بحث بالإسم أو الهاتف أو النوع أو التاريخ (20.01.2026)...">
           </div>
         </div>
         <div id="receiptsTableWrap"></div>
@@ -759,7 +760,7 @@
           <h2>سجل المصاريف</h2>
           <div class="search-box">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-            <input type="text" id="expenseSearch" placeholder="بحث بالبيان أو الفئة...">
+            <input type="text" id="expenseSearch" placeholder="بحث بالبيان أو الفئة أو التاريخ (20.01.2026)...">
           </div>
         </div>
         <div id="expensesTableWrap"></div>
@@ -860,8 +861,8 @@
             <button type="button" data-ts="custom">فترة محددة</button>
           </div>
           <div class="ts-range" id="tsRange" style="display:none;">
-            <label>من <input type="text" id="tsFrom" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></label>
-            <label>إلى <input type="text" id="tsTo" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric"></label>
+            <label>من <input type="text" id="tsFrom" class="date-dmy" placeholder="DD.MM.YYYY" maxlength="10" inputmode="numeric"></label>
+            <label>إلى <input type="text" id="tsTo" class="date-dmy" placeholder="DD.MM.YYYY" maxlength="10" inputmode="numeric"></label>
           </div>
           <div class="ts-period" id="tsPeriod"></div>
           <div class="ts-top" id="tsTop"></div>
@@ -886,11 +887,11 @@
         <div class="grid2" style="margin-bottom:10px;">
           <div class="search-box" style="max-width:none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-            <input type="text" id="paymentHistorySearch" placeholder="بحث باسم الزبون أو رقم الوصل/الفاتورة...">
+            <input type="text" id="paymentHistorySearch" placeholder="بحث باسم الزبون أو رقم الوصل أو التاريخ (20.01.2026)...">
           </div>
           <div style="display:flex; gap:8px;">
-            <input type="text" id="paymentHistoryFrom" title="من تاريخ" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric">
-            <input type="text" id="paymentHistoryTo" title="إلى تاريخ" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric">
+            <input type="text" id="paymentHistoryFrom" title="من تاريخ" class="date-dmy" placeholder="DD.MM.YYYY" maxlength="10" inputmode="numeric">
+            <input type="text" id="paymentHistoryTo" title="إلى تاريخ" class="date-dmy" placeholder="DD.MM.YYYY" maxlength="10" inputmode="numeric">
           </div>
         </div>
         <div id="paymentHistoryTableWrap"></div>
@@ -916,9 +917,9 @@
         <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
           <div class="search-box" style="max-width:280px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-            <input type="text" id="deliveredCustomerSearch" placeholder="بحث بالاسم أو الهاتف أو النوع...">
+            <input type="text" id="deliveredCustomerSearch" placeholder="بحث بالاسم أو الهاتف أو النوع أو التاريخ...">
           </div>
-          <input type="text" id="deliveredCustomerDate" title="بحث بتاريخ الوصل" style="max-width:170px;" class="date-field" placeholder="YYYY-MM-DD" maxlength="10" inputmode="numeric">
+          <input type="text" id="deliveredCustomerDate" title="بحث بتاريخ الوصل" style="max-width:170px;" class="date-dmy" placeholder="DD.MM.YYYY" maxlength="10" inputmode="numeric">
         </div>
         <div id="deliveredCustomersWrap"></div>
       </div>
@@ -2133,6 +2134,13 @@ document.getElementById('btnDisconnectFirebase').addEventListener('click', ()=>{
 function uid(){ return 'id' + Date.now() + Math.floor(Math.random()*1000); }
 // تنسيق الأرقام يدوياً (أرقام لاتينية دايماً 0-9) — بعض الأجهزة كانت تطلع أرقام عربية ٠١٢ من إعدادات المتصفح
 // تاريخ اليوم بتوقيت الجهاز (الجزائر) — toISOString كان يعطي تاريخ الأمس بين 00:00 و01:00
+// البحث بالتاريخ: اليوم أول شي، بعدين الشهر، بعدين السنة (20.01.2026) — ومقبول كمان 20/01/2026 أو 20-1-26 أو 20.01 بلا سنة
+function dmyOf(iso){ const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}.${m[2]}.${m[1]}` : ''; }
+function dmyToIso(t){ const m = String(t||'').trim().match(/^(\d{1,2})[.\/\-](\d{1,2})[.\/\-](\d{2}|\d{4})$/); if(!m) return '';
+  const d=+m[1], mo=+m[2], y=m[3].length===2?2000+(+m[3]):+m[3]; if(d<1||d>31||mo<1||mo>12) return '';
+  return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+function dmyMatch(q, iso){ const m = String(q||'').trim().match(/^(\d{1,2})[.\/\-](\d{1,2})(?:[.\/\-](\d{2}|\d{4}))?$/); const t = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m || !t) return false; if(+m[1]!==+t[3] || +m[2]!==+t[2]) return false; if(!m[3]) return true; return (m[3].length===2?'20'+m[3]:m[3])===t[1]; }
 function localDate(d){ d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function fmtNumLatn(n, maxFrac){
   n = Number(n)||0; if(maxFrac===undefined) maxFrac = 3;
@@ -3450,7 +3458,7 @@ function renderReceiptsTable(){
   const q = (document.getElementById('customerSearch').value || '').trim();
   let list = receipts.filter(r => !r.delivered).reverse();
   if(q) list = list.filter(r =>
-    rcpNoMatch(r, q) ||
+    rcpNoMatch(r, q) || dmyMatch(q, r.date) ||
     r.name.includes(q) ||
     (r.phone||'').includes(q) ||
     (r.items||[]).some(it => (it.desc||'').includes(q))
@@ -4660,7 +4668,7 @@ function renderExpensesTable(){
   const wrap = document.getElementById('expensesTableWrap');
   const q = (document.getElementById('expenseSearch').value || '').trim();
   let list = [...expenses].reverse();
-  if(q) list = list.filter(e => (e.desc||'').includes(q) || (e.category||'').includes(q));
+  if(q) list = list.filter(e => (e.desc||'').includes(q) || (e.category||'').includes(q) || dmyMatch(q, e.date));
   document.getElementById('expTotal').textContent = fmt(expenses.reduce((s,e)=>s+e.amount,0));
   document.getElementById('expCount').textContent = expenses.length;
   const now = new Date();
@@ -6140,9 +6148,10 @@ function renderDashboard(){
   if(due.length===0){
     dueWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا توجد مبالغ متبقية على أي زبون 🎉</div>';
   } else {
-    dueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th></tr></thead><tbody>${
-      due.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td></tr>`).join('')
+    dueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th><th style="width:70px"></th></tr></thead><tbody>${
+      due.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td><button class="btn btn-sm" onclick="viewReceipt('${r.id}')" title="عرض الوصل">👁 عرض</button></td></tr>`).join('')
     }</tbody></table>`;
+    cardifyTable(dueWrap.querySelector('table'));
   }
 
   const deliveredDue = receipts.filter(r => r.delivered && r.remaining > 0)
@@ -6151,9 +6160,10 @@ function renderDashboard(){
   if(deliveredDue.length===0){
     deliveredDueWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا يوجد زبائن مستلمين وعليهم دين 🎉</div>';
   } else {
-    deliveredDueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th><th>تأخر السداد</th><th style="width:90px"></th></tr></thead><tbody>${
-      deliveredDue.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td>${debtLateLabel(r)}</td><td><button class="btn btn-sm btn-primary" data-dashboard-edit-receipt="${r.id}">تعديل</button></td></tr>`).join('')
+    deliveredDueWrap.innerHTML = `<table><thead><tr><th>الاسم</th><th>رقم الوصل</th><th>الباقي</th><th>تأخر السداد</th><th style="width:150px"></th></tr></thead><tbody>${
+      deliveredDue.map(r=>`<tr><td>${escHtmlText(r.name)}</td><td>${r.no}</td><td style="color:var(--danger); font-weight:700;">${fmt(r.remaining)}</td><td>${debtLateLabel(r)}</td><td><div class="row-actions"><button class="btn btn-sm" onclick="viewReceipt('${r.id}')" title="عرض الوصل">👁 عرض</button><button class="btn btn-sm btn-primary" data-dashboard-edit-receipt="${r.id}">تعديل</button></div></td></tr>`).join('')
     }</tbody></table>`;
+    cardifyTable(deliveredDueWrap.querySelector('table'));
     deliveredDueWrap.querySelectorAll('[data-dashboard-edit-receipt]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         const r = receipts.find(x=>x.id===btn.dataset.dashboardEditReceipt);
@@ -6171,17 +6181,18 @@ function renderDashboard(){
   }
   const recentReceipts = receipts.map(r=>{
     const act = latestReceiptActivity(r);
-    return {type:'وصل', label:`${r.name} — #${r.no}`, amount: act.received, date: act.date};
+    return {type:'وصل', label:`${r.name} — #${r.no}`, amount: act.received, date: act.date, open:`viewReceipt('${r.id}')`};
   }).filter(x=>x.amount > 0);
-  const recentExp = expenses.map(e=>({type:'مصروف', label:e.desc, amount:-e.amount, date:e.date}));
+  const recentExp = expenses.map(e=>({type:'مصروف', label:e.desc, amount:-e.amount, date:e.date, open:`editExpense('${e.id}')`}));
   const combined = [...recentReceipts, ...recentExp].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,8);
   const recentWrap = document.getElementById('recentList');
   if(combined.length===0){
     recentWrap.innerHTML = '<div class="empty-state" style="padding:20px;">لا توجد حركات بعد.</div>';
   } else {
-    recentWrap.innerHTML = `<table><thead><tr><th>النوع</th><th>البيان</th><th>التاريخ</th><th>المبلغ المقبوض</th></tr></thead><tbody>${
-      combined.map(c=>`<tr><td>${c.type}</td><td>${escHtmlText(c.label)}</td><td>${c.date||''}</td><td style="color:${c.amount<0?'var(--danger)':'var(--verdigris-deep)'};font-weight:700;">${c.amount<0?'-':''}${fmt(Math.abs(c.amount))}</td></tr>`).join('')
+    recentWrap.innerHTML = `<table><thead><tr><th>النوع</th><th>البيان</th><th>التاريخ</th><th>المبلغ المقبوض</th><th style="width:70px"></th></tr></thead><tbody>${
+      combined.map(c=>`<tr><td>${c.type}</td><td>${escHtmlText(c.label)}</td><td>${c.date||''}</td><td style="color:${c.amount<0?'var(--danger)':'var(--verdigris-deep)'};font-weight:700;">${c.amount<0?'-':''}${fmt(Math.abs(c.amount))}</td><td><button class="btn btn-sm" onclick="${c.open}" title="${c.type==='مصروف'?'عرض المصروف':'عرض الوصل'}">👁 عرض</button></td></tr>`).join('')
     }</tbody></table>`;
+    cardifyTable(recentWrap.querySelector('table'));
   }
 }
 
@@ -6384,7 +6395,7 @@ function renderCustomerReports(){
     .filter(r => r.delivered)
     .sort((a,b)=>((b.deliveredDate||b.date||'')).localeCompare(a.deliveredDate||a.date||''));
   if(dq) delivered = delivered.filter(r =>
-    rcpNoMatch(r, dq) ||
+    rcpNoMatch(r, dq) || dmyMatch(dq, r.date) || dmyMatch(dq, r.deliveredDate) ||
     (r.name||'').includes(dq) ||
     (r.phone||'').includes(dq) ||
     (r.items||[]).some(it => (it.desc||'').includes(dq))
@@ -6431,7 +6442,7 @@ function getFilteredPaymentHistory(){
   const from = document.getElementById('paymentHistoryFrom').value;
   const to = document.getElementById('paymentHistoryTo').value;
   let list = [...paymentHistory];
-  if(q) list = list.filter(h => (h.customerName||'').includes(q) || (h.docNo||'').includes(q));
+  if(q) list = list.filter(h => (h.customerName||'').includes(q) || String(h.docNo||'').includes(q) || dmyMatch(q, h.date));
   if(from) list = list.filter(h => (h.date||'') >= from);
   if(to) list = list.filter(h => (h.date||'') <= to);
   return list.sort((a,b)=>{
@@ -6583,14 +6594,14 @@ function globalSearch(q){
   q = String(q||'').trim(); if(gsNorm(q).length<1) return [];
   const out = [], itemsTxt = it=>(it||[]).map(x=>[x.desc, x.unit, x.measType].filter(Boolean).join(' ')).join(' | ');
   const lbl = i => i.docType==='facture' ? 'Facture' : (i.docType==='devis' ? 'Facture proforma' : 'Devis');
-  receipts.forEach(r=>{ if(gsMatch(q,[r.no, 'وصل '+r.no, r.name, r.phone, r.address, itemsTxt(r.items), r.note, (r.productPhotos||[]).map(p=>p.caption).join(' ')]))
+  receipts.forEach(r=>{ if(dmyMatch(q, r.date) || gsMatch(q,[r.no, 'وصل '+r.no, r.name, r.phone, r.address, itemsTxt(r.items), r.note, (r.productPhotos||[]).map(p=>p.caption).join(' ')]))
     out.push({type:'وصل', icon:'🧾', id:r.id, title:`وصل ${r.no} — ${r.name||''}`, sub:[r.date, r.phone, itemsTxt(r.items)].filter(Boolean).join(' · '), extra:`الباقي ${fmt(r.remaining)}`, open:()=>viewReceipt(r.id), date:r.date}); });
-  invoices.forEach(i=>{ if(gsMatch(q,[i.no, lbl(i)+' '+i.no, i.clientName, i.clientPhone, i.clientAddress, itemsTxt(i.items), i.note, i.clientRC, i.clientNIF]))
+  invoices.forEach(i=>{ if(dmyMatch(q, i.date) || gsMatch(q,[i.no, lbl(i)+' '+i.no, i.clientName, i.clientPhone, i.clientAddress, itemsTxt(i.items), i.note, i.clientRC, i.clientNIF]))
     out.push({type:lbl(i), icon:'📄', id:i.id, title:`${lbl(i)} ${i.no} — ${i.clientName||''}`, sub:[i.date, i.clientPhone, itemsTxt(i.items)].filter(Boolean).join(' · '), extra:`الباقي ${fmt(i.remaining)}`, open:()=>viewInvoice(i.id), date:i.date}); });
   (window.__ordersJobs||[]).forEach(j=>{ const no = j.no ? 'ط-'+String(j.no).padStart(3,'0') : '';
     if(gsMatch(q,[no, j.no, j.cust&&j.cust.name, FS_DOC==='factory'?'':(j.cust&&j.cust.phone), j.cust&&j.cust.addr, itemsTxt(j.items), j.note, j.rcpNo?'وصل '+j.rcpNo:'', (j.prodPhotos||[]).map(p=>p.caption).join(' ')]))
       out.push({type:'طلبية', icon:'🏭', id:j.id, title:`طلبية ${no} — ${(j.cust&&j.cust.name)||''}`, sub:[j.status, itemsTxt(j.items)].filter(Boolean).join(' · '), open:()=>{ const n=[...document.querySelectorAll('.nav-item')].find(a=>/الطلبيات/.test(a.textContent)); if(n) n.click(); const qi=document.querySelector('#view-fjobs [data-q]'); if(qi){ qi.value=no||q; qi.dispatchEvent(new Event('input',{bubbles:true})); } }, date:j.at?localDate(new Date(j.at)):''}); });
-  (typeof measurementsList!=='undefined'?measurementsList:[]).forEach(m=>{ if(gsMatch(q,[m.customerName, m.customerPhone, m.note, m.who]))
+  (typeof measurementsList!=='undefined'?measurementsList:[]).forEach(m=>{ if(dmyMatch(q, m.date) || gsMatch(q,[m.customerName, m.customerPhone, m.note, m.who]))
     out.push({type:'قياسات', icon:'📏', id:m.id, title:`قياسات — ${m.customerName||''}`, sub:[m.date, m.customerPhone].filter(Boolean).join(' · '), open:()=>viewMeasurementRecord(m.id), date:m.date}); });
   (typeof priceList!=='undefined'?priceList:[]).forEach(p=>{ const cat=(priceCategories||[]).find(c=>c.id===p.categoryId); if(gsMatch(q,[p.type, p.measurement, p.color, cat&&cat.name]))
     out.push({type:'منتج / موديل', icon:'🏷️', id:p.id, title:[p.type, p.measurement, p.color].filter(Boolean).join(' — '), sub:cat?cat.name:'', extra:p.price?fmt(p.price):'', open:()=>{ const n=document.querySelector('.nav-item[data-view="pricelist"]'); if(n) n.click(); }}); });
@@ -6600,7 +6611,7 @@ window.globalSearch = globalSearch;
 {
   const box = document.createElement('div'); box.className = 'panel'; box.id = 'globalSearchBox';
   box.innerHTML = `<div style="display:flex;gap:8px;align-items:center"><span style="font-size:18px">🔍</span>
-    <input type="search" id="globalSearchInput" placeholder="بحث شامل: رقم موديل، منتج، زبون، هاتف، عنوان، رقم دوفي أو وصل أو طلبية..." autocomplete="off" style="flex:1;min-width:0;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px"></div>
+    <input type="search" id="globalSearchInput" placeholder="بحث شامل: رقم موديل، منتج، زبون، هاتف، عنوان، رقم دوفي أو وصل أو طلبية، تاريخ (20.01.2026)..." autocomplete="off" style="flex:1;min-width:0;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px"></div>
     <div id="globalSearchResults" style="margin-top:8px"></div>`;
   const tb = document.querySelector('#view-dashboard .topbar'); if(tb) tb.insertAdjacentElement('afterend', box);
   let t = null, last = [];
@@ -7435,14 +7446,14 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   const ov=document.createElement('section');ov.className='view';ov.id='view-fjobs';
   ov.innerHTML=`<div class="topbar"><h1>🏭 الطلبيات</h1></div>
     <div class="panel"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
-      <input data-q placeholder="بحث بالاسم أو الرقم أو البند..." style="flex:1;min-width:180px;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:10px">
+      <input data-q placeholder="بحث بالاسم أو الرقم أو البند أو التاريخ (20.01.2026)..." style="flex:1;min-width:180px;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:10px">
       <select data-f style="font:inherit;padding:8px 10px;border-radius:10px;border:1px solid var(--line);width:auto"><option value="all">الكل</option><option value="open">الشغّالة</option><option value="بدون تنفيذ">⚪ بدون تنفيذ</option><option value="قيد التنفيذ">🟠 قيد التنفيذ</option><option value="تم التنفيذ">🟢 تم التنفيذ</option><option value="جاهزة للاستلام">🔵 جاهزة للاستلام</option><option value="تم التسليم">✅ تم التسليم</option><option value="late">🔴 تأخر الزبون بالاستلام</option></select></div>
       <div style="font-size:12px;color:var(--text-dim);margin-bottom:10px">مشتركة بين المعرض والمعمل، بلا أسعار ولا دفعات. أي تعديل بيوصل إشعار للطرف التاني.</div>
       <div data-list></div><input type="file" accept="image/*" data-photo hidden></div>`;
   {const lv=document.getElementById('view-settings');(lv?lv.parentElement:document.body).appendChild(ov)}
   function render(){
     const fl=jobs.filter(j=>filter==='all'||(filter==='open'&&j.status!=='تم التسليم')||(filter==='late'&&pickupLate(j))||j.status===filter)
-      .filter(j=>!q||(ordNo(j)+' '+j.cust.name+' '+j.cust.phone+' '+lines(j)+' '+(j.note||'')).toLowerCase().includes(q));
+      .filter(j=>!q||dmyMatch(q,j.due)||dmyMatch(q,j.at?localDate(new Date(j.at)):'')||(ordNo(j)+' '+j.cust.name+' '+j.cust.phone+' '+lines(j)+' '+(j.note||'')).toLowerCase().includes(q));
     const rk=j=>{const i=ST.indexOf(j.status);return i<0?0:i};const list=fl.slice().sort((a,b)=>(rk(a)-rk(b))||((isUnseen(b)||freshIds.has(b.id))-(isUnseen(a)||freshIds.has(a.id)))||b.at-a.at);
     ov.querySelector('[data-list]').innerHTML=list.map((j,ji)=>{const st=j.status,op=openIds.has(j.id),un=isUnseen(j)||freshIds.has(j.id),du=dueInfo(j);const hd=(ji===0||list[ji-1].status!==st)&&ST.includes(filter)===false?`<div data-sthd style="font-weight:800;font-size:14px;color:${STC[st]};margin:${ji?14:2}px 2px 6px">${STI[st]} ${st} (${list.filter(x=>x.status===st).length})</div>`:'';const pl=pickupLate(j);return hd+`<div data-late="${pl?1:''}" style="border:1px solid ${un||pl?'#C0392B':'var(--line)'};border-inline-start:5px solid ${pl?'#C0392B':STC[st]};border-radius:10px;padding:10px 12px;margin-bottom:8px;background:${pl?'#FBE9E7':'var(--marble,#fff)'}">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:var(--brass-deep)">${ordNo(j)}</b><b>${esc(j.cust.name||'بدون اسم')}</b>${ME!=='factory'&&j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}
@@ -7736,6 +7747,23 @@ document.addEventListener('click',function(e){var h=e.target.closest&&e.target.c
   function latnLang(root){ (root.querySelectorAll ? root : document).querySelectorAll('input[type=number],input[type=date],input[type=time],input[type=datetime-local],input[type=month]').forEach(function(el){ if(el.getAttribute('lang')!=='en') el.setAttribute('lang','en'); }); }
   function startLatn(){ latnLang(document); new MutationObserver(function(ms){ for(var i=0;i<ms.length;i++){ var m=ms[i]; for(var j=0;j<m.addedNodes.length;j++){ var n=m.addedNodes[j]; if(n.nodeType!==1) continue; if(n.tagName==='INPUT'){ if(/^(number|date|time|datetime-local|month)$/.test(n.type)&&n.getAttribute('lang')!=='en') n.setAttribute('lang','en'); } else if(n.querySelector&&n.querySelector('input')) latnLang(n); } } }).observe(document.documentElement,{childList:true,subtree:true}); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', startLatn); else startLatn();
+})();
+</script>
+<script id="date-dmy">/* خانات البحث بالتاريخ: بتنكتب يوم.شهر.سنة (20.01.2026) والنقاط بتنحط لحالها.
+   el.value بيرجّع التاريخ بصيغة البرنامج الداخلية (2026-01-20) لما يكمل، وفاضي إذا لسا ناقص — فالفلترة ما بتتغيّر. */
+(function(){
+  var D=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+  function fmt(raw){ var d=String(raw).replace(/[٠-٩]/g,function(c){return c.charCodeAt(0)-1632;}).replace(/\D/g,'').slice(0,8), o=d;
+    if(d.length>2) o=d.slice(0,2)+'.'+d.slice(2); if(d.length>4) o=d.slice(0,2)+'.'+d.slice(2,4)+'.'+d.slice(4); return o; }
+  function enhance(el){ if(el.__dmy) return; el.__dmy=1; el.setAttribute('maxlength','10'); el.setAttribute('inputmode','numeric'); el.setAttribute('autocomplete','off');
+    Object.defineProperty(el,'value',{configurable:true,
+      get:function(){ return dmyToIso(D.get.call(this)); },
+      set:function(v){ v=String(v==null?'':v); D.set.call(this, /^\d{4}-\d{2}-\d{2}/.test(v) ? dmyOf(v) : fmt(v)); }}); }
+  document.addEventListener('input',function(e){ var el=e.target; if(!el||!el.matches||!el.matches('input.date-dmy')) return; enhance(el);
+    var v=D.get.call(el), f=fmt(v); if(f===v) return; var pos=el.selectionStart==null?v.length:el.selectionStart, n=(v.slice(0,pos).match(/\d/g)||[]).length, i=0, c=0;
+    D.set.call(el,f); while(i<f.length&&c<n){ if(/\d/.test(f.charAt(i))) c++; i++; } try{ el.setSelectionRange(i,i); }catch(_){} },true);
+  function start(){ document.querySelectorAll('input.date-dmy').forEach(enhance); }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
 })();
 </script>
 <script id="money-inputs">/* خانات المبالغ (السعر، الدفعة، الخصم، المصروف): فواصل الآلاف وانت عم تكتب (150,000) حتى تعرف الرقم من أول نظرة.

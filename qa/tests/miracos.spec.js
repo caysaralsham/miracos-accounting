@@ -849,3 +849,54 @@ test('حذف دفعة/وصل/مستند/مصروف أو تعديل سعر: ال�
   expect(all(r.cancelD)).toEqual([50000, 50000, 50000, 50000, 50000]);
   expect(n(r.delE[0]) - n(r.delE[1])).toBe(4000);
 });
+
+test('البحث بالتاريخ: يوم.شهر.سنة (20.01.2026) بكل خانات البحث والبحث الشامل', async ({ page }) => {
+  await page.evaluate(() => {
+    document.getElementById('loginScreen').style.display = 'none';
+    receipts.push({ id: 'dt1', no: 701, name: 'زبون تاريخ', date: '2026-01-20', delivered: true, deliveredDate: '2026-02-03', items: [{ qty: 1, desc: 'جرن', price: 1000, amount: 1000 }], total: 1000, remaining: 0, payments: [{ id: 'dtp', date: '2026-01-20', amount: 1000 }] },
+                  { id: 'dt2', no: 702, name: 'زبون تاني', date: '2026-01-21', items: [{ qty: 1, desc: 'درج', price: 1000, amount: 1000 }], total: 1000, remaining: 1000, payments: [] });
+    paymentHistory.push({ id: 'dth', paymentId: 'dtp', date: '2026-01-20', amount: 1000, customerName: 'زبون تاريخ', docNo: 701, docType: 'وصل' });
+    document.querySelector('.nav-item[data-view="customer-reports"]').click();
+  });
+  const dd = page.locator('#deliveredCustomerDate');
+  await dd.click(); await page.keyboard.type('20012026');
+  expect(await dd.inputValue()).toBe('20.01.2026');
+  expect(await dd.evaluate(e => e.value)).toBe('2026-01-20');
+  expect(await page.locator('#deliveredCustomersWrap').innerText()).toContain('زبون تاريخ');
+  await dd.fill(''); await dd.click(); await page.keyboard.type('21012026');
+  expect(await page.locator('#deliveredCustomersWrap').innerText()).not.toContain('زبون تاريخ');
+  const r = await page.evaluate(() => {
+    const ph = document.getElementById('paymentHistoryFrom'); ph.value = '2026-01-20';
+    const shown = ph.ownerDocument && Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').get.call(ph);
+    const gs = globalSearch('20.01.2026').map(x => x.title).join('|');
+    const gs2 = globalSearch('20/1/2026').length;
+    return { shown, gs, gs2, part: dmyMatch('20.01', '2026-01-20'), no: dmyMatch('01.20.2026', '2026-01-20') };
+  });
+  expect(r.shown).toBe('20.01.2026');
+  expect(r.gs).toContain('زبون تاريخ'); expect(r.gs).not.toContain('زبون تاني');
+  expect(r.gs2).toBeGreaterThan(0);
+  expect(r.part).toBe(true); expect(r.no).toBe(false);
+  await page.evaluate(() => document.querySelector('.nav-item[data-view="customers"]').click());
+  await page.locator('#customerSearch').fill('21.01.2026');
+  const t = await page.locator('#receiptsTableWrap').innerText();
+  expect(t).toContain('زبون تاني');
+});
+
+test('لوحة التحكم: زر «عرض» بالمبالغ المتبقية، الزبائن المستلمين وعليهم دين، وآخر الحركات', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    document.getElementById('loginScreen').style.display = 'none';
+    receipts.push({ id: 'vw1', no: 951, name: 'زبون عرض', date: '2026-01-20', delivered: true, deliveredDate: '2026-02-01', items: [{ qty: 1, desc: 'جرن', price: 9000, amount: 9000 }], total: 9000, remaining: 4000, payments: [{ id: 'vwp', date: '2026-01-20', amount: 5000 }] });
+    expenses.push({ id: 'vwe', date: '2026-01-21', desc: 'مصروف عرض', category: 'نقل', amount: 100 });
+    renderDashboard();
+    const btn = id => [...document.querySelectorAll('#' + id + ' button')].filter(b => /عرض/.test(b.textContent));
+    const out = { due: btn('dueList').length, deliv: btn('deliveredDueList').length, recent: btn('recentList').length };
+    btn('deliveredDueList')[0].click();
+    out.view = document.getElementById('viewReceiptOverlay').classList.contains('show') && document.getElementById('receiptPrintArea').innerText.includes('زبون عرض');
+    document.getElementById('viewReceiptOverlay').classList.remove('show');
+    btn('recentList').find(b => /مصروف/.test(b.title)).click();
+    out.exp = document.getElementById('expenseOverlay').classList.contains('show');
+    return out;
+  });
+  expect(r.due).toBeGreaterThan(0); expect(r.deliv).toBeGreaterThan(0); expect(r.recent).toBeGreaterThan(1);
+  expect(r.view).toBe(true); expect(r.exp).toBe(true);
+});
