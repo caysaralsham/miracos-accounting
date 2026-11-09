@@ -1018,3 +1018,91 @@ test('كل كتابة بالجدول سطر أفقي («جاهز — متأخر�
     if (r.truncated) expect(r.grew, 'w ' + w).toBe(true);
   }
 });
+
+
+// ---- تعديلات 2026-11-09: حالة العمل بالوصولات (نفس حالات طلبيات المعمل، للشاشة بس) ----
+test('حالة العمل: عمود بالزبائن والوصولات بحالات الطلبيات، بتتغيّر من الجدول والفورم، وما بتطلع بالطباعة', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    document.getElementById('loginScreen').style.display = 'none';
+    window.confirm = () => true;
+    window.saveReceiptsTx = async f => { receipts = f(receipts); return true; };
+    window.saveInvoicesTx = async f => { invoices = f(invoices); return true; };
+    const base = { phone: '', date: localDate(), duration: '10', items: [{ qty: 1, desc: 'جرن', price: 1, amount: 1 }], total: 1, remaining: 1, payments: [] };
+    receipts.push({ ...base, id: 'W1', no: 901, name: 'زبون جديد' }, { ...base, id: 'W2', no: 902, name: 'زبون جاهز', ready: true, readyDate: localDate() });
+    invoices.push({ id: 'WF', no: 'F-9', docType: 'facture', clientName: 'فاتورة', date: localDate(), delay: '10 jours', items: [], total: 5, ttc: 5, payments: [] });
+    renderAllViews(); document.querySelector('.nav-item[data-view="customers"]').click();
+    const wrap = document.getElementById('receiptsTableWrap');
+    const heads = [...wrap.querySelectorAll('thead th')].map(t => t.textContent.trim());
+    const chipOf = id => wrap.querySelector(`.ws-chip[data-ws-id="${id}"]`);
+    const before = { w1: chipOf('W1').textContent.trim(), w2: chipOf('W2').textContent.trim(), wf: chipOf('WF').textContent.trim() };
+    // من الجدول: «قيد التنفيذ»
+    chipOf('W1').click();
+    const menuItems = [...document.querySelectorAll('.ws-menu [data-ws-set]')].map(b => b.textContent.trim());
+    document.querySelector('.ws-menu [data-ws-set="قيد التنفيذ"]').click();
+    await new Promise(res => setTimeout(res, 50));
+    const w1 = receipts.find(x => x.id === 'W1');
+    const afterRun = { st: w1.workStatus, log: (w1.workLog || []).length, chip: chipOf('W1').textContent.trim() };
+    // «تم التسليم» بيعلّم الوصل مسلَّم (بينتقل لقائمة تم تسليمهم)
+    await applyRowWorkStatus('rcp', 'W2', 'تم التسليم');
+    const w2 = receipts.find(x => x.id === 'W2');
+    const delivered = { d: w2.delivered, dd: !!w2.deliveredDate, ready: w2.ready, gone: !chipOf('W2') };
+    // الـ Facture كمان
+    await applyRowWorkStatus('inv', 'WF', 'جاهزة للاستلام');
+    const wf = invoices.find(x => x.id === 'WF');
+    // الفورم: القائمة بتطلع بالحالة الحالية وبتحرّك خانتي جاهز/تسليم المخفيين
+    editReceipt('W1');
+    const sel = document.getElementById('rcpWorkStatus');
+    const formVal = sel.value;
+    sel.value = 'جاهزة للاستلام'; sel.dispatchEvent(new Event('change'));
+    const boxes = { ready: document.getElementById('rcpReady').checked, deliv: document.getElementById('rcpDelivered').checked };
+    document.getElementById('receiptOverlay').classList.remove('show');
+    // الطباعة: ما في أي ذكر لحالة العمل
+    viewReceipt('W1');
+    const printTxt = document.getElementById('receiptPrintArea').textContent;
+    return { heads, before, menuItems, afterRun, delivered, wf: { ready: wf.ready, st: wf.workStatus }, formVal, boxes,
+      printHas: ['قيد التنفيذ', 'حالة العمل', 'بدون تنفيذ'].filter(t => printTxt.includes(t)) };
+  });
+  expect(r.heads).toContain('حالة العمل');
+  expect(r.before).toEqual({ w1: 'بدون تنفيذ', w2: 'جاهزة للاستلام', wf: 'بدون تنفيذ' });
+  expect(r.menuItems).toEqual(['بدون تنفيذ', 'قيد التنفيذ', 'تم التنفيذ', 'جاهزة للاستلام', 'تم التسليم']);
+  expect(r.afterRun).toEqual({ st: 'قيد التنفيذ', log: 1, chip: 'قيد التنفيذ' });
+  expect(r.delivered).toEqual({ d: true, dd: true, ready: false, gone: true });
+  expect(r.wf).toEqual({ ready: true, st: 'جاهزة للاستلام' });
+  expect(r.formVal).toBe('قيد التنفيذ');
+  expect(r.boxes).toEqual({ ready: true, deliv: false });
+  expect(r.printHas).toEqual([]);
+});
+
+test('حالة العمل مع طلبية المعمل: التغيير من الوصل بيغيّر الطلبية، وتغيير المعمل بيغيّر الوصل (وطلبية قديمة ما بترجّع وصل لورا)', async ({ page }) => {
+  test.skip(await page.evaluate(() => FS_DOC === 'factory'), 'الطلبيات بتنبعت من وصولات المعرض بس');
+  const r = await page.evaluate(async () => {
+    document.getElementById('loginScreen').style.display = 'none';
+    window.confirm = () => true;
+    window.saveReceiptsTx = async f => { receipts = f(receipts); return true; };
+    const base = { phone: '', date: localDate(), duration: '10', items: [], total: 1, remaining: 1, payments: [] };
+    receipts.push({ ...base, id: 'J1', no: 911, name: 'مربوط' }, { ...base, id: 'J2', no: 912, name: 'قديم', ready: true, readyDate: localDate() });
+    const now = Date.now();
+    const jobs = [
+      { id: 'job1', no: 5, rcpId: 'J1', status: 'بدون تنفيذ', cust: { name: 'مربوط' }, log: [] },
+      { id: 'job2', no: 6, rcpId: 'J2', status: 'قيد التنفيذ', cust: { name: 'قديم' }, log: [{ at: now - 86400000, txt: 'الحالة: قيد التنفيذ' }] }];
+    window.__ordersJobs = jobs;
+    window.__jobForRow = row => jobs.find(j => j.rcpId === row.id) || null;
+    const pushed = [];
+    window.__setJobStatus = async (id, v) => { pushed.push([id, v]); const j = jobs.find(x => x.id === id); j.status = v; j.log.push({ at: Date.now() + 5, txt: 'الحالة: ' + v }); return true; };
+    // من الوصل → الطلبية
+    await applyRowWorkStatus('rcp', 'J1', 'قيد التنفيذ');
+    // المعمل خلّص الطلبية بعدين → الوصل بيصير «تم التنفيذ»
+    await new Promise(res => setTimeout(res, 20));
+    jobs[0].status = 'تم التنفيذ'; jobs[0].log.push({ at: Date.now() + 1000, txt: 'الحالة: تم التنفيذ' });
+    await syncWorkFromJobs();
+    const j1 = receipts.find(x => x.id === 'J1'), j2 = receipts.find(x => x.id === 'J2');
+    renderAllViews(); document.querySelector('.nav-item[data-view="customers"]').click();
+    const chip = document.querySelector('.ws-chip[data-ws-id="J1"]');
+    return { pushed, j1: j1.workStatus, j2: { ready: j2.ready, st: rowWorkStatus(j2) }, chip: chip.textContent.trim(), linked: !!chip.querySelector('.ws-ord') };
+  });
+  expect(r.pushed).toEqual([['job1', 'قيد التنفيذ']]);
+  expect(r.j1).toBe('تم التنفيذ');
+  expect(r.j2).toEqual({ ready: true, st: 'جاهزة للاستلام' });
+  expect(r.chip).toContain('تم التنفيذ');
+  expect(r.linked).toBe(true);
+});
