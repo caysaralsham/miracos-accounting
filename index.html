@@ -3662,6 +3662,8 @@ function deliveryCell(r, compact){
   const from = [due, rd].filter(Boolean).sort().pop();
   const today = new Date(); today.setHours(0,0,0,0);
   const late = from ? Math.round((today - new Date(from + 'T00:00:00')) / 86400000) : 0;
+  // بجدول الوصولات: «جاهز» بس مع الدائرة الزرقا (التأخير بيبيّن لما تقف عليها)
+  if(compact) return `<span style="color:#2D6FA3; font-weight:800; white-space:nowrap;" title="${late > 0 ? 'الشغل جاهز والزبون متأخر ' + late + ' يوم عن الاستلام' : 'الشغل جاهز للتسليم'}">🔵 جاهز</span>`;
   return late > 0
     ? `<span style="color:#2D6FA3; font-weight:800; white-space:nowrap;" title="الشغل جاهز والزبون متأخر ${late} يوم عن الاستلام">🔵 ${compact ? '' : 'جاهز — '}متأخر ${late} يوم</span>`
     : '<span style="color:#2D6FA3; font-weight:800;">🔵 جاهز للتسليم</span>';
@@ -3701,7 +3703,7 @@ function renderReceiptsTable(){
     return;
   }
   let html = `<table><thead><tr>
-    <th>رقم الوصل</th><th>الاسم</th><th>البيان</th><th>الهاتف</th><th>حالة العمل</th><th>موعد التسليم</th><th>المجموع</th><th>الباقي (مبلغ)</th><th>الحالة</th><th></th>
+    <th>رقم الوصل</th><th>الاسم</th><th>البيان</th><th>حالة العمل</th><th>موعد التسليم</th><th>المجموع</th><th>الباقي (مبلغ)</th><th>الحالة</th><th></th>
   </tr></thead><tbody>`;
   list.forEach(r=>{
     const details = (r.items||[]).map(it=>it.desc).filter(Boolean).join('، ') || '—';
@@ -3709,7 +3711,6 @@ function renderReceiptsTable(){
       <td>${rowNoHtml(r)}</td>
       <td>${escHtmlText(r.name)}</td>
       <td class="wrap-cell"><div class="details-wrap">${escHtmlText(details)}</div></td>
-      <td>${phoneHtml(r.phone)}</td>
       <td>${workCell(r)}</td>
       <td>${deliveryCell(r, true)}</td>
       <td>${fmt(r.total)}</td>
@@ -3728,7 +3729,6 @@ function renderReceiptsTable(){
       <td>${r.no}</td>
       <td>${escHtmlText(r.name)}</td>
       <td class="wrap-cell"><div class="details-wrap">${escHtmlText(details)}</div></td>
-      <td>${phoneHtml(r.phone)}</td>
       <td>${workCell(r)}</td>
       <td>${deliveryCell(r, true)}</td>
       <td>${fmt(r.total)}</td>

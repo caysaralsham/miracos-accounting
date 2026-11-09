@@ -427,14 +427,17 @@ test.describe('الزبائن والفواتير على الجوال والكم�
         invoices.push({ id:'ci', docType:'devis', no:'D9', date:'2026-10-01', clientName:'زبون فاتورة', clientPhone:'0661 22 33 44', items:[], ttc:500000, remaining:500000, payments:[] });
         document.querySelector('.nav-item[data-view="customers"]').click(); renderReceiptsTable(); renderInvoicesTable();
         const w = document.getElementById('receiptsTableWrap'), iw = document.getElementById('invoicesTableWrap');
-        const ph = w.querySelector('bdi.ph');
+        // الهاتف مخفي بجدول الوصولات (2026-11-09) — منفحص اتجاه الرقم من نفس الدالة اللي بتعرضه بباقي الجداول
+        const box = document.createElement('div'); box.innerHTML = phoneHtml('+213 550 12 34 53'); document.body.appendChild(box);
+        const ph = box.querySelector('bdi.ph');
         return { rcp: w.scrollWidth - w.clientWidth, inv: iw.scrollWidth - iw.clientWidth, page: document.documentElement.scrollWidth - innerWidth,
-          text: w.innerText, buttons: w.querySelectorAll('.row-actions button').length, phDir: ph && getComputedStyle(ph).direction, phText: ph && ph.textContent };
+          text: w.innerText, buttons: w.querySelectorAll('.row-actions button').length, phDir: ph && getComputedStyle(ph).direction, phText: ph && ph.textContent,
+          rcpPhone: !!w.querySelector('bdi.ph') };
       });
       expect(out.rcp).toBeLessThanOrEqual(1); expect(out.inv).toBeLessThanOrEqual(1); expect(out.page).toBeLessThanOrEqual(1);
       for (const t of ['403', '300.000 دج', '200.000 دج']) expect(out.text).toContain(t);
       expect(out.buttons).toBeGreaterThanOrEqual(12);
-      expect(out.phDir).toBe('ltr'); expect(out.phText).toBe('+213 550 12 34 53');
+      expect(out.phDir).toBe('ltr'); expect(out.phText).toBe('+213 550 12 34 53'); expect(out.rcpPhone).toBe(false);
     });
   }
 });
