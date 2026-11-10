@@ -1109,3 +1109,29 @@ test('حالة العمل مع طلبية المعمل: التغيير من ال
   expect(r.chip).toContain('تم التنفيذ');
   expect(r.linked).toBe(true);
 });
+
+test('الإعدادات: النسخة الاحتياطية وسلة المهملات والطلبيات مطوية، وتاريخ آخر نسخة بيبيّن وهي مطوية، والطلبية حمرا بعد يومين افتراضياً', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-settings').classList.add('active');
+    const shown = el => !!el && getComputedStyle(el).display !== 'none';
+    const out = { collapsed: {}, late: null };
+    for (const id of ['backupPanel', 'trashPanel', 'ordersSettingsPanel']) out.collapsed[id] = document.getElementById(id).classList.contains('collapsed');
+    settings.lastCloudBackupAt = '2026-11-10T10:02:44Z'; updateCloudBackupLabel();
+    const sum = document.querySelector('#backupPanel > .when-collapsed');
+    out.sumShown = shown(sum); out.sumText = sum.textContent;
+    out.bodyHidden = !shown(document.getElementById('btnExportBackup')) && !shown(document.getElementById('trashWrap'));
+    document.querySelector('#backupPanel > .panel-head').click();
+    out.opened = shown(document.getElementById('btnExportBackup')) && !shown(sum);
+    delete settings.pickupLateDays;
+    const d = 864e5, now = Date.now();
+    out.late = [window.__orderStatus.pickupLate({ status: 'جاهزة للاستلام', notifiedAt: now - 1 * d }), window.__orderStatus.pickupLate({ status: 'جاهزة للاستلام', notifiedAt: now - 2 * d })];
+    return out;
+  });
+  expect(r.collapsed).toEqual({ backupPanel: true, trashPanel: true, ordersSettingsPanel: true });
+  expect(r.sumShown).toBe(true);
+  expect(r.sumText).toMatch(/10\/11\/2026/);
+  expect(r.bodyHidden).toBe(true);
+  expect(r.opened).toBe(true);
+  expect(r.late).toEqual([null, 2]);
+});

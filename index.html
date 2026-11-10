@@ -118,7 +118,10 @@
   .collapsible > .panel-head h2::before{content:'▾'; display:inline-block; margin-inline-end:8px; transition:transform .2s; color:var(--text-dim);}
   .collapsible.collapsed > .panel-head h2::before{transform:rotate(90deg);}
   .collapsible.collapsed > .panel-head{margin-bottom:0;}
-  .collapsible.collapsed > :not(.panel-head){display:none !important;}
+  .collapsible.collapsed > :not(.panel-head):not(.when-collapsed){display:none !important;}
+  .collapsible:not(.collapsed) > .when-collapsed{display:none;}
+  .collapsible > .when-collapsed{font-size:13px; color:var(--text-dim); margin:8px 0 0;}
+  .collapsible > .when-collapsed b{color:var(--brass-deep);}
 
   .btn{
     display:inline-flex; align-items:center; gap:8px;
@@ -1076,8 +1079,9 @@
         <p style="font-size:12px; color:var(--text-dim);">لتغيير كلمة السر أو إضافة حساب مستخدم ثاني، هذا يصير من Firebase Console → Authentication → Users.</p>
       </div>
 
-      <div class="panel" style="max-width:520px;">
+      <div class="panel collapsible collapsed" id="backupPanel" style="max-width:520px;">
         <div class="panel-head"><h2>نسخة احتياطية</h2></div>
+        <p class="when-collapsed">آخر نسخة: <b id="lastBackupSummary">—</b></p>
         <p style="font-size:13px; color:var(--text-dim); margin-top:0;">حمّل ملف Excel فيه كل بياناتك (الوصولات، المصاريف، ملخص عام) — يفتح مباشرة على الكمبيوتر. احتفظ به في مكان آمن وحدّثه بين فترة وأخرى.</p>
         <button class="btn btn-primary" id="btnExportBackup">تحميل نسخة Excel</button>
         <hr style="margin:16px 0; border:none; border-top:1px solid var(--line);">
@@ -1099,8 +1103,8 @@
         <p style="font-size:12px; color:var(--text-dim); margin:6px 0 0;">الحد الأقصى للمستند الواحد بالسحابة 1 ميغا. إذا وصلت لـ 80% بيطلعلك تنبيه.</p>
       </div>
 
-      <div class="panel" style="max-width:520px;">
-        <div class="panel-head"><h2>🗑 سلة المهملات (الوصولات المحذوفة)</h2></div>
+      <div class="panel collapsible collapsed" id="trashPanel" style="max-width:520px;">
+        <div class="panel-head"><h2>🗑 سلة المهملات (الوصولات المحذوفة)</h2><span class="tag tag-due" id="trashCountBadge" style="display:none;"></span></div>
         <p style="font-size:13px; color:var(--text-dim); margin-top:0;">أي وصل تحذفه يبقى هنا 30 يوم قبل ما يمسح نهائيًا، ومبلغه ينشال من "إجمالي المقبوضات" فورًا. إذا استرجعته، يرجع المبلغ بتاريخه الأصلي.</p>
         <div id="trashWrap"></div>
       </div>
@@ -2639,6 +2643,18 @@ let cloudBackupBusy = false;
 function updateCloudBackupLabel(){
   const el = document.getElementById('lastCloudBackupLabel'); if(!el) return;
   el.textContent = settings.lastCloudBackupAt ? new Date(settings.lastCloudBackupAt).toLocaleString('fr-FR') : 'ما في لسا';
+  updateBackupSummary();
+}
+// سطر واحد بيبيّن تحت عنوان «نسخة احتياطية» وهي مطوية: تاريخ أحدث نسخة (سحابية أو تلقائية بالجهاز)
+function updateBackupSummary(){
+  const el = document.getElementById('lastBackupSummary'); if(!el) return;
+  const cloud = settings.lastCloudBackupAt ? new Date(settings.lastCloudBackupAt) : null;
+  const localStr = (typeof isMobileDevice==='function' && isMobileDevice()) ? settings.lastMobileBackupDate : (typeof lastDailyBackupHere==='function' ? lastDailyBackupHere() : '');
+  const cloudDay = cloud && !isNaN(cloud) ? cloud.toLocaleDateString('sv-SE') : '';
+  const localDayStr = /^\d{4}-\d{2}-\d{2}/.test(localStr||'') ? localStr.slice(0,10) : '';
+  if(cloudDay && cloudDay >= localDayStr) el.textContent = cloud.toLocaleString('fr-FR');
+  else if(localDayStr) el.textContent = localStr;
+  else el.textContent = 'ما في لسا';
 }
 function storageObjUrl(name){ const b = (firebase.app().options.storageBucket); return `https://firebasestorage.googleapis.com/v0/b/${b}/o`+(name!==undefined?'/'+encodeURIComponent(name):''); }
 async function uploadCloudBackup(name){
@@ -2701,6 +2717,7 @@ function updateLastDailyBackupLabel(){
   }else{
     el.textContent = lastDailyBackupHere() || 'لسا ما صارت';
   }
+  updateBackupSummary();
 }
 
 // النسخة اليومية الساعة 5: بتنزل على هالجهاز، فمنسجّل تاريخها على هالجهاز (مش بس بالإعدادات المشتركة —
@@ -3857,6 +3874,8 @@ async function purgeOldTrash(){
 function renderTrash(){
   const wrap = document.getElementById('trashWrap');
   if(!wrap) return;
+  const tb = document.getElementById('trashCountBadge');
+  if(tb){ const n = deletedReceipts.length + deletedInvoices.length; tb.textContent = n; tb.style.display = n ? '' : 'none'; }
   if(deletedReceipts.length === 0 && deletedInvoices.length === 0){
     wrap.innerHTML = '<div class="empty-state" style="padding:16px 0;">السلة فارغة.</div>';
     return;
@@ -3865,11 +3884,11 @@ function renderTrash(){
   wrap.innerHTML = sorted.map(r=>{
     const delDate = r.deletedAt ? r.deletedAt.slice(0,10) : '—';
     return `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
-      <div style="font-size:13px;">
+      <div style="font-size:13px; min-width:0;">
         <b>${escHtmlText(r.name)}</b> — وصل #${r.no} — ${fmt(r.total)}
         <div style="color:var(--text-dim); font-size:12px;">اتحذف بتاريخ ${delDate}</div>
       </div>
-      <div style="display:flex; gap:6px;">
+      <div style="display:flex; gap:6px; flex-shrink:0; white-space:nowrap;">
         <button class="btn btn-sm" onclick="restoreReceiptFromTrash('${r.id}')">↺ استرجاع</button>
         <button class="btn btn-sm btn-danger" onclick="permanentlyDeleteFromTrash('${r.id}')">حذف نهائي</button>
       </div>
@@ -3878,11 +3897,11 @@ function renderTrash(){
     const delDate = i.deletedAt ? i.deletedAt.slice(0,10) : '—';
     const label = i.docType==='devis' ? 'Facture proforma' : 'Devis';
     return `<div style="display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--line);">
-      <div style="font-size:13px;">
+      <div style="font-size:13px; min-width:0;">
         <b>${escHtmlText(i.clientName||'')}</b> — ${label} ${escHtmlText(i.no||'')} — ${fmt(i.ttc)}
         <div style="color:var(--text-dim); font-size:12px;">اتحذف بتاريخ ${delDate}</div>
       </div>
-      <div style="display:flex; gap:6px;">
+      <div style="display:flex; gap:6px; flex-shrink:0; white-space:nowrap;">
         <button class="btn btn-sm" onclick="restoreInvoiceFromTrash('${i.id}')">↺ استرجاع</button>
         <button class="btn btn-sm btn-danger" onclick="permanentlyDeleteInvoiceFromTrash('${i.id}')">حذف نهائي</button>
       </div>
@@ -7559,7 +7578,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   const normSt=s=>ST.includes(s)?s:s==='جاهز'?'جاهزة للاستلام':'بدون تنفيذ';
   const MADE=new Set(['تم التنفيذ','جاهزة للاستلام','تم التسليم']); // خلص تصنيعها
   // تأخر الاستلام: خلصت (أو جاهزة) وما إجا الزبون بعد المدة اللي بالإعدادات — بتطلع بالأحمر
-  const lateDays=()=>{const n=parseInt(settings&&settings.pickupLateDays,10);return n>0?n:7};
+  const lateDays=()=>{const n=parseInt(settings&&settings.pickupLateDays,10);return n>0?n:2};
   const pickupLate=j=>{if(j.status!=='تم التنفيذ'&&j.status!=='جاهزة للاستلام')return null;const from=j.notifiedAt||j.doneAt;if(!from)return null;
     const d=Math.floor((Date.now()-from)/864e5);return d>=lateDays()?d:null};
   window.__pickupLate=()=>jobs.filter(pickupLate).map(j=>({id:j.id,no:ordNo(j),name:j.cust.name||'',days:pickupLate(j)}));
@@ -7817,7 +7836,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     lateBox.innerHTML=`<div style="font-weight:800;color:#C0392B;margin-bottom:6px">🔴 ${L.length} طلبية خلصت والزبون ما استلمها (أكتر من ${lateDays()} يوم)</div>`+
       L.slice(0,8).map(j=>`<div style="font-size:13.5px">• ${ordNo(j)} — ${esc(j.cust.name||'بدون اسم')}${ME!=='factory'&&j.cust.phone?` — <bdi dir="ltr">${esc(j.cust.phone)}</bdi>`:''} — من ${pickupLate(j)} يوم</div>`).join('')+(L.length>8?'<div style="font-size:13px">…</div>':'');}
   lateBox.addEventListener('click',()=>{filter='late';const sel=ov.querySelector('[data-f]');if(sel)sel.value='late';showOrders()});
-  {const sv=document.getElementById('view-settings');if(sv){const pn=document.createElement('div');pn.className='panel';pn.innerHTML=`<h3 style="margin:0 0 8px">🏭 الطلبيات</h3>
+  {const sv=document.getElementById('view-settings');if(sv){const pn=document.createElement('div');pn.className='panel collapsible collapsed';pn.id='ordersSettingsPanel';pn.style.maxWidth='520px';pn.innerHTML=`<div class="panel-head"><h2>🏭 الطلبيات</h2></div>
       <label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px">الطلبية بتصير حمرا إذا خلصت والزبون ما استلمها بعد <input type="number" min="1" max="365" inputmode="numeric" data-late-days style="width:80px;font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:8px"> يوم</label>`;
     const tb=sv.querySelector('.topbar');(tb||sv.firstElementChild).insertAdjacentElement('afterend',pn);
     const inp=pn.querySelector('[data-late-days]');const fill=()=>{inp.value=lateDays()};fill();
