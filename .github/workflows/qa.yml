@@ -24,7 +24,7 @@ jobs:
       run:
         working-directory: qa
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -52,7 +52,7 @@ jobs:
     container:
       image: semgrep/semgrep
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: استخراج السكربتات المضمّنة في صفحات HTML
         run: python3 -I qa/tools/extract_scripts.py . _extracted
       - name: الفحص
