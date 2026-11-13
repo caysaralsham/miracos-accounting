@@ -382,6 +382,7 @@
   .meas-print-table th, .meas-print-table td{border:1px solid var(--line); padding:6px 8px; text-align:center;}
   .meas-print-table th{background:var(--ink); color:#EDEAE1;}
 
+  .overlay > .print-sheets{ display:none; }
   @media print{
     /* السبب الحقيقي للصفحات الفارغة: (1) كل صناديق النوافذ المنبثقة (.overlay) السبعة بالتطبيق
        كانت تدخل ضمن تدفق الصفحة المطبوعة مع بعض (حتى المخفية منها)، فكل نموذج غير ظاهر
@@ -422,8 +423,18 @@
     .print-head-row td{ padding:0 !important; border:none !important; }
     /* أكتر من 20 بند: بيكمّل على صفحة تانية، والرأس (اللوغو ورقم الوصل) بيتكرر بكل صفحة، وتحت: صفحة 1 من 2 */
     tbody tr{ break-inside:avoid; page-break-inside:avoid; }
-    body.print-multipage .overlay.show .modal{ page: multi; }
-    .overlay.show[data-multipage] .modal{ page: multi; }
+    body.print-multipage .overlay.show:not([data-sheets]) .modal{ page: multi; }
+    .overlay.show[data-multipage]:not([data-sheets]) .modal{ page: multi; }
+    /* الورقة الطويلة بتتقسّم لصفحات جاهزة (راجع buildPrintSheets): الرأس الكامل بأول صفحة بس،
+       الصفحات التانية بتبدا بسطر صغير (رقم الورقة واسم الزبون) وعناوين الأعمدة، وتحت بالنص رقم الصفحة */
+    .overlay.show[data-sheets] > .modal{ display:none !important; }
+    .overlay.show[data-sheets] > .print-sheets, .print-sheets.measuring{ display:block !important; }
+    .print-sheet{ position:relative; width:210mm; height:296.6mm; box-sizing:border-box; padding:10mm 10mm 15mm; overflow:hidden; background:#fff; break-after:page; page-break-after:always; }
+    .print-sheet:last-child{ break-after:auto; page-break-after:auto; }
+    .overlay.show > .print-sheets > .print-sheet > .modal{ padding:0 !important; }
+    .print-cont{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; font-size:14px; color:#1E1A16; border-bottom:1.5px solid var(--ink); padding-bottom:5px; margin-bottom:10px; }
+    .print-cont-more{ font-size:12px; color:#6B6157; flex:none; }
+    .print-sheet-foot{ position:absolute; left:0; right:0; bottom:6mm; text-align:center; font-size:12.5px; color:#4A433C; font-variant-numeric:tabular-nums; }
     /* التصغير لورقة وحدة بينكتب كقيمة ثابتة بـ <style id="printFitStyle"> (راجع fitPrintOverlay):
        كروم ما بيحسب تقسيم الصفحات صح إذا الـ zoom جاي من var()، فكان يطلع ورقة فيها جزء وورقة تانية فيها آخر سطر والمجموع */
     /* المجموع والدفعات والباقي والتواقيع والملاحظة ما بينقسموا بين ورقتين أبداً */
@@ -3983,7 +3994,7 @@ function viewReceipt(id){
     <table>
       <thead>
         <tr class="print-head-row"><td colspan="5">
-          <div class="receipt-top">
+          <div class="receipt-top" data-print-cont="${escHtmlText('وصل دفع #'+r.no+' — '+(r.name||''))}">
             <div class="receipt-brand">
               <img src="${settings.logo}">
               <div>
@@ -4738,7 +4749,7 @@ function viewInvoice(id){
       <table>
         <thead>
           <tr class="print-head-row"><td colspan="6">
-            <div class="receipt-top">
+            <div class="receipt-top" data-print-cont="${escHtmlText('Devis رقم '+inv.no+' — '+(inv.clientName||''))}">
               <div class="receipt-brand">
                 <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
                 <div>
@@ -4800,7 +4811,7 @@ function viewInvoice(id){
     <table style="direction:ltr;">
       <thead>
         <tr class="print-head-row"><td colspan="6">
-          <div class="receipt-top" style="direction:ltr; text-align:left;">
+          <div class="receipt-top" style="direction:ltr; text-align:left;" data-print-cont="${escHtmlText(docLabel+' N° '+inv.no+' — '+(inv.clientName||''))}">
             <div class="receipt-brand" style="flex:1; min-width:0;">
               <img src="${settings.logo}" style="width:2.2cm; height:2.6cm; object-fit:contain;">
               <div style="flex:1; min-width:0;">
@@ -6203,7 +6214,7 @@ function viewMeasurementRecord(id){
 // بيرسم ورقة القياسات (نفس شكل الطباعة) — بتستعمل للعرض وللمشاركة كصورة
 function renderMeasurementRecordInto(rec){
   const measDocHead = `
-    <div class="receipt-top">
+    <div class="receipt-top" data-print-cont="${escHtmlText('قياسات — '+(rec.customerName||'')+(rec.date?' — '+rec.date:''))}">
       <div class="receipt-brand">
         <img src="${settings.logo}">
         <div>
@@ -6337,7 +6348,8 @@ function measurePrintLayout(ov){
     fr.style.cssText = `position:fixed;left:-20000px;top:0;width:${PRINT_A4_W}px;height:${PRINT_A4_H}px;border:0;visibility:hidden;pointer-events:none;`;
     document.body.appendChild(fr);
     const clone = ov.cloneNode(true);
-    clone.removeAttribute('data-multipage'); clone.classList.remove('print-hide'); clone.classList.add('show'); clone.removeAttribute('id');
+    clone.removeAttribute('data-multipage'); clone.removeAttribute('data-sheets'); clone.classList.remove('print-hide'); clone.classList.add('show'); clone.removeAttribute('id');
+    clone.querySelectorAll('.print-sheets').forEach(x=>x.remove());
     clone.style.display = '';
     const links = [...document.querySelectorAll('link[rel="stylesheet"]')].map(l=>l.outerHTML).join('');
     const d = fr.contentDocument;
@@ -6349,7 +6361,10 @@ function measurePrintLayout(ov){
       if(done) return; done = true;
       try{
         const b = d.querySelector('.modal-body'), hd = b && b.querySelector('.receipt-top');
-        resolve({h: b ? b.scrollHeight : 0, headH: hd ? hd.offsetHeight : 0});
+        const h = b ? b.scrollHeight : 0, rows = b ? b.querySelectorAll('td.row-no').length : 0;
+        let sheets = null;
+        if(h && printNeedsPages(h, rows)){ try{ sheets = buildPrintSheets(d); }catch(e){ console.error('print sheets', e); } }
+        resolve({h, headH: hd ? hd.offsetHeight : 0, rows, sheets});
       }catch(e){ resolve({h:0, headH:0}); }
       fr.remove();
     };
@@ -6359,20 +6374,166 @@ function measurePrintLayout(ov){
     setTimeout(finish, 1500);
   });
 }
+
+// ===== تقسيم الورقة الطويلة لصفحات A4 جاهزة =====
+// بيشتغل جوّا إطار القياس (بنفس قواعد الطباعة وعرض A4)، فكل صفحة بتنقاس فعلياً قبل ما ينحط فيها السطر الجاي:
+//  • الرأس الكامل (اللوغو، الاسم، QR، الرقم) بأول صفحة بس — الصفحات التانية بتبدا بسطر صغير: رقم الورقة واسم الزبون
+//  • سطر المنتج ما بينقسم بين صفحتين، وعناوين الأعمدة بتتكرر بأول كل صفحة
+//  • المجموع/المدفوع/الباقي كتلة وحدة: إذا ما وسعت بتنتقل كاملة للصفحة الجاية (ومعها آخر سطر حتى ما تبقى لحالها)
+//  • تحت بالنص: «صفحة 1 من 3»، وبالأخيرة «الصفحة الأخيرة 3 من 3» — بأرقام لاتينية، وبس إذا في صفحتين أو أكتر
+const SHEET_ATOM = '.totals-box,.sig-block,.field,.prod-photo-block,.mirsam-print,.receipt-top,.receipt-info-grid,.fac-card,.item-draws';
+function buildPrintSheets(d){
+  const win = d.defaultView, ovc = d.body.firstElementChild;
+  const modal = ovc && ovc.querySelector('.modal'); if(!modal) return null;
+  const cs = el=>win.getComputedStyle(el);
+  const top = modal.querySelector('.receipt-top');
+  const ltr = !!top && cs(top).direction === 'ltr';
+  let cont = top ? (top.getAttribute('data-print-cont')||'') : '';
+  if(!cont && top){ const no = top.querySelector('.receipt-stamp .no'), lb = top.querySelector('.receipt-stamp .lbl');
+    const a = no ? no.textContent.trim() : '', b = lb ? lb.textContent.trim() : ''; cont = /^#/.test(a) ? (b+' '+a).trim() : (a+' '+b).trim(); }
+  const wrap = d.createElement('div'); wrap.className = 'print-sheets measuring'; ovc.appendChild(wrap);
+  const sheets = [], tinfo = new Map();
+  let sheet = null, map = null, count = 0, last = null, pageAvail = 0;
+  const hidden = el=> el.nodeType !== 1 || /^(SCRIPT|STYLE|TEMPLATE)$/.test(el.tagName) || cs(el).display === 'none';
+  function newSheet(){
+    sheet = d.createElement('div'); sheet.className = 'print-sheet';
+    if(sheets.length && cont){
+      const c = d.createElement('div'); c.className = 'print-cont'; c.dir = ltr ? 'ltr' : 'rtl';
+      const a = d.createElement('span'); cont.split(' — ').filter(Boolean).forEach((part,i)=>{ if(i) a.appendChild(d.createTextNode(' — ')); const b = d.createElement('bdi'); b.textContent = part; a.appendChild(b); });
+      const m = d.createElement('span'); m.className = 'print-cont-more'; m.textContent = ltr ? 'suite' : 'تابع';
+      c.appendChild(a); c.appendChild(m); sheet.appendChild(c);
+    }
+    wrap.appendChild(sheet); sheets.push(sheet); map = new Map(); count = 0; last = null;
+  }
+  const limit = ()=> sheet.getBoundingClientRect().bottom - parseFloat(cs(sheet).paddingBottom);
+  const fits = ()=>{ const m = map.get(modal); return !m || m.getBoundingClientRect().bottom <= limit() + 0.5; };
+  function target(path){
+    let parent = sheet;
+    for(const src of path){
+      let c = map.get(src);
+      if(!c){ c = src.cloneNode(false); c.removeAttribute('id'); c.__src = src;
+        if(src.tagName === 'TABLE') [...src.children].forEach(k=>{ if(/^(COLGROUP|CAPTION)$/.test(k.tagName)) c.appendChild(k.cloneNode(true)); });
+        parent.appendChild(c); map.set(src, c); }
+      parent = c;
+    }
+    return parent;
+  }
+  function pruneUp(node){
+    while(node && node !== sheet && ![...node.children].some(k=>!/^(COLGROUP|CAPTION)$/.test(k.tagName))){
+      const p = node.parentNode; if(node.__src) map.delete(node.__src); node.remove(); node = p; }
+  }
+  const drop = cl=>{ const p = cl.parentNode; cl.remove(); pruneUp(p); };
+  function shrink(cl){   // كتلة أطول من صفحة كاملة (صورة كبيرة مثلاً): بتتصغّر لتساع
+    const m = map.get(modal); if(!m || cl.tagName === 'TR') return;
+    const over = m.getBoundingClientRect().bottom - limit(), h = cl.getBoundingClientRect().height;
+    if(over > 0 && h > over) cl.style.zoom = Math.max(0.3, (h - over) / h * 0.98).toFixed(3);
+  }
+  const prevVisible = el=>{ let p = el.previousElementSibling; while(p && hidden(p)) p = p.previousElementSibling; return p; };
+  function splittable(el){
+    if(el.matches(SHEET_ATOM) || !/^(block|flow-root)$/.test(cs(el).display)) return false;
+    for(const n of el.childNodes) if(n.nodeType === 3 && n.nodeValue.trim()) return false;
+    const kids = [...el.children].filter(k=>!hidden(k)); if(!kids.length) return false;
+    return !!el.querySelector('table') || (kids.length > 1 && el.getBoundingClientRect().height > pageAvail * 0.35);
+  }
+  function fixWidths(cl, src){ [...src.children].forEach((th,i)=>{ if(cl.children[i]) cl.children[i].style.width = cs(th).width; }); }
+  function addColHead(tbl, tpath){
+    const info = tinfo.get(tbl); if(!info || !info.colHead) return;
+    const h = info.colHead.cloneNode(true); h.__src = info.colHead; h.__kind = 'col'; fixWidths(h, info.colHead);
+    target(tpath.concat(info.colHead.parentNode)).appendChild(h);
+  }
+  function flowTable(tbl, path){
+    const info = {colHead:null}; tinfo.set(tbl, info);
+    const tpath = path.concat(tbl);
+    for(const sec of [...tbl.children]){
+      if(!/^(THEAD|TBODY|TFOOT)$/.test(sec.tagName) || hidden(sec)) continue;
+      const secPath = tpath.concat(sec);
+      for(const tr of [...sec.children]){
+        if(tr.tagName !== 'TR' || hidden(tr)) continue;
+        const isHead = tr.classList.contains('print-head-row');
+        const isCol = !isHead && tr.children.length > 0 && [...tr.children].every(x=>x.tagName === 'TH');
+        const cl = tr.cloneNode(true); cl.__src = tr; cl.__kind = isHead ? 'head' : isCol ? 'col' : 'data';
+        if(isCol){ info.colHead = tr; fixWidths(cl, tr); }
+        target(secPath).appendChild(cl);
+        if(fits()){ if(!isCol) count++; continue; }
+        if(count === 0){ count++; continue; }   // سطر أطول من الصفحة كلها: بيبقى مكانه
+        drop(cl);
+        const tc = map.get(tbl);
+        if(tc){ const rs = [...tc.querySelectorAll(':scope > * > tr')], lr = rs[rs.length-1]; if(lr && lr.__kind === 'col') drop(lr); }   // عناوين الأعمدة ما بتبقى لحالها بآخر الصفحة
+        newSheet();
+        if(!isCol && !isHead) addColHead(tbl, tpath);
+        target(secPath).appendChild(cl);
+        if(!isCol) count++;
+      }
+    }
+    last = null;
+  }
+  function place(c, path){
+    if(hidden(c)) return;
+    const st = cs(c);
+    if((st.breakBefore === 'page' || st.pageBreakBefore === 'always') && count > 0) newSheet();
+    if(c.tagName === 'TABLE'){ flowTable(c, path); return; }
+    const put = ()=>{ const cl = c.cloneNode(true); cl.__src = c; target(path).appendChild(cl); return cl; };
+    let cl = put();
+    if(fits()){ count++; last = {cl, src:c, path}; return; }
+    if(splittable(c)){ drop(cl); const p2 = path.concat(c); [...c.children].forEach(k=>place(k, p2)); return; }
+    if(count > 0){
+      drop(cl);
+      const prev = prevVisible(c);
+      let carryRow = null, carryBlock = null;
+      if(prev && prev.tagName === 'TABLE' && map.has(prev) && c.matches('.totals-box')){
+        const rows = [...map.get(prev).querySelectorAll(':scope > * > tr')].filter(r=>r.__kind === 'data');
+        const lr = rows[rows.length-1];
+        if(rows.length >= 2 && lr.getBoundingClientRect().height < pageAvail * 0.4){ carryRow = lr.__src; drop(lr); }
+      } else if(last && last.src === prev && count > 1 && last.cl.getBoundingClientRect().height < 70){ carryBlock = last; drop(last.cl); }   // العنوان بيلحق اللي تحته
+      newSheet();
+      if(carryRow){ const tp = path.concat(prev); addColHead(prev, tp); const rc = carryRow.cloneNode(true); rc.__src = carryRow; rc.__kind = 'data'; target(tp.concat(carryRow.parentNode)).appendChild(rc); count++; }
+      if(carryBlock){ const bc = carryBlock.src.cloneNode(true); bc.__src = carryBlock.src; target(carryBlock.path).appendChild(bc); count++; }
+      cl = put();
+    }
+    if(!fits()) shrink(cl);
+    count++; last = {cl, src:c, path};
+  }
+  newSheet();
+  pageAvail = limit() - sheet.getBoundingClientRect().top - parseFloat(cs(sheet).paddingTop);
+  [...modal.children].forEach(k=>place(k, [modal]));
+  if(sheets.length > 1 && count === 0){ sheets.pop().remove(); }
+  const n = sheets.length;
+  if(n > 1) sheets.forEach((s,i)=>{
+    const f = d.createElement('div'); f.className = 'print-sheet-foot'; f.dir = ltr ? 'ltr' : 'rtl';
+    f.textContent = ltr ? ((i === n-1 ? 'Dernière page ' : 'Page ') + (i+1) + ' / ' + n) : ((i === n-1 ? 'الصفحة الأخيرة ' : 'صفحة ') + (i+1) + ' من ' + n);
+    s.appendChild(f);
+  });
+  wrap.querySelectorAll('[id]').forEach(el=>{ if(!el.closest('svg')) el.removeAttribute('id'); });
+  wrap.classList.remove('measuring');
+  const html = wrap.outerHTML; wrap.remove();
+  return html;
+}
 const __fitSeq = new WeakMap();
-async function fitPrintOverlay(ov){
+const printAvailH = ()=> (PRINT_A4_H - PRINT_PAD_MM_V*96/25.4) * 0.97;   // هامش أمان 3%
+// إذا بتساع بورقة وحدة بتصغير معقول → ورقة وحدة (ما في ورقة تانية فيها سطر واحد والمجموع بس).
+// كتير بنود وبدها تصغير كبير → بتتقسّم على صفحات مرتّبة ومرقّمة.
+function printNeedsPages(h, rowsCount){ const scale = Math.min(1, printAvailH() / h); return (rowsCount > 20 && scale < 0.7) || (scale < 0.55 && rowsCount > 0); }
+function clearPrintSheets(ov){ ov.removeAttribute('data-sheets'); ov.querySelectorAll(':scope > .print-sheets').forEach(x=>x.remove()); }
+function fitPrintOverlay(ov){
+  const p = fitPrintOverlayNow(ov);
+  if(ov){ ov.__fitBusy = p; const end = ()=>{ if(ov.__fitBusy === p) ov.__fitBusy = null; }; p.then(end, end); }
+  return p;
+}
+async function fitPrintOverlayNow(ov){
   const body = ov && ov.querySelector('.modal-body');
   if(!body) return;
   const seq = (__fitSeq.get(ov)||0) + 1; __fitSeq.set(ov, seq);
-  const {h, headH} = await measurePrintLayout(ov);
+  clearPrintSheets(ov);   // حتى ما تنطبع صفحات قديمة من ورقة غير هي
+  const {h, headH, rows, sheets} = await measurePrintLayout(ov);
   if(__fitSeq.get(ov) !== seq || !h) return;   // في قياس أحدث
-  const avail = (PRINT_A4_H - PRINT_PAD_MM_V*96/25.4) * 0.97;   // هامش أمان 3%
+  const avail = printAvailH();
   let scale = Math.min(1, avail / h);
   const MIN_HEAD = 0.8;
-  // إذا بتساع بورقة وحدة بتصغير معقول → ورقة وحدة (ما في ورقة تانية فيها سطر واحد والمجموع بس).
-  // كتير بنود وبدها تصغير كبير → بيكمّل على صفحات مرتّبة، بنفس الرأس ورقم الوصل بكل صفحة.
-  const rowsCount = body.querySelectorAll('td.row-no').length;
-  if((rowsCount > 20 && scale < 0.7) || (scale < 0.55 && rowsCount > 0)){ setPrintFit(ov, 0); ov.setAttribute('data-multipage', '1'); return; }
+  if(printNeedsPages(h, rows||0)){
+    setPrintFit(ov, 0); ov.setAttribute('data-multipage', '1');
+    if(sheets){ ov.insertAdjacentHTML('beforeend', sheets); ov.setAttribute('data-sheets', '1'); }
+    return;
+  }
   ov.removeAttribute('data-multipage');
   if(scale >= 1){ setPrintFit(ov, 0); return; }
   let headScale = scale;
@@ -6386,7 +6547,7 @@ function fitPrintAll(){ return Promise.all([...document.querySelectorAll('.overl
 // بعد ما تتحمّل كل صور الورقة (اللوغو، الباركود، الرسمة، صور المنتج)
 function fitPrintWhenReady(ov){
   ov.__fitReady = fitPrintOverlay(ov);
-  const imgs = [...ov.querySelectorAll('img')].filter(im=>!im.complete);
+  const imgs = [...ov.querySelectorAll('img')].filter(im=>!im.complete && !im.closest('.print-sheets'));
   imgs.forEach(im=>{ im.addEventListener('load', ()=>fitPrintOverlay(ov), {once:true}); im.addEventListener('error', ()=>fitPrintOverlay(ov), {once:true}); });
 }
 window.fitPrintWhenReady = fitPrintWhenReady;
@@ -6398,6 +6559,13 @@ function printWhenFit(ovId){
     window.print();
   }, 50);
 }
+// كبسة الطباعة بتستنى حساب الورقة/تقسيم الصفحات إذا لسا شغّال (حتى ما تنطبع قبل ما تجهز الصفحات)
+{ const _p0 = window.print.bind(window);
+  window.print = function(){
+    const busy = [...document.querySelectorAll('.overlay.show')].map(o=>o.__fitBusy).filter(Boolean);
+    if(!busy.length) return _p0();
+    Promise.race([Promise.all(busy), new Promise(r=>setTimeout(r, 2500))]).catch(()=>{}).then(()=>_p0());
+  }; }
 new MutationObserver(muts=>{
   muts.forEach(m=>{ const t = m.target; if(t.classList && t.classList.contains('overlay') && t.classList.contains('show')){
     if(m.oldValue==null || !/\bshow\b/.test(m.oldValue)){ t.dataset.shownAt = String(Date.now()); setTimeout(()=>fitPrintWhenReady(t), 0); } } });
@@ -6416,7 +6584,7 @@ window.addEventListener('beforeprint', ()=>{
   document.body.classList.toggle('print-page', !document.querySelector('.overlay.show') && !document.body.classList.contains('print-audit'));
   document.body.classList.remove('print-compact');
   markPrintTopOverlay();
-  document.body.classList.toggle('print-multipage', !!document.querySelector('.overlay.show[data-multipage]'));
+  document.body.classList.toggle('print-multipage', !!document.querySelector('.overlay.show[data-multipage]:not([data-sheets])'));
 });
 window.addEventListener('afterprint', ()=>{
   document.body.classList.remove('print-multipage', 'print-page');
@@ -7130,7 +7298,7 @@ function showLedger(title, rows, oneLine, amountRight){
       ${oneLine ? (amountRight ? '<colgroup><col style="width:60px"><col style="width:150px"><col style="width:120px"><col></colgroup>' : '<colgroup><col style="width:60px"><col style="width:120px"><col><col style="width:150px"></colgroup>') : ''}
       <thead>
         <tr class="print-head-row"><td colspan="4">
-          <div class="receipt-top" style="margin-bottom:16px;">
+          <div class="receipt-top" style="margin-bottom:16px;" data-print-cont="${escHtmlText(title)}">
             <div class="receipt-brand">
               <img src="${settings.logo}" style="width:60px; height:60px;">
               <div>
@@ -7615,7 +7783,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   function askDue(name,count,cb){
     const ov=document.createElement('div');ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
     ov.innerHTML=`<div style="background:var(--marble,#faf8f4);border-radius:14px;padding:20px;width:100%;max-width:360px"><b>🏭 إرسال طلبية للمعمل</b><div style="font-size:13px;color:var(--text-dim);margin:4px 0 12px">${esc(name||'بدون اسم')} — ${count} بند، بلا أسعار</div>
-      <label style="font-size:13px;font-weight:700">تاريخ التسليم المطلوب (اختياري)</label><input type="date" data-due style="width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;margin:4px 0 14px;box-sizing:border-box">
+      <label style="font-size:13px;font-weight:700">تاريخ التسليم المطلوب (اختياري)</label><input type="text" class="date-dmy" placeholder="DD.MM.YYYY" maxlength="10" inputmode="numeric" autocomplete="off" data-due style="width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;margin:4px 0 14px;box-sizing:border-box">
       <button type="button" class="btn btn-primary" data-ok style="width:100%;margin-bottom:8px">إرسال</button><button type="button" class="btn btn-ghost" data-x style="width:100%">إلغاء</button></div>`;
     document.body.appendChild(ov);
     ov.addEventListener('click',e=>{if(e.target===ov||e.target.closest('[data-x]'))return ov.remove();if(e.target.closest('[data-ok]')){const v=ov.querySelector('[data-due]').value;ov.remove();cb(v)}});
@@ -7766,8 +7934,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
         <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">${j.draw?`<span style="font-size:12.5px">📐 فيها رسمة</span>`:''}<button type="button" class="btn btn-sm" data-drw="${j.id}">${j.draw?'✏️ عدّل الرسمة بمرسم':'✏️ ارسم بمرسم'}</button></div>
         <textarea data-tx="${j.id}" rows="${Math.min(6,j.items.length+1)}" style="width:100%;margin-top:8px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">${esc(lines(j))}</textarea>
         <input data-nt="${j.id}" value="${esc(j.note||'')}" placeholder="ملاحظة" style="width:100%;margin-top:6px;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;box-sizing:border-box">
-        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px">📅 تاريخ التسليم <input type="date" data-du="${j.id}" value="${esc(j.due||'')}" style="font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:8px;width:auto"></label>
-        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px">📞 تاريخ إبلاغ الزبون <input type="date" data-nf="${j.id}" value="${j.notifiedAt?localDate(new Date(j.notifiedAt)):''}" style="font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:8px;width:auto"></label>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px">📅 تاريخ التسليم <input type="text" class="date-dmy" placeholder="DD.MM.YYYY" maxlength="10" inputmode="numeric" autocomplete="off" data-du="${j.id}" value="${dmyOf(j.due||'')}" style="font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:8px;width:9.5em"></label>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;margin-top:6px">📞 تاريخ إبلاغ الزبون <input type="text" class="date-dmy" placeholder="DD.MM.YYYY" maxlength="10" inputmode="numeric" autocomplete="off" data-nf="${j.id}" value="${j.notifiedAt?dmyOf(localDate(new Date(j.notifiedAt))):''}" style="font:inherit;padding:4px 8px;border:1px solid var(--line);border-radius:8px;width:9.5em"></label>
         ${(j.prodPhotos||[]).length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center"><span style="font-size:12.5px">🖼 صور المنتج:</span>${j.prodPhotos.map(p=>`<img data-pid="${p.id}" title="${esc(p.caption||'')}" style="width:72px;height:72px;object-fit:contain;background:#fff;border-radius:8px;border:1px solid var(--line);cursor:pointer">`).join('')}</div>`:''}
         <div data-ph="${j.id}" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${j.photos.map(p=>`<img data-pid="${p.id}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer">`).join('')}</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn btn-sm btn-primary" data-sv="${j.id}">حفظ التعديل</button><button type="button" class="btn btn-sm" data-cx="${j.id}">إلغاء</button><button type="button" class="btn btn-sm" data-addph="${j.id}">📷 صورة الشغل</button><span style="flex:1"></span><button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" style="color:#A6453D">حذف الطلبية</button></div>
@@ -8069,7 +8237,10 @@ document.addEventListener('click',function(e){var h=e.target.closest&&e.target.c
   document.addEventListener('input',function(e){ var el=e.target; if(!el||!el.matches||!el.matches('input.date-dmy')) return; enhance(el);
     var v=D.get.call(el), f=fmt(v); if(f===v) return; var pos=el.selectionStart==null?v.length:el.selectionStart, n=(v.slice(0,pos).match(/\d/g)||[]).length, i=0, c=0;
     D.set.call(el,f); while(i<f.length&&c<n){ if(/\d/.test(f.charAt(i))) c++; i++; } try{ el.setSelectionRange(i,i); }catch(_){} },true);
-  function start(){ document.querySelectorAll('input.date-dmy').forEach(enhance); }
+  // الخانات اللي بتنرسم لاحقاً (متل تاريخ التسليم وتاريخ إبلاغ الزبون بالطلبيات) بتتجهّز لحالها أول ما تنضاف
+  function start(){ document.querySelectorAll('input.date-dmy').forEach(enhance);
+    new MutationObserver(function(ms){ for(var i=0;i<ms.length;i++){ var a=ms[i].addedNodes; for(var j=0;j<a.length;j++){ var n=a[j]; if(n.nodeType!==1) continue;
+      if(n.matches&&n.matches('input.date-dmy')) enhance(n); else if(n.querySelectorAll) n.querySelectorAll('input.date-dmy').forEach(enhance); } } }).observe(document.documentElement,{childList:true,subtree:true}); }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
 })();
 </script>

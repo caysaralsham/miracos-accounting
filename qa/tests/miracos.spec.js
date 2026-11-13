@@ -1135,3 +1135,87 @@ test('الإعدادات: النسخة الاحتياطية وسلة المهم�
   expect(r.opened).toBe(true);
   expect(r.late).toEqual([null, 2]);
 });
+
+// ---- الطباعة على صفحتين أو أكتر: رأس كامل بأول صفحة بس، عناوين الأعمدة بكل صفحة، ورقم الصفحة تحت بالنص ----
+test('ورقة طويلة: الرأس بأول صفحة بس، سطر تكملة وعناوين الأعمدة بالباقي، و«الصفحة الأخيرة» مع رقمها تحت بالنص', async ({ page }) => {
+  await page.evaluate(r => { receipts.push(r); viewReceipt(r.id); }, fakeRcp(60));
+  await page.waitForTimeout(150);
+  const r = await page.evaluate(async () => {
+    const o = document.getElementById('viewReceiptOverlay'); await o.__fitReady; await o.__fitBusy;
+    const sheets = [...o.querySelectorAll(':scope > .print-sheets > .print-sheet')];
+    return {
+      n: sheets.length,
+      heads: sheets.map(s => s.querySelectorAll('.receipt-top').length),
+      conts: sheets.map(s => (s.querySelector('.print-cont') || {}).textContent || ''),
+      cols: sheets.map(s => [...s.querySelectorAll('tr')].filter(t => t.children.length && [...t.children].every(c => c.tagName === 'TH')).length),
+      rows: sheets.map(s => s.querySelectorAll('td.row-no').length),
+      totals: sheets.map(s => s.querySelectorAll('.totals-box').length),
+      foots: sheets.map(s => s.querySelector('.print-sheet-foot').textContent),
+      ids: o.querySelectorAll('.print-sheets [id]').length,
+    };
+  });
+  expect(r.n).toBe(3);
+  expect(r.heads).toEqual([1, 0, 0]);
+  expect(r.conts[0]).toBe('');
+  expect(r.conts[1]).toContain('وصل دفع #360');
+  expect(r.conts[1]).toContain('زبون تجريبي');
+  expect(r.cols).toEqual([1, 1, 1]);
+  expect(r.rows.reduce((a, b) => a + b, 0)).toBe(60);
+  expect(r.totals).toEqual([0, 0, 1]);
+  expect(r.foots).toEqual(['صفحة 1 من 3', 'صفحة 2 من 3', 'الصفحة الأخيرة 3 من 3']);
+  expect(r.ids).toBe(0);
+  await page.emulateMedia({ media: 'print' });
+  // كل صفحة جوّا ورقتها: ما في سطر مقطوع ولا كتابة طالعة لتحت رقم الصفحة
+  const over = await page.evaluate(() => [...document.querySelectorAll('#viewReceiptOverlay .print-sheet')].map(s => {
+    const lim = s.querySelector('.print-sheet-foot').getBoundingClientRect().top;
+    return Math.max(...[...s.querySelectorAll('tr, .totals-box')].map(e => e.getBoundingClientRect().bottom)) <= lim;
+  }));
+  expect(over).toEqual([true, true, true]);
+  expect(pdfPages(await page.pdf({ preferCSSPageSize: true, printBackground: true }))).toBe(3);
+});
+
+test('ورقة وحدة: بلا رقم صفحة، وفتح وصل قصير بعد وصل طويل ما بيترك صفحات قديمة', async ({ page }) => {
+  const count = () => page.evaluate(async () => { const o = document.getElementById('viewReceiptOverlay'); await o.__fitReady; await o.__fitBusy;
+    return { sheets: o.querySelectorAll('.print-sheet').length, flag: o.hasAttribute('data-sheets') }; });
+  await page.evaluate(r => { receipts.push(r); viewReceipt(r.id); }, fakeRcp(60));
+  await page.waitForTimeout(150);
+  expect((await count()).sheets).toBe(3);
+  await page.evaluate(r => { document.getElementById('viewReceiptOverlay').classList.remove('show'); receipts.push(r); viewReceipt(r.id); }, fakeRcp(3));
+  await page.waitForTimeout(150);
+  expect(await count()).toEqual({ sheets: 0, flag: false });
+  await page.emulateMedia({ media: 'print' });
+  expect(pdfPages(await page.pdf({ preferCSSPageSize: true, printBackground: true }))).toBe(1);
+});
+
+test('Facture طويلة: رقم الصفحة بالفرنسي والتواقيع بآخر صفحة', async ({ page }) => {
+  await page.evaluate(() => { const n = 40, inv = { id: 'ivp', no: 'F-12', docType: 'facture', clientName: 'SARL Exemple', date: '2026-10-16',
+    items: Array.from({ length: n }, (_, i) => ({ qty: 2, desc: 'Marbre ' + (i + 1), unit: 'm²', price: 1500, amount: 3000, total: 3000 })), ht: 3000 * n, tva: 570 * n, ttc: 3570 * n, remaining: 3570 * n, payments: [] };
+    invoices.push(inv); viewInvoice(inv.id); });
+  await page.waitForTimeout(150);
+  const r = await page.evaluate(async () => { const o = document.getElementById('viewInvoiceOverlay'); await o.__fitReady; await o.__fitBusy;
+    const sheets = [...o.querySelectorAll('.print-sheet')];
+    return { foots: sheets.map(s => s.querySelector('.print-sheet-foot').textContent), sig: sheets.map(s => s.querySelectorAll('.sig-block').length), cont: sheets[1].querySelector('.print-cont').textContent }; });
+  expect(r.foots).toEqual(['Page 1 / 2', 'Dernière page 2 / 2']);
+  expect(r.sig).toEqual([0, 1]);
+  expect(r.cont).toContain('F-12');
+});
+
+test('الطلبيات: تاريخ التسليم وتاريخ إبلاغ الزبون بأرقام 0-9 (يوم.شهر.سنة)، والحفظ بنفس القيمة', async ({ page }) => {
+  expect(await page.locator('input[type=date]').count()).toBe(0);
+  const r = await page.evaluate(async () => {
+    window.__fjobsShow();
+    window.__fjobsTest([{ id: 'a', no: 1, status: 'جاهزة للاستلام', at: Date.now(), due: '2026-11-20', notifiedAt: new Date('2026-11-12T12:00').getTime(), items: [{ qty: '1', desc: 'جرن' }] }]);
+    document.querySelector('#view-fjobs [data-ed="a"]').click();
+    await new Promise(r => setTimeout(r, 80));
+    const nf = document.querySelector('#view-fjobs [data-nf="a"]'), du = document.querySelector('#view-fjobs [data-du="a"]');
+    const shown = { nf: nf.getAttribute('value'), du: du.getAttribute('value'), type: nf.type };
+    const iso = { nf: nf.value, du: du.value };
+    nf.focus(); nf.value = ''; document.execCommand('insertText', false, '١٣١١٢٠٢٦');
+    return { shown, iso, typed: Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').get.call(nf), typedIso: nf.value, list: document.querySelector('#view-fjobs [data-list]').innerText };
+  });
+  expect(r.shown).toEqual({ nf: '12.11.2026', du: '20.11.2026', type: 'text' });
+  expect(r.iso).toEqual({ nf: '2026-11-12', du: '2026-11-20' });
+  expect(r.typed).toBe('13.11.2026');
+  expect(r.typedIso).toBe('2026-11-13');
+  expect(r.list).not.toMatch(/[٠-٩۰-۹]/);
+});
