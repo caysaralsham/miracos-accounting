@@ -759,13 +759,11 @@
         <div id="receiptsTableWrap"></div>
       </div>
 
-      <div class="panel">
-        <div class="panel-head">
-          <h2>عروض الأسعار</h2>
-          <span style="font-size:12px; color:var(--text-dim);">Devis و Facture proforma — الـ Facture بتطلع فوق مع الزبائن والوصولات</span>
-        </div>
+      <details class="panel top-sales" id="quotesBox">
+        <summary class="ts-sum"><span>عروض الأسعار <span id="quotesCount" style="font-size:13px; color:var(--text-dim);"></span></span><span class="ts-hint">اضغط للفتح</span></summary>
+        <div style="font-size:12px; color:var(--text-dim); margin:10px 0 12px;">Devis و Facture proforma — الـ Facture بتطلع فوق مع الزبائن والوصولات</div>
         <div id="invoicesTableWrap"></div>
-      </div>
+      </details>
     </section>
 
     <section class="view" id="view-expenses">
@@ -3430,6 +3428,7 @@ async function buildAndSaveReceiptFromForm(){
     receipts.push(data);
   }
   saveReceipts();
+  try{ if(prevReceipt && window.__autoUpdateOrder) window.__autoUpdateOrder('rcp', data, prevReceipt); }catch(e){}
   try{ pushWorkStatusToJob('rcp', data.id, prevReceipt ? rowOwnWorkStatus(prevReceipt) : 'بدون تنفيذ'); }catch(e){}
   logPaymentHistoryEntries(payments, {customerName: name, docType: 'وصل', docNo: data.no, details: items.map(it=>it.desc).filter(Boolean).join('، ')}, prevReceipt ? prevReceipt.payments : []);
   if(convertingFromInvoiceId){
@@ -4526,6 +4525,8 @@ async function buildAndSaveInvoiceFromForm(){
   }
   noteInvoiceNoUsed(data.no);
   saveInvoices();
+  try{ if(prevInvoice && window.__autoUpdateOrder) window.__autoUpdateOrder('inv', data, prevInvoice); }catch(e){}
+  try{ if(!id && data.docType!=='facture') document.getElementById('quotesBox').open = true; }catch(e){}   // مستند جديد: القسم بينفتح حتى يبيّن
   if(data.docType==='facture'){ try{ pushWorkStatusToJob('inv', data.id, prevInvoice && prevInvoice.docType==='facture' ? rowOwnWorkStatus(prevInvoice) : 'بدون تنفيذ'); }catch(e){} }
   logPaymentHistoryEntries(payments, {customerName: clientName, docType: data.docType==='facture'?'فاتورة':(data.docType==='devis'?'Facture proforma':'Devis'), docNo: data.no, details: (items||[]).map(it=>it.desc).filter(Boolean).join('، ')}, prevInvoice ? prevInvoice.payments : []);
   renderInvoicesTable();
@@ -4555,6 +4556,7 @@ function renderInvoicesTable(){
   if(!wrap) return;
   // عروض الأسعار بس (Devis / Facture proforma) + الـ Facture الملغاة (لترجيعها إذا لزم). الـ Facture الفعّالة بجدول الزبائن والوصولات
   const shownInv = invoices.filter(i=>i.docType!=='facture' || i.cancelled);
+  { const qc = document.getElementById('quotesCount'); if(qc) qc.textContent = shownInv.length ? '('+shownInv.length+')' : ''; }
   if(shownInv.length === 0){
     wrap.innerHTML = `<div class="empty-state">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
@@ -7803,6 +7805,18 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   }
   const fromReceipt=r=>({cust:{name:r.name||'',phone:r.phone||'',addr:r.address||''},items:mapItems(r.items),draw:r.mirsamDrawing||null,prodPhotos:(r.productPhotos||[]).map(p=>({id:p.id,caption:p.caption||''})),note:r.note||'',due:dueFrom(r.date,r.duration),rcpId:r.id,rcpNo:r.no||''});
   const fromInvoice=v=>({cust:{name:v.clientName||'',phone:v.clientPhone||'',addr:v.clientAddress||''},items:mapItems(v.items),draw:v.mirsamDrawing||null,prodPhotos:(v.productPhotos||[]).map(p=>({id:p.id,caption:p.caption||''})),note:v.note||'',due:dueFrom(v.date,v.delay),invId:v.id});
+  // تعديل وصل/مستند إله طلبية بالمعمل: الطلبية بتتحدّث لحالها (الزبون، البنود، الملاحظة، موعد التسليم، الرسمة، صور المنتج).
+  // بس إذا هالمعلومات تغيّرت فعلاً — تعديل دفعة أو سعر ما بيبعت شي للمعمل وما بيمسح تعديلات المعمل.
+  window.__autoUpdateOrder=async(kind,row,prev)=>{
+    if(ME!=='main'||!row||!prev)return false;
+    const mk=kind==='rcp'?fromReceipt:fromInvoice,o=mk(row);
+    if(JSON.stringify(o)===JSON.stringify(mk(prev)))return false;
+    const ex=kind==='rcp'?(jobs.find(x=>x.rcpId&&x.rcpId===row.id)||jobs.find(x=>!x.rcpId&&x.rcpNo&&String(x.rcpNo)===String(prev.no)&&(x.cust.name||'@@')===(prev.name||''))):jobs.find(x=>x.invId&&x.invId===row.id);
+    if(!ex)return false;
+    const ok=await osave(a=>a.map(x=>x.id===ex.id?stamp({...x,cust:o.cust,items:o.items,draw:o.draw||x.draw||null,prodPhotos:o.prodPhotos,note:o.note,due:o.due||x.due||'',...(kind==='rcp'?{rcpId:row.id,rcpNo:o.rcpNo}:{}),seen:{...(x.seen||{}),[ME]:Date.now()}},'حدّث المعرض الطلبية (تعديل '+(kind==='rcp'?'الوصل':'المستند')+')'):x),false);
+    if(ok)toast('✓ تحدّثت الطلبية '+ordNo(ex)+' بالمعمل');
+    return ok;
+  };
   window.__sendOrderReceipt=id=>{const r=receipts.find(x=>x.id===id);if(r)sendOrder(fromReceipt(r))};
   window.__sendOrderInvoice=id=>{const v=invoices.find(x=>x.id===id);if(v)sendOrder(fromInvoice(v))};
   if(ME==='main'){
@@ -8022,13 +8036,18 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
   window.__openOrder=id=>{const j=jobs.find(x=>x.id===id);showOrders();const qi=ov.querySelector('[data-q]');if(qi&&j){qi.value=ordNo(j);qi.dispatchEvent(new Event('input',{bubbles:true}))}};
   // ---- حالة الطلبية جنب الوصل بصفحة الزبائن (المعرض) ----
   function markRcpTable(){if(ME!=='main')return;
+    const mark=(btn,tr,j,send)=>{
+      if(!tr.querySelector('.ord-send')){const sb=document.createElement('button');sb.className='btn btn-sm btn-ghost ord-send';sb.title='إرسال للمعمل';sb.textContent='🏭';sb.onclick=send;btn.insertAdjacentElement('afterend',sb)}
+      let chip=tr.cells[0].querySelector('.ord-chip');if(!j){if(chip)chip.remove();return}
+      if(!chip){chip=document.createElement('span');chip.className='ord-chip';chip.style.cssText='display:inline-block;margin-inline-start:6px;font-size:11px;border-radius:10px;padding:0 6px;color:#fff;cursor:pointer';chip.onclick=showOrders;tr.cells[0].appendChild(chip)}
+      const pl=pickupLate(j);chip.style.background=pl?'#C0392B':'#7A6A58';chip.textContent=(pl?'🔴':'🏭')+' '+ordNo(j);chip.title='الطلبية بالمعمل: '+j.status+(pl?' — الزبون ما استلم من '+pl+' يوم':'')};
     document.querySelectorAll('button[onclick^="editReceipt("]').forEach(btn=>{const id=(btn.getAttribute('onclick').match(/'([^']+)'/)||[])[1];const tr=btn.closest('tr');if(!tr)return;
       const no=tr.cells[0]&&tr.cells[0].textContent.replace(/(⚪|🟠|🟢|🔵|✅|🔴).*$/u,'').trim();
       const j=jobs.find(x=>x.rcpId&&x.rcpId===id)||jobs.find(x=>x.rcpNo&&x.rcpNo===no&&tr.textContent.includes(x.cust.name||'@@'));
-      if(!tr.querySelector('.ord-send')){const sb=document.createElement('button');sb.className='btn btn-sm btn-ghost ord-send';sb.title='إرسال للمعمل';sb.textContent='🏭';sb.onclick=()=>window.__sendOrderReceipt(id);btn.insertAdjacentElement('afterend',sb)}
-      let chip=tr.cells[0].querySelector('.ord-chip');if(!j){if(chip)chip.remove();return}
-      if(!chip){chip=document.createElement('span');chip.className='ord-chip';chip.style.cssText='display:inline-block;margin-inline-start:6px;font-size:11px;border-radius:10px;padding:0 6px;color:#fff;cursor:pointer';chip.onclick=showOrders;tr.cells[0].appendChild(chip)}
-      const pl=pickupLate(j);chip.style.background=pl?'#C0392B':'#7A6A58';chip.textContent=(pl?'🔴':'🏭')+' '+ordNo(j);chip.title='الطلبية بالمعمل: '+j.status+(pl?' — الزبون ما استلم من '+pl+' يوم':'')});}
+      mark(btn,tr,j,()=>window.__sendOrderReceipt(id))});
+    // الـ Facture بجدول الزبائن والوصولات: نفس الشي (رقم الطلبية وزر الإرسال للمعمل)
+    document.querySelectorAll('#receiptsTableWrap button[onclick^="editInvoice("]').forEach(btn=>{const id=(btn.getAttribute('onclick').match(/'([^']+)'/)||[])[1];const tr=btn.closest('tr');if(!tr||!tr.cells[0])return;
+      mark(btn,tr,jobs.find(x=>x.invId&&x.invId===id),()=>window.__sendOrderInvoice(id))});}
   {const hs=document.createElement('style');hs.textContent='#btnReceiptToFactory,#btnInvoiceToFactory,#btnReceiptEditToFactory{display:none!important}';document.head.appendChild(hs);
    if(ME==='main'){const mk=(after,fn)=>{const a=document.getElementById(after);if(!a)return;const b=document.createElement('button');b.type='button';b.className='btn btn-sm';b.textContent='🏭 إرسال للمعمل';b.onclick=fn;a.insertAdjacentElement('afterend',b)};
      mk('btnReceiptToFactory',()=>window.__sendOrderReceipt(currentViewedReceiptId));mk('btnInvoiceToFactory',()=>window.__sendOrderInvoice(currentViewedInvoiceId));

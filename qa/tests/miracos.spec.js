@@ -917,7 +917,7 @@ test('الـ Facture بتطلع مع الزبائن والوصولات (TTC)، �
     renderAllViews();
     const rcpTxt = document.getElementById('receiptsTableWrap').innerText;
     const invTxt = document.getElementById('invoicesTableWrap').innerText;
-    const heading = [...document.querySelectorAll('#view-customers h2')].map(h => h.textContent).join('|');
+    const heading = [...document.querySelectorAll('#view-customers h2, #view-customers #quotesBox > summary')].map(h => h.textContent).join('|');
     const btn = document.getElementById('btnNewInvoice').textContent.trim();
     const track = document.getElementById('deliveryTrackWrap').innerText;
     const due = document.getElementById('dueList').innerText;
@@ -1218,4 +1218,61 @@ test('الطلبيات: تاريخ التسليم وتاريخ إبلاغ الز
   expect(r.typed).toBe('13.11.2026');
   expect(r.typedIso).toBe('2026-11-13');
   expect(r.list).not.toMatch(/[٠-٩۰-۹]/);
+});
+
+test('عروض الأسعار مطوية افتراضياً مع العدد، وبتنفتح بكبسة', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    invoices.push({ id: 'q1', docType: 'simple', no: 'D900/2026', clientName: 'زبون عرض', date: '2026-11-10', items: [], ttc: 1000, remaining: 1000, payments: [] });
+    renderInvoicesTable();
+    const box = document.getElementById('quotesBox'), before = box.open, h = box.querySelector('#invoicesTableWrap').getBoundingClientRect().height;
+    box.querySelector('summary').click();
+    return { before, h, after: box.open, sum: box.querySelector('summary').textContent, rows: box.querySelectorAll('#invoicesTableWrap tbody tr').length };
+  });
+  expect(r.before).toBe(false); expect(r.h).toBe(0);
+  expect(r.after).toBe(true);
+  expect(r.sum).toContain('عروض الأسعار'); expect(r.sum).toContain('(1)');
+  expect(r.rows).toBe(1);
+});
+
+test('طلبية الـ Facture: رقمها بيطلع جنب رقم الفاتورة متل الوصولات، مع زر الإرسال للمعمل', async ({ page }) => {
+  test.skip(await page.evaluate(() => FS_DOC === 'factory'), 'الطلبيات بتنبعت من وصولات المعرض بس');
+  const r = await page.evaluate(() => {
+    invoices.push({ id: 'fq', docType: 'facture', no: 'F900/2026', clientName: 'لجنة المسجد', date: '2026-11-01', delay: '40', items: [{ qty: 1, desc: 'عامود' }], ht: 100, tva: 19, ttc: 119, remaining: 119, payments: [] });
+    receipts.push({ id: 'rq', no: 901, name: 'زبون وصل', date: '2026-11-01', items: [{ qty: 1, desc: 'جرن', price: 1, amount: 1 }], total: 1, remaining: 1, payments: [] });
+    window.__fjobsTest([{ id: 'j1', no: 40, status: 'قيد التنفيذ', at: 1, invId: 'fq', cust: { name: 'لجنة المسجد' } }, { id: 'j2', no: 41, status: 'قيد التنفيذ', at: 2, rcpId: 'rq', cust: { name: 'زبون وصل' } }]);
+    renderReceiptsTable();
+    const row = t => [...document.querySelectorAll('#receiptsTableWrap tbody tr')].find(x => x.textContent.includes(t));
+    const f = row('F900/2026'), c = row('901');
+    return { f: (f.cells[0].querySelector('.ord-chip') || {}).textContent, c: (c.cells[0].querySelector('.ord-chip') || {}).textContent, send: !!f.querySelector('.ord-send') };
+  });
+  expect(r.f).toContain('ط-040');
+  expect(r.c).toContain('ط-041');
+  expect(r.send).toBe(true);
+});
+
+test('تعديل وصل إله طلبية: الطلبية بتتحدّث لحالها بالبنود الجديدة، وتعديل دفعة بس ما بيبعت شي', async ({ page }) => {
+  test.skip(await page.evaluate(() => FS_DOC === 'factory'), 'الطلبيات بتنبعت من وصولات المعرض بس');
+  const r = await page.evaluate(async () => {
+    const saved = [];
+    const job = { id: 'j9', no: 7, status: 'قيد التنفيذ', at: 1, rcpId: 'ru', rcpNo: '950', cust: { name: 'زبون' }, items: [{ qty: '1', desc: 'جرن', unit: '' }], photos: [], note: '' };
+    db = { collection: () => ({ doc: () => ({ get: async () => ({ exists: true, data: () => ({ jobs: [job], seq: 7 }) }), set: async d => { saved.push(d); } }) }) };
+    window.__fjobsTest([job]);
+    const prev = { id: 'ru', no: '950', name: 'زبون', phone: '', address: '', date: '2026-11-01', duration: '10', items: [{ qty: 1, desc: 'جرن', price: 100, amount: 100 }], total: 100, remaining: 100, payments: [], note: '' };
+    const paidOnly = { ...prev, payments: [{ date: '2026-11-02', amount: 50 }], remaining: 50, items: [{ qty: 1, desc: 'جرن', price: 120, amount: 120 }] };
+    const a = await window.__autoUpdateOrder('rcp', paidOnly, prev);
+    const n1 = saved.length;
+    const edited = { ...prev, items: [{ qty: 2, desc: 'جرن كبير', price: 100, amount: 200 }, { qty: 1, desc: 'نافورة', price: 5, amount: 5 }], note: 'مستعجل' };
+    const b = await window.__autoUpdateOrder('rcp', edited, prev);
+    const j = saved.length ? saved[saved.length - 1].jobs[0] : null;
+    const none = await window.__autoUpdateOrder('rcp', { ...edited, id: 'other' }, { ...prev, id: 'other', no: '999' });
+    return { a, n1, b, items: j && j.items.map(x => x.qty + '×' + x.desc), note: j && j.note, status: j && j.status, no: j && j.no, by: j && j.upd.txt, none, hasPrice: j && JSON.stringify(j.items).includes('price') };
+  });
+  expect(r.a).toBe(false); expect(r.n1).toBe(0);
+  expect(r.b).toBe(true);
+  expect(r.items).toEqual(['2×جرن كبير', '1×نافورة']);
+  expect(r.note).toBe('مستعجل');
+  expect(r.status).toBe('قيد التنفيذ'); expect(r.no).toBe(7);
+  expect(r.by).toContain('تعديل الوصل');
+  expect(r.hasPrice).toBe(false);
+  expect(r.none).toBe(false);
 });
