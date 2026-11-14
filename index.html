@@ -185,6 +185,28 @@
     table.rt-cards td.wrap-cell .details-wrap{ width:0; min-width:100%; max-width:none; }
   }
   @media (max-width:1500px){ table.rt-cards td.rt-name .nm{ max-width:140px; } table.rt-cards th, table.rt-cards td{ padding-left:5px !important; padding-right:5px !important; } }
+  /* الجهة اليسرى من الجدول: الجدول بيضل جوّا اللوحة (ما بينقص عمود «الحالة» ولا الأزرار)، وكل زر إلو مكان ثابت بكل الأسطر */
+  @media (min-width:1301px){
+    #receiptsTableWrap, #invoicesTableWrap{ overflow-x:auto; }
+    #receiptsTableWrap table.rt-cards td.wrap-cell, #invoicesTableWrap table.rt-cards td.wrap-cell{ width:100%; min-width:56px; }
+    #receiptsTableWrap table.rt-cards th:last-child, #receiptsTableWrap table.rt-cards td.rt-actions,
+    #invoicesTableWrap table.rt-cards th:last-child, #invoicesTableWrap table.rt-cards td.rt-actions{ padding-left:2px !important; padding-right:4px !important; }
+    #receiptsTableWrap .row-actions, #invoicesTableWrap .row-actions{ display:grid; grid-template-columns:repeat(5, 25px); gap:0; justify-content:start; align-items:center; }
+    #receiptsTableWrap .row-actions .btn-sm, #invoicesTableWrap .row-actions .btn-sm{ width:25px; height:28px; padding:0 !important; display:inline-flex; align-items:center; justify-content:center; grid-row:1; }
+    #invoicesTableWrap .row-actions{ grid-template-columns:25px 25px 25px 40px 25px; }
+    #invoicesTableWrap .row-actions [onclick^="convert"]{ width:40px; }
+    #receiptsTableWrap .row-actions [onclick^="view"]{ grid-column:1; }
+    #receiptsTableWrap .row-actions [onclick^="edit"]{ grid-column:2; }
+    #receiptsTableWrap .row-actions .ord-send{ grid-column:3; }
+    #receiptsTableWrap .row-actions [onclick^="duplicate"]{ grid-column:4; }
+    #receiptsTableWrap .row-actions [onclick^="delete"]{ grid-column:5; }
+  }
+  @media (min-width:1301px) and (max-width:1500px){
+    #receiptsTableWrap table.rt-cards th, #receiptsTableWrap table.rt-cards td{ padding-left:4px !important; padding-right:4px !important; }
+    #receiptsTableWrap table.rt-cards td.rt-name .nm{ max-width:118px; }
+    #receiptsTableWrap table.rt-cards td .tag{ padding:3px 7px; }
+    #receiptsTableWrap table.rt-cards .ws-chip{ padding:2px 6px 2px 5px; gap:4px; }
+  }
   table.rt-cards .row-actions{ flex-wrap:wrap; }
   @media (max-width: 1300px){
     table.rt-cards, table.rt-cards tbody{ display:block; width:100%; }

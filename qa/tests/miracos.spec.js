@@ -1276,3 +1276,26 @@ test('تعديل وصل إله طلبية: الطلبية بتتحدّث لحا�
   expect(r.hasPrice).toBe(false);
   expect(r.none).toBe(false);
 });
+
+test.describe('جدول الزبائن والوصولات على شاشة 1366', () => {
+  test.use({ viewport: { width: 1349, height: 768 } });
+  test('الجدول لا يخرج عن اللوحة من اليسار، ولكل زر مكان ثابت', async ({ page }) => {
+    const r = await page.evaluate(() => {
+      document.getElementById('loginScreen').style.display = 'none';
+      const mk = (no, name, total) => ({ id: 'L' + no, no, name, date: '2026-11-01', duration: '30', workStatus: 'قيد التنفيذ', items: [{ qty: 1, desc: 'شمينه رخام ابيض مع تركيب', price: total, amount: total }], total, remaining: total - 1000, payments: [{ date: '2026-11-01', amount: 1000 }] });
+      receipts.push(mk('067', 'eurl hd travaux et services', 3708000), mk('068', 'احمد خبزاوي', 130000));
+      invoices.push({ id: 'LF', docType: 'facture', no: 'F001/2026', date: '2026-11-01', delay: '40 يوم', clientName: 'اللجنة الدينية لمسجد النور', items: [], ttc: 14470495.2, payments: [], workStatus: 'قيد التنفيذ' });
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      const wrap = document.getElementById('receiptsTableWrap');
+      wrap.closest('.view').classList.add('active');
+      renderReceiptsTable();
+      wrap.querySelectorAll('tbody tr').forEach(tr => { const c = document.createElement('span'); c.textContent = '🏭 b-036'; c.style.cssText = 'display:inline-block;margin-inline-start:6px;font-size:11px;padding:0 6px'; tr.cells[0].appendChild(c); });
+      const t = wrap.querySelector('table').getBoundingClientRect(), w = wrap.getBoundingClientRect();
+      const lefts = sel => [...wrap.querySelectorAll('.row-actions ' + sel)].map(b => Math.round(b.getBoundingClientRect().left));
+      return { over: Math.round(w.left - t.left), view: lefts('[onclick^="view"]'), del: lefts('[onclick^="delete"]') };
+    });
+    expect(r.over, 'الجدول خارج عن اللوحة من اليسار').toBeLessThanOrEqual(0);
+    expect(new Set(r.view).size).toBe(1);
+    expect(new Set(r.del).size).toBe(1);
+  });
+});
