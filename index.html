@@ -7858,7 +7858,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     if(JSON.stringify(o)===JSON.stringify(mk(prev)))return false;
     const ex=kind==='rcp'?(jobs.find(x=>x.rcpId&&x.rcpId===row.id)||jobs.find(x=>!x.rcpId&&x.rcpNo&&String(x.rcpNo)===String(prev.no)&&(x.cust.name||'@@')===(prev.name||''))):jobs.find(x=>x.invId&&x.invId===row.id);
     if(!ex)return false;
-    const ok=await osave(a=>a.map(x=>x.id===ex.id?stamp({...x,cust:o.cust,items:o.items,draw:o.draw||x.draw||null,prodPhotos:o.prodPhotos,note:o.note,due:o.due||x.due||'',...(kind==='rcp'?{rcpId:row.id,rcpNo:o.rcpNo}:{}),seen:{...(x.seen||{}),[ME]:Date.now()}},'حدّث المعرض الطلبية (تعديل '+(kind==='rcp'?'الوصل':'المستند')+')'):x),false);
+    const hadDraw=!!mk(prev).draw; // الرسمة انشالت من الوصل = بتنشال من الطلبية كمان
+    const ok=await osave(a=>a.map(x=>x.id===ex.id?stamp({...x,cust:o.cust,items:o.items,draw:o.draw||(hadDraw?null:x.draw)||null,prodPhotos:o.prodPhotos,note:o.note,due:o.due||x.due||'',...(kind==='rcp'?{rcpId:row.id,rcpNo:o.rcpNo}:{}),seen:{...(x.seen||{}),[ME]:Date.now()}},'حدّث المعرض الطلبية (تعديل '+(kind==='rcp'?'الوصل':'المستند')+')'):x),false);
     if(ok)toast('✓ تحدّثت الطلبية '+ordNo(ex)+' بالمعمل');
     return ok;
   };
@@ -7967,7 +7968,16 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       ${viewOnly?'':'<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script>'}</body></html>`);w.document.close();
   }
   // ---- صفحة الطلبيات ----
-  let filter='all',q='';const openIds=new Set();
+  let filter='all',q='';const openIds=new Set(),drawOpen=new Set();
+  // تثبيت الصفحة: الطلبية اللي اشتغلت عليها بتضل بمكانها على الشاشة بعد الحفظ أو تغيير الحالة أو أي تحديث
+  let keepId=null,keepTop=null,keepT=0;
+  const jobCard=()=>keepId?[...ov.querySelectorAll('[data-list] [data-job]')].find(c=>c.dataset.job===keepId)||null:null;
+  const cardTop=()=>{const c=jobCard();return c?c.getBoundingClientRect().top:null};
+  function keepAt(ot){const c=jobCard();if(!c||!ov.classList.contains('active')){keepTop=null;return}
+    if(ot==null){c.scrollIntoView({block:'nearest'});keepTop=c.getBoundingClientRect().top}
+    else{const d=c.getBoundingClientRect().top-ot;if(Math.abs(d)>1)window.scrollBy(0,d);keepTop=ot}
+    keepT=Date.now()}
+  function realign(){const c=jobCard();if(!c||keepTop==null||Date.now()-keepT>1500)return;const d=c.getBoundingClientRect().top-keepTop;if(Math.abs(d)>1)window.scrollBy(0,d)}
   if(/^(127\.0\.0\.1|localhost)$/.test(location.hostname)){window.__fjobsBadge=()=>{const ub=navA.querySelector('[data-u]');return {shown:ub.style.display!=='none',fb:fb.style.display!=='none',fresh:ov.querySelectorAll('[data-list] span').length?[...ov.querySelectorAll('[data-list] span')].filter(x=>x.textContent.includes('جديد')).length:0}};window.__fjobsShow=()=>showOrders();window.__fjobsTest=a=>{jobs=a.map(j=>({items:[],cust:{},photos:[],...j}));render();renderLatePanel();return [...ov.querySelectorAll('[data-list] b[style*="brass"]')].map(b=>b.textContent)}} // للاختبارات المحلية فقط
   const ov=document.createElement('section');ov.className='view';ov.id='view-fjobs';
   ov.innerHTML=`<div class="topbar"><h1>🏭 الطلبيات</h1></div>
@@ -7981,11 +7991,12 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     const fl=jobs.filter(j=>filter==='all'||(filter==='open'&&j.status!=='تم التسليم')||(filter==='late'&&pickupLate(j))||j.status===filter)
       .filter(j=>!q||dmyMatch(q,j.due)||dmyMatch(q,j.at?localDate(new Date(j.at)):'')||(ordNo(j)+' '+j.cust.name+' '+j.cust.phone+' '+lines(j)+' '+(j.note||'')).toLowerCase().includes(q));
     const rk=j=>{const i=ST.indexOf(j.status);return i<0?0:i};const list=fl.slice().sort((a,b)=>(rk(a)-rk(b))||((isUnseen(b)||freshIds.has(b.id))-(isUnseen(a)||freshIds.has(a.id)))||b.at-a.at);
-    ov.querySelector('[data-list]').innerHTML=list.map((j,ji)=>{const st=j.status,op=openIds.has(j.id),un=isUnseen(j)||freshIds.has(j.id),du=dueInfo(j);const hd=(ji===0||list[ji-1].status!==st)&&ST.includes(filter)===false?`<div data-sthd style="font-weight:800;font-size:14px;color:${STC[st]};margin:${ji?14:2}px 2px 6px">${STI[st]} ${st} (${list.filter(x=>x.status===st).length})</div>`:'';const pl=pickupLate(j);return hd+`<div data-late="${pl?1:''}" style="border:1px solid ${un||pl?'#C0392B':'var(--line)'};border-inline-start:5px solid ${pl?'#C0392B':STC[st]};border-radius:10px;padding:10px 12px;margin-bottom:8px;background:${pl?'#FBE9E7':'var(--marble,#fff)'}">
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:var(--brass-deep)">${ordNo(j)}</b><b>${esc(j.cust.name||'بدون اسم')}</b>${ME!=='factory'&&j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}
+    const keepOld=cardTop();
+    ov.querySelector('[data-list]').innerHTML=list.map((j,ji)=>{const st=j.status,op=openIds.has(j.id),dro=!!j.draw&&(op||drawOpen.has(j.id)),un=isUnseen(j)||freshIds.has(j.id),du=dueInfo(j);const hd=(ji===0||list[ji-1].status!==st)&&ST.includes(filter)===false?`<div data-sthd style="font-weight:800;font-size:14px;color:${STC[st]};margin:${ji?14:2}px 2px 6px">${STI[st]} ${st} (${list.filter(x=>x.status===st).length})</div>`:'';const pl=pickupLate(j);return hd+`<div data-job="${j.id}" data-late="${pl?1:''}" style="border:1px solid ${un||pl?'#C0392B':'var(--line)'};border-inline-start:5px solid ${pl?'#C0392B':STC[st]};border-radius:10px;padding:10px 12px;margin-bottom:8px;background:${pl?'#FBE9E7':'var(--marble,#fff)'}">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="color:var(--brass-deep)">${ordNo(j)}</b><b${j.draw?` data-nm="${j.id}" role="button" tabindex="0" aria-expanded="${dro}" title="${dro?'إخفاء الرسمة':'اضغط لإظهار الرسمة'}" style="cursor:pointer"`:''}>${j.draw?`<span style="display:inline-block;color:var(--text-dim);font-size:12px;margin-inline-end:4px">${dro?'▾':'◂'}</span>`:''}${esc(j.cust.name||'بدون اسم')}${j.draw?' 📐':''}</b>${ME!=='factory'&&j.cust.phone?`<a href="tel:${esc(j.cust.phone)}" dir="ltr" style="font-size:12.5px">${esc(j.cust.phone)}</a>`:''}
         <span style="background:${STC[st]};color:#fff;border-radius:20px;padding:1px 10px;font-size:12px;font-weight:700">${STI[st]} ${st}</span>${du?`<span style="color:${du.c};font-size:12px;font-weight:700">📅 ${du.t}</span>`:''}${pl?`<span style="background:#C0392B;color:#fff;border-radius:20px;padding:1px 9px;font-size:12px;font-weight:700">🔴 الزبون ما استلم من ${pl} يوم</span>`:''}${j.doneAt?`<span style="font-size:11.5px;color:var(--text-dim)">خلصت ${fmtD(j.doneAt)}</span>`:''}${j.notifiedAt?`<span style="font-size:11.5px;color:var(--text-dim)">انبلّغ الزبون ${fmtD(j.notifiedAt)}</span>`:''}${j.deliveredAt?`<span style="font-size:11.5px;color:var(--text-dim)">انسلّمت ${fmtD(j.deliveredAt)}</span>`:''}${un?'<span style="background:#C0392B;color:#fff;border-radius:20px;padding:1px 8px;font-size:11.5px">🔔 جديد</span>':''}<span style="flex:1"></span>
         <button type="button" class="btn btn-sm" data-ed="${j.id}">${op?'إخفاء':'✏️ تعديل'}</button><button type="button" class="btn btn-sm" data-vw="${j.id}">👁 إظهار الوصل</button><button type="button" class="btn btn-sm" data-wa="${j.id}" style="background:#25D366;color:#fff;border-color:#25D366">واتساب</button>${ME==='main'&&j.rcpId&&receipts.some(x=>x.id===j.rcpId)?`<button type="button" class="btn btn-sm" data-rv="${j.rcpId}" title="وصل الزبون الأصلي (مع الأسعار)">🧾 وصل الزبون</button>`:''}<button type="button" class="btn btn-sm btn-ghost" data-del="${j.id}" title="حذف الطلبية" style="color:#A6453D">🗑</button></div>
-      <div style="font-size:13px;color:var(--text-dim);margin-top:4px">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)+(x.draws?' 📏':'')).join(' · ')}${(j.prodPhotos||[]).length?' · 🖼 '+j.prodPhotos.length+' صورة منتج':''}${j.photos.length?' · 📷 '+j.photos.length:''}${j.note?' · 📝 '+esc(j.note):''}</div>${j.draw?`<img data-jdraw="${j.id}" data-vw="${j.id}" alt="" title="الرسمة" style="display:block;margin-top:8px;max-width:280px;max-height:${op?260:150}px;min-width:80px;min-height:60px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;cursor:pointer">`:''}
+      <div style="font-size:13px;color:var(--text-dim);margin-top:4px">${j.items.map(x=>esc((x.qty?x.qty+' × ':'')+x.desc)+(x.draws?' 📏':'')).join(' · ')}${(j.prodPhotos||[]).length?' · 🖼 '+j.prodPhotos.length+' صورة منتج':''}${j.photos.length?' · 📷 '+j.photos.length:''}${j.note?' · 📝 '+esc(j.note):''}</div>${dro?`<img data-jdraw="${j.id}" data-vw="${j.id}" alt="" title="الرسمة" style="display:block;margin-top:8px;max-width:280px;max-height:260px;min-width:80px;min-height:60px;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;cursor:pointer">`:''}
       ${j.upd?`<div style="font-size:11.5px;color:${un?'#C0392B':'var(--text-dim)'};margin-top:3px">آخر تعديل: ${j.upd.by==='factory'?'المعمل':'المعرض'} — ${esc(j.upd.txt||'')} — ${fmtT(j.upd.at)}</div>`:''}
       ${op?`<div style="margin-top:10px;border-top:1px dashed var(--line);padding-top:10px">
         <div style="display:flex;gap:6px;flex-wrap:wrap">${ST.map(s=>`<button type="button" class="btn btn-sm${s===st?' btn-primary':''}" data-st="${j.id}" data-v="${s}">${STI[s]} ${s}</button>`).join('')}</div>
@@ -8001,7 +8012,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
         <details style="margin-top:8px;font-size:12px;color:var(--text-dim)"><summary style="cursor:pointer">سجل التعديلات (${(j.log||[]).length})</summary>${(j.log||[]).slice().reverse().map(l=>`<div>• ${l.by==='factory'?'المعمل':'المعرض'}: ${esc(l.txt)} — ${fmtT(l.at)}</div>`).join('')}</details></div>`:''}
     </div>`}).join('')||'<div style="color:var(--text-dim);padding:10px 0">ما في طلبيات.</div>';
     ov.querySelectorAll('img[data-pid]').forEach(async im=>{const src=await loadImg({id:im.dataset.pid});if(src)im.src=src});
-    ov.querySelectorAll('img[data-jdraw]').forEach(async im=>{const j=jobs.find(x=>x.id===im.dataset.jdraw);const src=j&&j.draw?await drawingSrc(j.draw):null;if(src)im.src=src;else im.remove()});
+    ov.querySelectorAll('img[data-jdraw]').forEach(async im=>{const j=jobs.find(x=>x.id===im.dataset.jdraw);const src=j&&j.draw?await drawingSrc(j.draw):null;if(src){im.onload=realign;im.src=src}else{im.remove();realign()}});
+    keepAt(keepOld);
     ov.querySelectorAll('[data-wa]').forEach(b=>{const f=()=>prepJob(jobs.find(x=>x.id===b.dataset.wa));b.addEventListener('pointerenter',f,{once:true});b.addEventListener('focus',f,{once:true})});
     list.filter(j=>openIds.has(j.id)).forEach(j=>setTimeout(()=>prepJob(j),500));
   }
@@ -8017,9 +8029,10 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     try{const d=await oref().get();const arr=(d.exists&&d.data().jobs)||[];  // حفظ صامت: بلا رسالة حتى لو النت ضعيف
       await oref().set({jobs:arr.map(x=>ids.includes(x.id)&&x.upd&&x.upd.by!==ME?{...x,seen:{...(x.seen||{}),[ME]:seenAt(x)}}:x)},{merge:true})}catch(e){console.warn(e)}}
   const showOrders=()=>{document.querySelectorAll('.nav-item').forEach(i=>i.classList.toggle('active',i===navA));
-    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));ov.classList.add('active');freshIds.clear();jobs.filter(isUnseen).forEach(j=>freshIds.add(j.id));render();markAllSeen();window.scrollTo(0,0);
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));ov.classList.add('active');freshIds.clear();jobs.filter(isUnseen).forEach(j=>freshIds.add(j.id));keepId=null;keepTop=null;render();markAllSeen();window.scrollTo(0,0);
     try{if(window.Notification&&Notification.permission==='default')Notification.requestPermission()}catch(e){}};
   navA.addEventListener('click',showOrders);fb.onclick=showOrders;
+  ov.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.dataset&&e.target.dataset.nm!==undefined){e.preventDefault();e.target.click()}});
   ov.addEventListener('input',e=>{if(e.target.dataset.q!==undefined){q=e.target.value.trim().toLowerCase();render()}});
   ov.addEventListener('change',async e=>{const t=e.target;
     if(t.dataset.f!==undefined){filter=t.value;render()}
@@ -8029,6 +8042,8 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
         await osave(a=>a.map(x=>x.id===id?stamp({...x,photos:[...(x.photos||[]),{id:pid}]},'أضاف صورة للشغل'):x))}catch(err){console.error(err);toast('ما انرفعت الصورة')}}});
   ov.addEventListener('click',async e=>{const t=e.target;
     const g=s=>t.closest(s);let b;
+    {const c=g('[data-job]');if(c)keepId=c.dataset.job}
+    if(b=g('[data-nm]')){const id=b.dataset.nm;if(openIds.has(id))return;if(drawOpen.has(id))drawOpen.delete(id);else drawOpen.add(id);render();return}
     if(b=g('[data-pr]'))return printJob(jobs.find(x=>x.id===b.dataset.pr));
     if(b=g('[data-wa]'))return shareJob(jobs.find(x=>x.id===b.dataset.wa));
     if(b=g('[data-vw]'))return printJob(jobs.find(x=>x.id===b.dataset.vw),true);

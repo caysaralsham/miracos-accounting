@@ -1386,3 +1386,55 @@ test('البحث بيتفرّغ لما تنتقل لقسم تاني، والقا
   expect(r.gs).toBe(1); expect(r.gsCleared).toBe('|0');
   expect(r.dateCleared).toBe(''); expect(r.expAll).toBe(2);
 });
+
+test('الطلبيات: الرسمة مطوية وبتنفتح بكبسة على الاسم، والصفحة بتضل ثابتة على الطلبية بعد أي تحديث', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 700 });
+  const r = await page.evaluate(async () => {
+    document.getElementById('loginScreen').style.display = 'none';
+    const tick = () => new Promise(res => setTimeout(res, 80));
+    const mk = (i, extra) => ({ id: 'k' + i, no: i, status: i > 28 ? 'تم التسليم' : 'قيد التنفيذ', at: 1000 - i, cust: { name: 'زبون ' + i }, items: [{ qty: '1', desc: 'جرن رخام' }, { qty: '2', desc: 'درج' }], photos: [], note: '', ...extra });
+    const list = () => Array.from({ length: 40 }, (_, i) => mk(i + 1, i === 24 ? { draw: { id: 'nodraw', kind: 'pure' } } : {}));
+    window.__fjobsShow(); window.__fjobsTest(list());
+    const ov = document.getElementById('view-fjobs'), card = id => ov.querySelector(`[data-job="${id}"]`), top = id => Math.round(card(id).getBoundingClientRect().top);
+    const out = {};
+    out.noDrawName = !card('k3').querySelector('[data-nm]');
+    out.imgClosed = !!card('k25').querySelector('img[data-jdraw]');
+    card('k25').scrollIntoView({ block: 'center' }); await tick();
+    const t0 = top('k25');
+    card('k25').querySelector('[data-nm]').click();
+    out.imgOpen = !!card('k25').querySelector('img[data-jdraw]'); out.t1 = top('k25') - t0;
+    await tick(); await tick(); out.t1b = top('k25') - t0;
+    card('k25').querySelector('[data-nm]').click(); out.imgClosedAgain = !card('k25').querySelector('img[data-jdraw]');
+    // تحديث من السحابة: طلبيات فوقها بتغيّر مكانها/حجمها، وحالتها هي بتتغيّر (بتنتقل لمجموعة تانية)
+    card('k25').querySelector('[data-ed]').click(); out.t2 = top('k25') - t0;
+    card('k25').querySelector('[data-cx]').click(); out.t3 = top('k25') - t0;
+    const l2 = list(); l2[24].status = 'تم التنفيذ'; l2[3].note = 'ملاحظة طويلة '.repeat(40); l2.splice(1, 2);
+    window.__fjobsTest(l2); out.t4 = top('k25') - t0;
+    out.inView = top('k25') >= 0 && top('k25') < innerHeight;
+    window.__fjobsShow(); out.resetTop = scrollY;
+    return out;
+  });
+  expect(r.noDrawName).toBe(true);
+  expect(r.imgClosed).toBe(false); expect(r.imgOpen).toBe(true); expect(r.imgClosedAgain).toBe(true);
+  for (const k of ['t1', 't1b', 't2', 't3', 't4']) expect(Math.abs(r[k]), k).toBeLessThanOrEqual(2);
+  expect(r.inView).toBe(true); expect(r.resetTop).toBe(0);
+});
+
+test('إزالة الرسمة من الوصل بتشيلها من الطلبية، وتعديل البنود بلا رسمة ما بيمسح رسمة المعمل', async ({ page }) => {
+  test.skip(await page.evaluate(() => FS_DOC === 'factory'), 'الطلبيات بتنبعت من وصولات المعرض بس');
+  const r = await page.evaluate(async () => {
+    const saved = [];
+    const job = { id: 'jd', no: 9, status: 'قيد التنفيذ', at: 1, rcpId: 'rd', rcpNo: '960', cust: { name: 'زبون' }, items: [{ qty: '1', desc: 'نافورة', unit: '' }], photos: [], note: '', draw: { id: 'd1', kind: 'pure' } };
+    db = { collection: () => ({ doc: () => ({ get: async () => ({ exists: true, data: () => ({ jobs: [job], seq: 9 }) }), set: async d => { saved.push(d); } }) }) };
+    window.__fjobsTest([job]);
+    const base = { id: 'rd', no: '960', name: 'زبون', phone: '', address: '', date: '2026-11-01', duration: '10', items: [{ qty: 1, desc: 'نافورة', price: 100, amount: 100 }], total: 100, remaining: 100, payments: [], note: '' };
+    const withDraw = { ...base, mirsamDrawing: { id: 'd1', kind: 'pure' } };
+    await window.__autoUpdateOrder('rcp', base, withDraw);
+    const removed = saved[saved.length - 1].jobs[0].draw;
+    await window.__autoUpdateOrder('rcp', { ...base, note: 'تعديل' }, base);
+    const kept = saved[saved.length - 1].jobs[0].draw;
+    return { removed, kept: kept && kept.id };
+  });
+  expect(r.removed).toBe(null);
+  expect(r.kept).toBe('d1');
+});
