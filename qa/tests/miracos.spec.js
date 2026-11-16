@@ -1299,3 +1299,90 @@ test.describe('جدول الزبائن والوصولات على شاشة 1366',
     expect(new Set(r.del).size).toBe(1);
   });
 });
+
+test('الأقسام المطوية بسطر واحد: التقارير (4) والإعدادات (2+2)، وبينفتح واحد بس، وكل بطاقات الإعدادات بنفس العرض', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 768 });
+  const r = await page.evaluate(async () => {
+    document.getElementById('loginScreen').style.display = 'none';
+    const go = v => document.querySelector(`.nav-item[data-view="${v}"]`).click();
+    const tick = () => new Promise(res => setTimeout(res, 60));
+    const tops = row => [...row.children].map(b => Math.round(b.getBoundingClientRect().top));
+    const shown = id => getComputedStyle(document.getElementById(id)).display !== 'none';
+    const out = {};
+    go('reports'); await tick();
+    const ids = ['periodReportBox', 'repSummaryBox', 'topSalesBox', 'expByCategoryBox'];
+    const rep = document.querySelector('#view-reports .fold-row');
+    out.repTabs = rep.children.length; out.repOneLine = new Set(tops(rep)).size === 1;
+    out.repClosed = ids.every(id => !shown(id));
+    rep.children[1].click(); await tick(); out.open1 = ids.map(shown);
+    rep.children[3].click(); await tick(); out.open2 = ids.map(shown);
+    rep.children[3].click(); await tick(); out.open3 = ids.map(shown);
+    go('settings'); await tick();
+    const rows = [...document.querySelectorAll('#view-settings .fold-row')];
+    out.setRows = rows.map(x => [...x.children].map(b => b.querySelector('.ft-title').textContent));
+    out.setOneLine = rows.every(x => new Set(tops(x)).size === 1);
+    out.loginClosed = !shown('loginPanel');
+    const boxes = [...document.querySelectorAll('#view-settings > .panel:not(.fold-body), #view-settings > .fold-row')].map(e => e.getBoundingClientRect());
+    out.sameEdges = new Set(boxes.map(b => Math.round(b.left) + ':' + Math.round(b.right))).size === 1;
+    document.getElementById('currentAdminEmail').textContent = 'a@b.dz'; await tick();
+    out.email = rows[1].children[0].querySelector('.ft-meta').textContent;
+    rows[1].children[0].click(); await tick(); out.s1 = [shown('loginPanel'), shown('backupPanel')];
+    rows[1].children[1].click(); await tick(); out.s2 = [shown('loginPanel'), shown('backupPanel'), shown('btnExportBackup')];
+    out.page = document.documentElement.scrollWidth - innerWidth;
+    return out;
+  });
+  expect(r.repTabs).toBe(4); expect(r.repOneLine).toBe(true); expect(r.repClosed).toBe(true);
+  expect(r.open1).toEqual([false, true, false, false]);
+  expect(r.open2).toEqual([false, false, false, true]);
+  expect(r.open3).toEqual([false, false, false, false]);
+  expect(r.setRows[0][0]).toContain('الطلبيات'); expect(r.setRows[0][1]).toContain('Firebase');
+  expect(r.setRows[1]).toEqual(['حساب الدخول', 'نسخة احتياطية']);
+  expect(r.setOneLine).toBe(true); expect(r.loginClosed).toBe(true); expect(r.sameEdges).toBe(true);
+  expect(r.email).toBe('a@b.dz');
+  expect(r.s1).toEqual([true, false]); expect(r.s2).toEqual([false, true, true]);
+  expect(r.page).toBeLessThanOrEqual(1);
+});
+
+test('المصاريف: فئات المصاريف مطوية، و«+ فئة جديدة» بتفتحها', async ({ page }) => {
+  const r = await page.evaluate(() => {
+    document.querySelector('.nav-item[data-view="expenses"]').click();
+    const p = document.getElementById('expCategoriesPanel'), chips = document.getElementById('expenseCategoryChips');
+    const shown = el => getComputedStyle(el).display !== 'none';
+    const out = { closed: p.classList.contains('collapsed') && !shown(chips), btn: shown(document.getElementById('btnAddExpenseCategory')) };
+    window.prompt = () => null; document.getElementById('btnAddExpenseCategory').click();
+    out.opened = !p.classList.contains('collapsed') && shown(chips);
+    p.querySelector('.panel-head h2').click(); out.closedAgain = p.classList.contains('collapsed');
+    return out;
+  });
+  expect(r).toEqual({ closed: true, btn: true, opened: true, closedAgain: true });
+});
+
+test('البحث بيتفرّغ لما تنتقل لقسم تاني، والقائمة بترجع كاملة', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const tick = () => new Promise(res => setTimeout(res, 250));
+    const go = v => document.querySelector(`.nav-item[data-view="${v}"]`).click();
+    const mk = (id, no, name) => ({ id, no, name, date: '2026-11-01', items: [{ qty: 1, desc: 'رخام', price: 100, amount: 100 }], total: 100, discount: 0, remaining: 100, payments: [] });
+    receipts.push(mk('s1', 801, 'سليم بحث'), mk('s2', 802, 'كريم بحث'));
+    expenses.push({ id: 'x1', date: '2026-11-02', amount: 10, desc: 'مازوت' }, { id: 'x2', date: '2026-11-02', amount: 20, desc: 'كهرباء' });
+    const type = (id, v) => { const i = document.getElementById(id); i.value = v; i.dispatchEvent(new Event('input', { bubbles: true })); };
+    const rows = id => document.querySelectorAll('#' + id + ' tbody tr').length;
+    const out = {};
+    go('customers'); type('customerSearch', 'سليم'); out.filtered = rows('receiptsTableWrap');
+    go('customers'); await tick(); out.sameSection = document.getElementById('customerSearch').value;
+    go('expenses'); await tick(); type('expenseSearch', 'مازوت'); out.expFiltered = rows('expensesTableWrap');
+    out.custCleared = document.getElementById('customerSearch').value;
+    go('customers'); await tick();
+    out.back = rows('receiptsTableWrap'); out.expCleared = document.getElementById('expenseSearch').value;
+    go('dashboard'); await tick(); type('globalSearchInput', 'سليم'); await tick();
+    out.gs = document.querySelectorAll('#globalSearchResults [data-gs]').length;
+    go('reports'); await tick(); type('paymentHistoryFrom', '01.11.2026');
+    out.gsCleared = document.getElementById('globalSearchInput').value + '|' + document.querySelectorAll('#globalSearchResults [data-gs]').length;
+    go('expenses'); await tick(); out.dateCleared = document.getElementById('paymentHistoryFrom').value; out.expAll = rows('expensesTableWrap');
+    return out;
+  });
+  expect(r.filtered).toBe(1); expect(r.sameSection).toBe('سليم');
+  expect(r.expFiltered).toBe(1); expect(r.custCleared).toBe('');
+  expect(r.back).toBe(2); expect(r.expCleared).toBe('');
+  expect(r.gs).toBe(1); expect(r.gsCleared).toBe('|0');
+  expect(r.dateCleared).toBe(''); expect(r.expAll).toBe(2);
+});
