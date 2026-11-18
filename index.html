@@ -3968,7 +3968,7 @@ let convertingFromInvoiceId = null;
 // باركود صفحة روابط الشركة (cesar-alcham.com/links) — يظهر في رأس الوصل والفواتير
 const DOC_QR_SRC = 'data:image/svg+xml;base64,PHN2ZyBzaGFwZS1yZW5kZXJpbmc9ImNyaXNwRWRnZXMiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDMzIDMzIiBjbGFzcz0ic2Vnbm8iPjxwYXRoIGZpbGw9IiNmZmYiIGQ9Ik0wIDBoMzN2MzNoLTMzeiIvPjxwYXRoIGNsYXNzPSJxcmxpbmUiIHN0cm9rZT0iIzJlMWMxMCIgZD0iTTIgMi41aDdtMiAwaDNtMSAwaDFtMSAwaDJtMSAwaDNtMSAwaDdtLTI5IDFoMW01IDBoMW0xIDBoMW00IDBoNG01IDBoMW01IDBoMW0tMjkgMWgxbTEgMGgzbTEgMGgxbTEgMGgxbTIgMGgxbTIgMGgzbTEgMGgybTIgMGgxbTEgMGgzbTEgMGgxbS0yOSAxaDFtMSAwaDNtMSAwaDFtMyAwaDJtMiAwaDFtMSAwaDJtMSAwaDJtMSAwaDFtMSAwaDNtMSAwaDFtLTI5IDFoMW0xIDBoM20xIDBoMW0yIDBoMW0xIDBoMW0yIDBoM20yIDBoMW0yIDBoMW0xIDBoM20xIDBoMW0tMjkgMWgxbTUgMGgxbTMgMGg0bTEgMGgxbTEgMGg0bTEgMGgxbTUgMGgxbS0yOSAxaDdtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDdtLTE4IDFoMW0zIDBoM20tMTcgMWgzbTEgMGgybTIgMGgxbTEgMGgzbTIgMGg0bTYgMGgybS0yNyAxaDRtMiAwaDRtMSAwaDFtMiAwaDFtMiAwaDdtMSAwaDFtMSAwaDFtLTI3IDFoMW0zIDBoNm01IDBoMW0yIDBoMW0xIDBoMW0xIDBoMW0xIDBoMm0tMjcgMWgybTEgMGgxbTIgMGgxbTEgMGgzbTEgMGgxbTEgMGgybTEgMGgzbTcgMGgxbS0yOSAxaDFtMSAwaDFtMiAwaDRtMiAwaDJtMSAwaDFtMSAwaDJtMSAwaDFtMSAwaDFtMSAwaDFtMiAwaDNtLTI5IDFoMW03IDBoMW0xIDBoMW0yIDBoM20yIDBoMm0yIDBoMm0xIDBoMm0xIDBoMW0tMjkgMWgxbTIgMGgxbTEgMGgybTEgMGgybTEgMGgzbTEgMGgxbTEgMGgxbTEgMGgzbTEgMGgzbTEgMGgybS0yOSAxaDJtMiAwaDJtNCAwaDFtMiAwaDFtMSAwaDJtMiAwaDFtMiAwaDFtMSAwaDJtMiAwaDFtLTI3IDFoMm0yIDBoMW0xIDBoMW0zIDBoMm00IDBoMW0xIDBoMm0xIDBoM20tMjUgMWg0bTIgMGgxbTQgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTIgMGgxbTEgMGgxbS0yNiAxaDFtMiAwaDFtMSAwaDJtMyAwaDFtMSAwaDJtMSAwaDFtMSAwaDJtMSAwaDFtMSAwaDFtMiAwaDFtLTI0IDFoM200IDBoMm0xIDBoMW0xIDBoMW0yIDBoMW0xIDBoMW0xIDBoMm0xIDBoNW0tMjggMWg2bTEgMGgybTIgMGgybTIgMGgybTIgMGg4bS0yMCAxaDNtMSAwaDFtMyAwaDFtMSAwaDFtMSAwaDFtMyAwaDJtMSAwaDJtLTI5IDFoN20yIDBoM20xIDBoMm0xIDBoMW0yIDBoMm0xIDBoMW0xIDBoMW0xIDBoMm0tMjggMWgxbTUgMGgxbTEgMGgzbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTEgMGgxbTMgMGgxbTMgMGgxbS0yOSAxaDFtMSAwaDNtMSAwaDFtMiAwaDRtMiAwaDFtMSAwaDJtMSAwaDdtMSAwaDFtLTI5IDFoMW0xIDBoM20xIDBoMW0xIDBoMW0zIDBoMm01IDBoMW00IDBoMm0xIDBoMW0tMjggMWgxbTEgMGgzbTEgMGgxbTEgMGgybTIgMGgzbTMgMGgxbTEgMGgxbTIgMGgxbTQgMGgxbS0yOSAxaDFtNSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMSAwaDFtMyAwaDFtMSAwaDFtMSAwaDFtMiAwaDFtLTI4IDFoN20zIDBoMW0xIDBoNG0yIDBoMW0xIDBoMm0xIDBoMW0zIDBoMSIvPjwvc3ZnPgo=';
 function docQrHtml(lang){
-  const cap = lang === 'fr' ? 'Scannez-moi' : 'امسح الرمز';
+  const cap = lang === 'fr' ? 'Contactez-nous' : 'تواصل معنا';
   return `<div class="doc-qr" style="display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;">
     <img src="${DOC_QR_SRC}" alt="QR" style="width:2.1cm;height:2.1cm;display:block;image-rendering:pixelated;">
     <div style="font-size:9.5px;font-weight:700;color:var(--text-dim);white-space:nowrap;">${cap}</div>
@@ -4009,7 +4009,7 @@ function viewReceipt(id){
       return `<div style="margin-top:14px;">
         <div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${spec.label}</div>
         <table class="meas-print-table">
-          <thead><tr><th>#</th>${headCols}${measHasNote(tbl.type)?'<th>التفاصيل</th>':''}<th>العدد</th><th>النتيجة</th></tr></thead>
+          <thead><tr><th>N°</th>${headCols}${measHasNote(tbl.type)?'<th>التفاصيل</th>':''}<th>العدد</th><th>النتيجة</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>`;
@@ -4066,7 +4066,7 @@ function viewReceipt(id){
             <div><span>المدة: </span>${r.duration||'—'}</div>
           </div>
         </td></tr>
-        <tr><th class="row-no">#</th><th>العدد</th><th>النوع والتفاصيل</th><th>السعر</th><th>المبلغ</th></tr>
+        <tr><th class="row-no">N°</th><th>العدد</th><th>النوع والتفاصيل</th><th>السعر</th><th>المبلغ</th></tr>
       </tbody>
       <tbody>${itemsRows}</tbody>
     </table>
@@ -4826,7 +4826,7 @@ function viewInvoice(id){
               ${inv.delay ? `<div><span>مدة التسليم: </span>${escHtmlText(String(inv.delay))}</div>` : ''}
             </div>
           </td></tr>
-          <tr><th class="row-no">#</th><th>العدد</th><th>البيان</th><th>الوحدة</th><th>السعر</th><th>المجموع</th></tr>
+          <tr><th class="row-no">N°</th><th>العدد</th><th>البيان</th><th>الوحدة</th><th>السعر</th><th>المجموع</th></tr>
         </tbody>
         <tbody>${itemsRowsAr}</tbody>
       </table>
@@ -6301,7 +6301,7 @@ function renderMeasurementRecordInto(rec){
       <div style="margin-top:14px;">
         ${tblIndex>0 ? `<div style="font-weight:700; color:var(--brass-deep); margin-bottom:6px;">${spec.label}</div>` : ''}
         <table class="meas-print-table">
-          <thead>${headRow}<tr><th>#</th>${headCols}${measHasNote(tbl.type)?'<th>التفاصيل</th>':''}<th>العدد</th><th>النتيجة</th></tr></thead>
+          <thead>${headRow}<tr><th>N°</th>${headCols}${measHasNote(tbl.type)?'<th>التفاصيل</th>':''}<th>العدد</th><th>النتيجة</th></tr></thead>
           <tbody>${rowsHtml}</tbody>
         </table>
       </div>`;
@@ -6410,8 +6410,10 @@ function measurePrintLayout(ov){
         const b = d.querySelector('.modal-body'), hd = b && b.querySelector('.receipt-top');
         const h = b ? b.scrollHeight : 0, rows = b ? b.querySelectorAll('td.row-no').length : 0;
         let sheets = null;
-        if(h && printNeedsPages(h, rows)){ try{ sheets = buildPrintSheets(d); }catch(e){ console.error('print sheets', e); } }
-        resolve({h, headH: hd ? hd.offsetHeight : 0, rows, sheets});
+        const fixedT = b ? b.querySelector('table[data-rows-per-page]') : null;
+        const fixedNeed = !!fixedT && rows > (parseInt(fixedT.getAttribute('data-rows-per-page'), 10) || 1e9);
+        if(h && (fixedNeed || printNeedsPages(h, rows))){ try{ sheets = buildPrintSheets(d); }catch(e){ console.error('print sheets', e); } }
+        resolve({h, headH: hd ? hd.offsetHeight : 0, rows, sheets, fixedNeed});
       }catch(e){ resolve({h:0, headH:0}); }
       fr.remove();
     };
@@ -6440,7 +6442,7 @@ function buildPrintSheets(d){
     const a = no ? no.textContent.trim() : '', b = lb ? lb.textContent.trim() : ''; cont = /^#/.test(a) ? (b+' '+a).trim() : (a+' '+b).trim(); }
   const wrap = d.createElement('div'); wrap.className = 'print-sheets measuring'; ovc.appendChild(wrap);
   const sheets = [], tinfo = new Map();
-  let sheet = null, map = null, count = 0, last = null, pageAvail = 0;
+  let sheet = null, map = null, count = 0, last = null, pageAvail = 0, rowsOnSheet = 0;
   const hidden = el=> el.nodeType !== 1 || /^(SCRIPT|STYLE|TEMPLATE)$/.test(el.tagName) || cs(el).display === 'none';
   function newSheet(){
     sheet = d.createElement('div'); sheet.className = 'print-sheet';
@@ -6450,7 +6452,7 @@ function buildPrintSheets(d){
       const m = d.createElement('span'); m.className = 'print-cont-more'; m.textContent = ltr ? 'suite' : 'تابع';
       c.appendChild(a); c.appendChild(m); sheet.appendChild(c);
     }
-    wrap.appendChild(sheet); sheets.push(sheet); map = new Map(); count = 0; last = null;
+    wrap.appendChild(sheet); sheets.push(sheet); map = new Map(); count = 0; last = null; rowsOnSheet = 0;
   }
   const limit = ()=> sheet.getBoundingClientRect().bottom - parseFloat(cs(sheet).paddingBottom);
   const fits = ()=>{ const m = map.get(modal); return !m || m.getBoundingClientRect().bottom <= limit() + 0.5; };
@@ -6491,6 +6493,8 @@ function buildPrintSheets(d){
   function flowTable(tbl, path){
     const info = {colHead:null}; tinfo.set(tbl, info);
     const tpath = path.concat(tbl);
+    const maxRows = parseInt(tbl.getAttribute('data-rows-per-page'), 10) || 0;   // سجل المصاريف والدخل: عدد ثابت من السطور بكل صفحة
+    rowsOnSheet = 0;
     for(const sec of [...tbl.children]){
       if(!/^(THEAD|TBODY|TFOOT)$/.test(sec.tagName) || hidden(sec)) continue;
       const secPath = tpath.concat(sec);
@@ -6500,6 +6504,8 @@ function buildPrintSheets(d){
         const isCol = !isHead && tr.children.length > 0 && [...tr.children].every(x=>x.tagName === 'TH');
         const cl = tr.cloneNode(true); cl.__src = tr; cl.__kind = isHead ? 'head' : isCol ? 'col' : 'data';
         if(isCol){ info.colHead = tr; fixWidths(cl, tr); }
+        if(maxRows && !isCol && !isHead && rowsOnSheet >= maxRows){ newSheet(); addColHead(tbl, tpath); }
+        if(!isCol && !isHead) rowsOnSheet++;
         target(secPath).appendChild(cl);
         if(fits()){ if(!isCol) count++; continue; }
         if(count === 0){ count++; continue; }   // سطر أطول من الصفحة كلها: بيبقى مكانه
@@ -6507,7 +6513,7 @@ function buildPrintSheets(d){
         const tc = map.get(tbl);
         if(tc){ const rs = [...tc.querySelectorAll(':scope > * > tr')], lr = rs[rs.length-1]; if(lr && lr.__kind === 'col') drop(lr); }   // عناوين الأعمدة ما بتبقى لحالها بآخر الصفحة
         newSheet();
-        if(!isCol && !isHead) addColHead(tbl, tpath);
+        if(!isCol && !isHead){ addColHead(tbl, tpath); rowsOnSheet = 1; }
         target(secPath).appendChild(cl);
         if(!isCol) count++;
       }
@@ -6571,12 +6577,12 @@ async function fitPrintOverlayNow(ov){
   if(!body) return;
   const seq = (__fitSeq.get(ov)||0) + 1; __fitSeq.set(ov, seq);
   clearPrintSheets(ov);   // حتى ما تنطبع صفحات قديمة من ورقة غير هي
-  const {h, headH, rows, sheets} = await measurePrintLayout(ov);
+  const {h, headH, rows, sheets, fixedNeed} = await measurePrintLayout(ov);
   if(__fitSeq.get(ov) !== seq || !h) return;   // في قياس أحدث
   const avail = printAvailH();
   let scale = Math.min(1, avail / h);
   const MIN_HEAD = 0.8;
-  if(printNeedsPages(h, rows||0)){
+  if(fixedNeed || printNeedsPages(h, rows||0)){
     setPrintFit(ov, 0); ov.setAttribute('data-multipage', '1');
     if(sheets){ ov.insertAdjacentHTML('beforeend', sheets); ov.setAttribute('data-sheets', '1'); }
     return;
@@ -7330,18 +7336,24 @@ document.getElementById('btnPrintPaymentHistory').addEventListener('click', ()=>
   showLedger('سجل الدفعات', rows);
 });
 
-function sortLedgerRows(rows){
-  return rows.sort((a,b)=>{
-    const da = a.date ? new Date(a.date).getTime() : 0;
-    const db = b.date ? new Date(b.date).getTime() : 0;
-    return da - db;
-  });
+// الترتيب من القديم للجديد. التاريخ بيتقبل 2026-01-20 أو 20.01.2026 أو 20/01/2026، ونفس اليوم بيبقى بترتيب التسجيل
+function ledgerDateKey(v){
+  const t = String(v||'').trim(); let m;
+  if((m = t.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/))) return (+m[1])*10000 + (+m[2])*100 + (+m[3]);
+  if((m = t.match(/^(\d{1,2})[-./](\d{1,2})[-./](\d{4})/))) return (+m[3])*10000 + (+m[2])*100 + (+m[1]);
+  const d = new Date(t); return isNaN(d) ? 0 : d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate();
 }
-function showLedger(title, rows, oneLine, amountRight){
+function sortLedgerRows(rows){
+  rows.forEach((r,i)=>{ r.__i = i; });
+  rows.sort((a,b)=> (ledgerDateKey(a.date) - ledgerDateKey(b.date)) || (a.__i - b.__i));
+  rows.forEach(r=>{ delete r.__i; });
+  return rows;
+}
+function showLedger(title, rows, oneLine, amountRight, rowsPerPage){
   document.getElementById('ledgerViewTitle').textContent = title;
   const totalAmount = rows.reduce((s,r)=>s+r.amount,0);
   let html = `
-    <table${oneLine ? ' style="table-layout:fixed; width:100%;"' : ''}>
+    <table${oneLine ? ' style="table-layout:fixed; width:100%;"' : ''}${rowsPerPage ? ` data-rows-per-page="${rowsPerPage}"` : ''}>
       ${oneLine ? (amountRight ? '<colgroup><col style="width:60px"><col style="width:150px"><col style="width:120px"><col></colgroup>' : '<colgroup><col style="width:60px"><col style="width:120px"><col><col style="width:150px"></colgroup>') : ''}
       <thead>
         <tr class="print-head-row"><td colspan="4">
@@ -7356,8 +7368,8 @@ function showLedger(title, rows, oneLine, amountRight){
           </div>
         </td></tr>
         ${amountRight
-          ? '<tr><th style="width:60px;">#</th><th style="width:130px;">المبلغ</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th></tr>'
-          : '<tr><th style="width:60px;">#</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr>'}
+          ? '<tr><th style="width:60px;">N°</th><th style="width:130px;">المبلغ</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th></tr>'
+          : '<tr><th style="width:60px;">N°</th><th style="width:120px;">التاريخ</th><th>التفاصيل</th><th style="width:130px;">المبلغ</th></tr>'}
       </thead>
       <tbody>
         ${rows.map((r,i)=>{
@@ -7391,7 +7403,7 @@ document.getElementById('btnPrintIncomeLedger').addEventListener('click', ()=>{
   });
   sortLedgerRows(rows);
   if(rows.length === 0){ toast('لا يوجد دخل مسجّل بعد'); return; }
-  showLedger('سجل الدخل', rows, true, true);   // الاسم والتفاصيل بسطر واحد، والمبلغ جهة اليمين
+  showLedger('سجل الدخل', rows, true, true, 22);   // الاسم والتفاصيل بسطر واحد، والمبلغ جهة اليمين
 });
 
 document.getElementById('btnPrintExpenseLedger').addEventListener('click', ()=>{
@@ -7402,7 +7414,7 @@ document.getElementById('btnPrintExpenseLedger').addEventListener('click', ()=>{
   }));
   sortLedgerRows(rows);
   if(rows.length === 0){ toast('لا يوجد مصاريف مسجّلة بعد'); return; }
-  showLedger('سجل المصروف', rows, false, true);   // المبلغ جهة اليمين
+  showLedger('سجل المصروف', rows, true, true, 22);   // المبلغ جهة اليمين
 });
 
 document.getElementById('btnPrintLedger').addEventListener('click', ()=>window.print());
@@ -7918,7 +7930,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
     h.innerHTML=`<div dir="rtl" style="font-family:Cairo,Tahoma,Arial,sans-serif;color:#3B2414;padding:28px;background:#fff">
       <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #9A6A3A;padding-bottom:8px;margin-bottom:14px"><div><div style="font-size:24px;font-weight:800">طلبية ${ordNo(j)}</div></div><div style="font-size:14px;text-align:left">${fmtD(j.at)}${j.due?'<br>التسليم: '+fmtD(new Date(j.due).getTime()):''}</div></div>
       <div style="font-size:16px;margin-bottom:14px"><b>الزبون:</b> ${esc(j.cust.name||'-')}</div>
-      <table style="width:100%;border-collapse:collapse;font-size:16px">${'<tr>'+['#','العدد','النوع والتفاصيل'].map(t=>`<th style="border:1px solid #CDB894;padding:8px;background:#F5ECDD">${t}</th>`).join('')+'</tr>'}${rows.replace(/<td/g,'<td style="border:1px solid #CDB894;padding:8px;text-align:center"').replace(/text-align:center" style="text-align:right"/g,'text-align:right"')}</table>
+      <table style="width:100%;border-collapse:collapse;font-size:16px">${'<tr>'+['N°','العدد','النوع والتفاصيل'].map(t=>`<th style="border:1px solid #CDB894;padding:8px;background:#F5ECDD">${t}</th>`).join('')+'</tr>'}${rows.replace(/<td/g,'<td style="border:1px solid #CDB894;padding:8px;text-align:center"').replace(/text-align:center" style="text-align:right"/g,'text-align:right"')}</table>
       ${j.note?`<div style="margin-top:12px;font-size:15px;border:1px dashed #CDB894;padding:8px;border-radius:6px"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}
       ${img?`<div style="display:flex;gap:14px;align-items:center;margin-top:14px">${st.length?`<table style="flex:1 1 44%;border-collapse:collapse;font-size:16px">${st.map(r=>`<tr><td style="padding:5px 6px;border-bottom:1px solid #eee4d3;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="padding:5px 6px;border-bottom:1px solid #eee4d3;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table>`:''}<img src="${img}" style="max-width:${st.length?'54%':'100%'};max-height:520px;border:1px solid #E6D6BC;margin:0 auto"></div>`:''}${secHtml(sec,'60%')}${pp.length?`<div style="margin-top:14px">${pp.map((p,i)=>ppSrc[i]?`<div style="display:flex;gap:14px;align-items:flex-start;border:1px solid #E6D6BC;border-radius:8px;padding:8px;margin-bottom:10px"><img src="${ppSrc[i]}" style="max-width:378px;max-height:378px;object-fit:contain">${p.caption?`<div style="flex:1;white-space:pre-wrap;font-size:16px;line-height:1.6">${esc(p.caption)}</div>`:''}</div>`:'').join('')}</div>`:''}</div>`;
     document.body.appendChild(hb);
@@ -7960,7 +7972,7 @@ window.__stIn=st=>(Array.isArray(st)?st:[]).map(r=>Array.isArray(r)?r:[r&&r.k,r&
       .sig{margin-top:30px;display:flex;justify-content:space-between;font-size:13px}.item-draws{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.item-draw{text-align:center;font-size:11px}.item-draw svg{max-width:160px;height:auto}.prod-photos{margin-top:12px;display:flex;flex-direction:column;gap:10px}.prod-photo-block{display:flex;gap:14px;align-items:flex-start;border:1px solid #E6D6BC;border-radius:8px;padding:8px;break-inside:avoid;page-break-inside:avoid}.prod-photo-block img{max-width:100mm;max-height:100mm;width:auto;height:auto;object-fit:contain;margin:0;border:none}.prod-photo-block .cap{flex:1;white-space:pre-wrap;font-size:15px;line-height:1.6}@page{size:A4 portrait;margin:10mm 10mm 14mm;@bottom-center{content:'صفحة ' counter(page) ' من ' counter(pages);font-size:11px;color:#666}}@media print{body{background:#fff}.pg{margin:0;box-shadow:none;padding:0;width:auto;min-height:0}.pop-bar{display:none!important}}</style></head><body>${window.popBar()}<div class="pg"><div class="pgi">
       <div class="hd"><div><h1>طلبية ${ordNo(j)}</h1></div><div style="font-size:13px;text-align:left">${fmtD(j.at)}<br>الحالة: ${esc(j.status)}${j.due?'<br>التسليم المطلوب: '+fmtD(new Date(j.due).getTime()):''}</div></div>
       <div class="info"><div><b>الزبون:</b> ${esc(j.cust.name||'-')}</div></div>
-      <table><thead><tr><th style="width:36px">#</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
+      <table><thead><tr><th style="width:36px">N°</th><th style="width:70px">العدد</th><th>النوع والتفاصيل</th></tr></thead><tbody>${rows||'<tr><td colspan="3">-</td></tr>'}</tbody></table>
       ${j.note?`<div class="note"><b>ملاحظة:</b> ${esc(j.note)}</div>`:''}${img?(j.draw&&Array.isArray(j.draw.stats)&&j.draw.stats.length?`<div class="blk" style="display:flex;gap:14px;align-items:center;direction:rtl;margin-top:14px"><table style="flex:1 1 46%;width:48%;font-size:15px">${__stIn(j.draw.stats).map(r=>`<tr><td style="text-align:right;color:#7a5a3a;white-space:nowrap">${esc(r[0])}</td><td style="text-align:right;font-weight:700">${esc(r[1])}</td></tr>`).join('')}</table><img src="${img}" style="max-width:56%;margin:0"></div>`:`<div class="blk"><img src="${img}"></div>`):''}
       ${secHtml(sec,'55%')}
       ${prodPhotosHtml(pp,ppSrc)}
@@ -8257,7 +8269,7 @@ window.printBlankMeasSheet=function(type){const ml=type==='ml';
     <div class="hd"><div><h1>ورقة قياس — ${ml?'متر طول (م.ط)':'متر مربع (م²)'}</h1><div class="co">${name.replace(/[<>&]/g,'')}</div></div><div style="font-size:12.5px;font-weight:700">ورقة رقم: ........</div></div>
     <div class="info"><div>الزبون:<span></span></div><div>الهاتف:<span></span></div><div>العنوان:<span></span></div><div>التاريخ:<span></span></div></div>
     <table><colgroup><col style="width:9mm"><col><col style="width:${ml?30:24}mm">${ml?'':'<col style="width:24mm">'}<col style="width:17mm"><col style="width:27mm"></colgroup>
-      <thead><tr><th>#</th><th>المكان / البيان</th><th>الطول (سم)</th>${ml?'':'<th>العرض (سم)</th>'}<th>العدد</th><th>النتيجة (${ml?'م.ط':'م²'})</th></tr></thead>
+      <thead><tr><th>N°</th><th>المكان / البيان</th><th>الطول (سم)</th>${ml?'':'<th>العرض (سم)</th>'}<th>العدد</th><th>النتيجة (${ml?'م.ط':'م²'})</th></tr></thead>
       <tbody>${rows}</tbody>
       <tfoot><tr><th colspan="${ml?4:5}" style="text-align:left;padding-left:8px">المجموع (${ml?'م.ط':'م²'})</th><td></td></tr></tfoot></table>
     <div class="ft"><div>القائس:<span></span></div><div>ملاحظات:<span></span></div></div>

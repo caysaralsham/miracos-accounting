@@ -1438,3 +1438,33 @@ test('إزالة الرسمة من الوصل بتشيلها من الطلبية
   expect(r.removed).toBe(null);
   expect(r.kept).toBe('d1');
 });
+
+test('سجل المصروف والدخل: 22 سطر بكل صفحة، من القديم للجديد، وعمود N°، وتحت الباركود «تواصل معنا»', async ({ page }) => {
+  await page.evaluate(() => {
+    expenses.length = 0;
+    for (let i = 50; i >= 1; i--) {   // مدخلة من الجديد للقديم وبصيغ تاريخ مختلفة
+      const dd = String(((i - 1) % 28) + 1).padStart(2, '0'), mm = String(Math.ceil(i / 28)).padStart(2, '0');
+      expenses.push({ id: 'e' + i, date: i % 2 ? `2026-${mm}-${dd}` : `${dd}.${mm}.2026`, desc: 'مصروف ' + i, category: '', amount: 100 * i });
+    }
+    document.getElementById('btnPrintExpenseLedger').click();
+  });
+  await page.waitForTimeout(200);
+  const r = await page.evaluate(async () => {
+    const o = document.getElementById('ledgerViewOverlay'); await o.__fitReady; await o.__fitBusy;
+    const sheets = [...o.querySelectorAll(':scope > .print-sheets > .print-sheet')];
+    const descs = [...o.querySelectorAll('#ledgerPrintArea tbody tr')].map(t => t.children[3].textContent);
+    return {
+      rows: sheets.map(s => s.querySelectorAll('td.row-no').length),
+      cols: sheets.map(s => [...s.querySelectorAll('th')].map(t => t.textContent).join('|')),
+      first: descs[0], last: descs[descs.length - 1],
+      foot: sheets.length ? sheets[sheets.length - 1].querySelector('.print-sheet-foot').textContent : '',
+      qr: docQrHtml('ar').includes('تواصل معنا') && docQrHtml('fr').includes('Contactez-nous'),
+    };
+  });
+  expect(r.rows).toEqual([22, 22, 6]);
+  expect(r.cols.every(c => c.startsWith('N°'))).toBe(true);
+  expect(r.first).toBe('مصروف 1');
+  expect(r.last).toBe('مصروف 50');
+  expect(r.foot).toBe('الصفحة الأخيرة 3 من 3');
+  expect(r.qr).toBe(true);
+});
